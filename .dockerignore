@@ -4,3 +4,4 @@ server-data/secrets.cfg
 server-data/cache/
 *.bat
 README.md
+server-data/.replxx_history
