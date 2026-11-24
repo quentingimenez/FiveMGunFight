@@ -90,10 +90,13 @@ if [ "$TXADMIN" = "true" ]; then
   #
   # IMPORTANT : dans ce mode il ne faut AUCUN argument (+exec, etc.) après
   # run.sh, sinon txAdmin plante (SIGSEGV) au démarrage.
-  echo "txAdmin          : activé -> http://localhost:40120"
+  echo "txAdmin          : activé -> http://127.0.0.1:40120"
   echo "  Premier lancement : choisis un compte admin dans le navigateur, puis"
   echo "  indique $DATA comme dossier de données du serveur."
-  exec "$SERVER/run.sh" +set monitorMode true
+  # Aucun argument après run.sh : c'est la condition pour que FXServer démarre
+  # en mode moniteur et lance txAdmin (un "+exec" ou un "+set monitorMode"
+  # explicite fait planter le serveur).
+  exec "$SERVER/run.sh"
 fi
 
 echo "txAdmin          : désactivé (TXADMIN=false)"
