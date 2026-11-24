@@ -24,6 +24,7 @@ DB_HOST="$(strip_cr "${DB_HOST:-mariadb}")"
 DB_NAME="$(strip_cr "${MARIADB_DATABASE:-gunfight}")"
 DB_USER="$(strip_cr "${MARIADB_USER:-gunfight}")"
 DB_PASS="$(strip_cr "${MARIADB_PASSWORD:-}")"
+TXADMIN="$(strip_cr "${TXADMIN:-true}")"
 
 if [ -z "$LICENSE_KEY" ] || [ "$LICENSE_KEY" = "change_moi" ]; then
   echo "=================================================================="
@@ -56,7 +57,6 @@ esac
   echo "sv_licenseKey \"$LICENSE_KEY\""
   echo "sv_maxclients $MAX_PLAYERS"
   echo "sv_hostname \"$SERVER_NAME\""
-  echo "sets sv_projectName \"$SERVER_NAME\""
   echo "set mysql_connection_string \"mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_NAME?charset=utf8mb4\""
   if [ -n "$STEAM_WEB_API_KEY" ]; then
     echo "set steam_webApiKey \"$STEAM_WEB_API_KEY\""
@@ -78,10 +78,23 @@ esac
 
 echo "secrets.cfg généré (joueurs max : $MAX_PLAYERS)"
 echo "Version FXServer : $(cat "$SERVER/FX_VERSION.txt" 2>/dev/null)"
-echo "Panneau txAdmin  : http://localhost:40120 (code PIN dans les lignes ci-dessous)"
 echo "Connexion en jeu : touche F8 puis  connect localhost"
 
 # Le répertoire courant devient le "data dir" de FXServer : c'est lui qui
 # contient server.cfg, resources/ et secrets.cfg.
 cd "$DATA"
+
+if [ "$TXADMIN" = "true" ]; then
+  # Mode moniteur : txAdmin démarre en même temps que FXServer, sert le panneau
+  # web sur le port 40120 et lance lui-même le serveur de jeu.
+  #
+  # IMPORTANT : dans ce mode il ne faut AUCUN argument (+exec, etc.) après
+  # run.sh, sinon txAdmin plante (SIGSEGV) au démarrage.
+  echo "txAdmin          : activé -> http://localhost:40120"
+  echo "  Premier lancement : choisis un compte admin dans le navigateur, puis"
+  echo "  indique $DATA comme dossier de données du serveur."
+  exec "$SERVER/run.sh" +set monitorMode true
+fi
+
+echo "txAdmin          : désactivé (TXADMIN=false)"
 exec "$SERVER/run.sh" +exec server.cfg

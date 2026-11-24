@@ -48,7 +48,7 @@ if errorlevel 1 (
 echo.
 echo === Demarre ===
 echo Serveur      : dans FiveM, touche F8 puis tape  connect localhost
-echo Panneau web  : http://localhost:40120  (code PIN affiche dans les journaux ci-dessous)
+echo Panneau web  : http://127.0.0.1:40120  (code PIN affiche ci-dessous, 1er reglage a faire dans le navigateur)
 echo Journaux     : ferme cette fenetre quand tu veux, le serveur continue de tourner
 echo Etat du serveur a tout moment : double-clic sur status.bat
 echo.

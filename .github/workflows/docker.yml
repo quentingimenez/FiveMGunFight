@@ -85,6 +85,7 @@ jobs:
           docker pull "$IMAGE_LC:ci-${{ github.sha }}"
           docker run -d --name smoke \
             -e LICENSE_KEY="$CFX_LICENSE_KEY" \
+            -e TXADMIN=false \
             -e SERVER_NAME="Gunfight CI" \
             -e MAX_PLAYERS=48 \
             -e MARIADB_DATABASE=gunfight \

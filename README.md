@@ -148,14 +148,32 @@ docker compose exec mariadb mariadb-dump -u root -p gunfight > sauvegarde.sql
 
 ## 8. Panneau web txAdmin
 
-txAdmin est intégré à FXServer : **il démarre automatiquement** avec le serveur, il n'y a
-rien à activer. Ouvre http://localhost:40120, entre le code PIN affiché dans les journaux,
-connecte ton compte Cfx.re, puis choisis **« Existing Server Data »** avec le chemin
-`/opt/fivem/server-data` et le fichier `server.cfg`.
+txAdmin est **le lanceur** du serveur : au démarrage, FXServer se met en « mode moniteur »,
+txAdmin ouvre son panneau web sur le port 40120, puis lance lui-même le serveur de jeu. C'est
+le fonctionnement normal de FiveM (le même que sous Windows), il n'y a rien à installer.
 
-Ses comptes administrateurs et sa configuration sont conservés dans le volume `txdata` :
-un `docker compose down` ne les efface pas. Pour repartir de zéro, utiliser
-`docker compose down -v` (**attention : efface aussi la base de données**).
+1. Ouvre **http://127.0.0.1:40120** (`localhost` peut viser l'IPv6 sur Windows et échouer).
+2. Le **code PIN** est affiché à chaque démarrage dans les journaux :
+   `docker compose logs fxserver | Select-String "PIN"`.
+3. Crée ton compte administrateur, puis, à l'étape « Existing Server Data », choisis le
+   dossier **`/opt/fivem/server-data`** (c'est le volume de ce dépôt, avec ton `server.cfg`).
+4. Enregistre : le serveur de jeu démarre juste après et apparaît dans `docker compose logs -f`.
+
+Ce premier réglage n'est à faire qu'une fois : ensuite txAdmin redémarre le serveur tout seul.
+
+Particularités du mode moniteur :
+
+- le conteneur lance `run.sh +set monitorMode true`, **sans** `+exec server.cfg` : c'est txAdmin
+  qui transmet les arguments de lancement (`+exec server.cfg`). Ajouter des arguments au
+  conteneur fait planter txAdmin ;
+- pour revenir à un démarrage direct (sans txAdmin, utile pour un test rapide), mets
+  `TXADMIN=false` dans `.env` : le conteneur lance alors `run.sh +exec server.cfg` ;
+- les commandes tapées dans `console.bat` vont au **mode moniteur**, pas au serveur de jeu :
+  utilise la console de txAdmin pour les commandes de jeu.
+
+Ses comptes administrateurs et sa configuration sont conservés dans le volume `txdata`
+(`/opt/fivem/txData`) : un `docker compose down` ne les efface pas. Pour repartir de zéro,
+utiliser `docker compose down -v` (**attention : efface aussi la base de données**).
 
 txAdmin donne aussi un accès à distance (HTTP) aux personnes autorisées : garde des mots de
 passe forts et n'ouvre le port 40120 que si tu en as besoin.
@@ -167,7 +185,7 @@ Le dépôt contient un workflow (`.github/workflows/docker.yml`) qui, à chaque 
 
 1. construit l'image Docker ;
 2. démarre la pile complète avec une clé de licence fournie par le secret
-   **`CFX_LICENSE_KEY`** ;
+   **`CFX_LICENSE_KEY`** (avec `TXADMIN=false`, pour tester le serveur de jeu directement) ;
 3. vérifie que les 11 ressources sont trouvées (`Found 11 resources`) et que les quatre
    ressources de jeu démarrent ;
 4. envoie l'image sur GitHub Container Registry (`ghcr.io/<compte>/fivem-gunfight`).

@@ -9,6 +9,15 @@ services:
     container_name: gunfight-fxserver
     restart: unless-stopped
     env_file: .env
+    environment:
+      # true (défaut) : FXServer démarre en "mode moniteur", c'est txAdmin qui
+      # lance le serveur de jeu et qui fournit le panneau web (port 40120).
+      # false : FXServer démarre directement avec server.cfg, sans txAdmin.
+      TXADMIN: ${TXADMIN:-true}
+      # Où txAdmin range ses données (comptes, config) : volume persistant
+      TXHOST_DATA_PATH: /opt/fivem/txData
+      TXHOST_TXA_PORT: "40120"
+      TXHOST_INTERFACE: 0.0.0.0
     init: true
     stdin_open: true   # permet de taper des commandes avec console.bat
     tty: true
