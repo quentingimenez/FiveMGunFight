@@ -1,0 +1,158 @@
+:root {
+    --bg: rgba(12, 14, 20, 0.78);
+    --bg-strong: rgba(12, 14, 20, 0.92);
+    --text: #f1f4f9;
+    --muted: #9aa4b6;
+    --red: #ff5a5f;
+    --blue: #4ea8ff;
+    --radius: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: transparent;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    color: var(--text);
+    user-select: none;
+}
+
+.hidden { display: none !important; }
+
+/* ------------------------------------------------------------------ HUD */
+#hud {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+#hud .center {
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 8px 22px;
+    text-align: center;
+    min-width: 260px;
+}
+
+#hud .title { font-size: 14px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+#hud .timer { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.15; }
+#hud .timer.low { color: var(--red); }
+#hud .subtitle { font-size: 12px; color: var(--muted); }
+#hud .badge {
+    display: inline-block;
+    margin-top: 5px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #0c0e14;
+}
+#hud .badge:empty { display: none; }
+
+#hud .side {
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    min-width: 130px;
+    text-align: center;
+    border-top: 3px solid var(--muted);
+}
+#hud .side:empty, #hud .side.hidden { display: none; }
+#hud .side-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+#hud .side-value { font-size: 30px; font-weight: 800; line-height: 1.15; }
+#hud .side-sub { font-size: 12px; color: var(--muted); }
+
+/* ------------------------------------------------------------------ Kill feed */
+#killfeed {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.kf {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    animation: kfIn .2s ease-out;
+    transition: opacity .4s;
+}
+.kf.mine { border: 1px solid rgba(255, 255, 255, .55); }
+.kf .weapon { color: var(--muted); font-weight: 400; font-size: 12px; }
+.kf.fade { opacity: 0; }
+
+@keyframes kfIn {
+    from { transform: translateX(30px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+
+/* ------------------------------------------------------------------ Annonces */
+#announce {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    animation: annIn .25s ease-out;
+}
+#announce .a-title {
+    font-size: 46px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 0 3px 14px rgba(0, 0, 0, .8);
+}
+#announce .a-sub {
+    font-size: 20px;
+    margin-top: 4px;
+    color: #dfe5ef;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, .8);
+}
+
+@keyframes annIn {
+    from { transform: translate(-50%, -50%) scale(.9); opacity: 0; }
+    to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* ------------------------------------------------------------------ Classement */
+#scoreboard {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-strong);
+    border-radius: 10px;
+    padding: 16px 20px;
+    min-width: 560px;
+    max-height: 80vh;
+    overflow: hidden;
+}
+#scoreboard .sb-title { font-size: 18px; font-weight: 800; margin-bottom: 10px; text-transform: uppercase; }
+#scoreboard table { width: 100%; border-collapse: collapse; font-size: 14px; }
+#scoreboard th {
+    text-align: left;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, .12);
+}
+#scoreboard td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, .05); }
+#scoreboard td:first-child { border-left: 3px solid transparent; }
+#scoreboard .sb-empty { color: var(--muted); font-size: 13px; margin-top: 8px; }

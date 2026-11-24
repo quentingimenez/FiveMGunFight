@@ -1,0 +1,67 @@
+# =============================================================================
+#  Lancement : docker compose up -d --build   (ou double-clic sur start.bat)
+#  Arrêt     : docker compose down            (ou double-clic sur stop.bat)
+#  État     : double-clic sur status.bat
+# =============================================================================
+services:
+  fxserver:
+    build: .
+    container_name: gunfight-fxserver
+    restart: unless-stopped
+    env_file: .env
+    init: true
+    stdin_open: true   # permet de taper des commandes avec console.bat
+    tty: true
+    ports:
+      - "30120:30120/tcp"
+      - "30120:30120/udp"
+      - "40120:40120/tcp"
+    volumes:
+      # Tes scripts : modifie-les sur ton PC, ils sont pris en compte directement
+      - ./server-data:/opt/fivem/server-data
+      # Données de txAdmin (comptes admin, configuration) conservées entre les redémarrages
+      - txdata:/opt/fivem/txData
+    depends_on:
+      mariadb:
+        # n'attend pas seulement le conteneur : attend que la base accepte les connexions
+        condition: service_healthy
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mariadb:
+    image: mariadb:11.4
+    container_name: gunfight-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+      # met à jour les tables système quand l'image MariaDB est mise à jour
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - dbdata:/var/lib/mysql
+      # réglages InnoDB / utf8mb4 / connexions (voir docker/mariadb.cnf)
+      - ./docker/mariadb.cnf:/etc/mysql/conf.d/zz-gunfight.cnf:ro
+      # scripts SQL exécutés uniquement au tout premier démarrage (volume vide)
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Pas de port exposé : la base n'est accessible que par le serveur FiveM
+
+volumes:
+  txdata:
+  dbdata:

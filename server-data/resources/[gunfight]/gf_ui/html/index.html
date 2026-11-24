@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Gunfight UI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- HUD en haut au centre -->
+    <div id="hud" class="hidden">
+        <div class="side left">
+            <div class="side-label"></div>
+            <div class="side-value"></div>
+            <div class="side-sub"></div>
+        </div>
+        <div class="center">
+            <div class="title"></div>
+            <div class="timer"></div>
+            <div class="subtitle"></div>
+            <div class="badge"></div>
+        </div>
+        <div class="side right">
+            <div class="side-label"></div>
+            <div class="side-value"></div>
+            <div class="side-sub"></div>
+        </div>
+    </div>
+
+    <!-- Kill feed en haut à droite -->
+    <div id="killfeed"></div>
+
+    <!-- Annonces au centre de l'écran -->
+    <div id="announce" class="hidden">
+        <div class="a-title"></div>
+        <div class="a-sub"></div>
+    </div>
+
+    <!-- Classement (touche Z maintenue) -->
+    <div id="scoreboard" class="hidden">
+        <div class="sb-title"></div>
+        <table>
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+        <div class="sb-empty">Rejoins un mode avec /attack ou /redzone</div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# =============================================================================
+#  Réglages MariaDB du serveur Gunfight
+#  Monté en lecture seule dans /etc/mysql/conf.d/ par docker-compose.yml.
+#  Après une modification : docker compose restart mariadb
+# =============================================================================
+[mysqld]
+# Encodage complet (accents, emojis) pour les pseudos et les textes du jeu
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+# Cache InnoDB : le plus large possible sans dépasser la RAM du conteneur.
+# 1G couvre très largement les statistiques de la phase 2. Sur un VPS dédié
+# (32 Go), monter à 2G ou 4G.
+innodb_buffer_pool_size = 1G
+innodb_log_buffer_size = 64M
+
+# Journal des transactions vidé une fois par seconde au lieu de chaque commit :
+# gain net en écriture. Contrepartie : une coupure brutale peut perdre la
+# dernière seconde d'écritures. Acceptable pour des statistiques de match ;
+# remettre à 1 si la base contient un jour des comptes ou de l'économie.
+innodb_flush_log_at_trx_commit = 2
+
+# Connexions simultanées (pool oxmysql + outils d'administration)
+max_connections = 200
+
+# Requêtes lentes : utiles pour diagnostiquer la phase 2
+slow_query_log = 1
+long_query_time = 1
