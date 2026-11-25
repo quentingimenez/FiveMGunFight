@@ -286,12 +286,12 @@ sur les tags `v*`, qui publient l'image :
 **Image Docker** construit l'image et lance le job **`Vérifier le démarrage des
 ressources`** :
 
-- sur une **pull request**, l'image est construite localement (sans envoi au registre)
-  puis démarrée avec `TXADMIN=false` ;
+- sur une **pull request**, lorsque le secret est disponible, l'image est construite
+  localement (sans envoi au registre) puis démarrée avec `TXADMIN=false` ;
 - sur `main` et les tags, l'image est publiée sur GitHub Container Registry
   (`ghcr.io/<compte>/fivemgunfight`), puis le job télécharge et démarre cette image.
 
-Le test vérifie que toutes les ressources attendues sont trouvées et que les cinq
+Le test vérifie que le serveur scanne bien ses ressources et que les cinq
 ressources de jeu `gf_*` démarrent réellement. Il utilise le secret dédié
 **`CFX_LICENSE_KEY`** (une clé de test, distincte de celle du serveur de production) :
 
@@ -299,9 +299,12 @@ ressources de jeu `gf_*` démarrent réellement. Il utilise le secret dédié
 gh secret set CFX_LICENSE_KEY
 ```
 
-Sans ce secret (PR d'un fork ou de Dependabot, secret non configuré), le job affiche une
-note et saute les étapes de démarrage : il reste vert, et les autres vérifications
-continuent de bloquer la fusion.
+Le secret doit être configuré **au niveau du dépôt** pour être visible sur les
+pull requests.
+
+Sans ce secret (PR d'un fork ou de Dependabot, secret non configuré), le job
+affiche une note et saute les étapes de démarrage : il reste vert, et les autres
+vérifications continuent de bloquer la fusion.
 
 Les actions GitHub sont **épinglées par un SHA de commit** et les images Docker par un
 **digest** : une mise à jour ne peut pas arriver par surprise. `.github/dependabot.yml`

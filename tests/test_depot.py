@@ -517,6 +517,15 @@ class ChaineCI(unittest.TestCase):
                     "le smoke est encore exclu des pull requests",
                 )
 
+    def test_smoke_garde_l_entree_standard_ouverte(self) -> None:
+        texte = lire(self.WORKFLOWS / "docker.yml")
+        self.assertRegex(
+            texte,
+            r"(?s)docker run -d --name smoke \\\n\s+--init \\\n\s+-i \\",
+            "FXServer quitte quand son entrée standard est fermée : "
+            "le conteneur smoke doit être lancé avec -i",
+        )
+
 
 class DepotGit(unittest.TestCase):
     """Aucun fichier secret ne doit être suivi par Git."""

@@ -136,8 +136,12 @@ jobs:
         if: env.disponible == 'true'
         run: |
           set -euo pipefail
+          # -i : FXServer interprète la fermeture de son entrée standard comme un
+          # Ctrl-C et quitte aussitôt. Sans lui, un conteneur détaché démarre
+          # puis s'arrête avant même d'avoir répondu.
           docker run -d --name smoke \
             --init \
+            -i \
             --memory 4g \
             -p 30120:30120 \
             -e LICENSE_KEY="$CFX_LICENSE_KEY" \
@@ -186,11 +190,11 @@ jobs:
             echo "::error::La clé de licence du secret CFX_LICENSE_KEY a été refusée par Cfx.re."
             exit 1
           fi
-          # Le nombre de ressources dépend du dépôt : le calculer évite qu'un
-          # ajout de ressource fasse échouer ce test avec un 12 codé en dur.
-          attendu="$(find server-data/resources -name fxmanifest.lua | wc -l | tr -d ' ')"
-          if ! grep -q "Found ${attendu} resources" smoke.log; then
-            echo "::error::Le serveur n'a pas trouvé les ${attendu} ressources attendues."
+          # FXServer ajoute ses ressources système (chat, etc.) au total affiché :
+          # ce total n'est pas le nombre de fxmanifest du dépôt. On vérifie donc
+          # que le scan a eu lieu, puis que chaque ressource gunfight démarre.
+          if ! grep -qE "Found [0-9]+ resources" smoke.log; then
+            echo "::error::Le serveur n'a pas scanné ses ressources."
             tail -n 200 smoke.log
             exit 1
           fi
@@ -201,7 +205,7 @@ jobs:
               exit 1
             fi
           done
-          echo "Les ${attendu} ressources ont été trouvées et les ressources gunfight ont démarré."
+          echo "Ressources scannées et ressources gunfight démarrées."
 
       # Même si une étape précédente a échoué : le conteneur ne doit pas rester
       # sur le runner, et son nom doit être libre au prochain run.

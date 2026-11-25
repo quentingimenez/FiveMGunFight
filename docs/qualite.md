@@ -16,10 +16,15 @@ se contente pas de « lancer des tests » : les trois checks sont déclarés com
 | `.github/workflows/docker.yml` | `Vérifier le démarrage des ressources` | chaque pull request, chaque envoi sur `main`, tags `v*` | 10 à 20 min |
 
 Le job de démarrage réel (`smoke`) tourne désormais **aussi sur les pull
-requests** : il construit l'image localement, démarre FXServer avec une vraie
-clé de licence et vérifie que les ressources `gf_*` démarrent. Sur `main` et les
-tags, il télécharge l'image publiée sur GHCR à la place. C'est le seul contrôle
-qui exécute réellement le serveur ; il bloque donc la fusion comme les autres.
+requests**, lorsque le secret y est disponible : il construit l'image
+localement, démarre FXServer avec une vraie clé de licence et vérifie que les
+ressources `gf_*` démarrent. Sur `main` et les tags, il télécharge l'image
+publiée sur GHCR à la place. C'est le seul contrôle qui exécute réellement le
+serveur ; il bloque donc la fusion comme les autres.
+
+Le secret doit être un secret **de dépôt** pour être visible sur les pull
+requests. Sans secret (PR d'un fork ou de Dependabot, secret non configuré), le
+job affiche une note et saute le démarrage, sans échec.
 
 Il est limité par une `concurrency` (`smoke-licence`, sans annulation) : la clé
 de licence CI est partagée, deux smoke tests ne doivent pas tourner en même
