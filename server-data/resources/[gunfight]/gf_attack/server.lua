@@ -536,15 +536,23 @@ local function reply(src, msg)
 end
 
 -- /startround : force le lancement (fonctionne même seul, pour tester)
+-- Lance une manche tout de suite. Si src est donné et que ce joueur n'est pas
+-- dans le mode, il y entre d'abord (partie de test en solo).
+local function startTestRound(src)
+    if src and src > 0 and not S.team[src] then core:SetMode(src, 'attack') end
+    if next(S.team) == nil then return false, 'Aucun joueur dans le mode Attaque.' end
+    if S.phase == 'waiting' or S.phase == 'ended' then
+        if S.phase == 'ended' and S.matchOver then nextRound() else startSelect() end
+        return true
+    end
+    return false, 'Une manche est déjà en cours.'
+end
+exports('StartTestRound', startTestRound)
+
 RegisterCommand('startround', function(src)
     if not core:IsAdmin(src) then return end
-    if next(S.team) == nil then return reply(src, 'Aucun joueur dans le mode Attaque.') end
-    if S.phase == 'waiting' or S.phase == 'ended' then
-        if S.phase == 'ended' and S.matchOver then nextRound() return end
-        startSelect()
-    else
-        reply(src, 'Une manche est déjà en cours.')
-    end
+    local ok, err = startTestRound(src)
+    if not ok then reply(src, err) end
 end, false)
 
 -- /endmatch : arrête le match et remet les scores à zéro
