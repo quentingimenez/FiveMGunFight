@@ -7,7 +7,8 @@
 --  Les rôles s'inversent à chaque manche. Premier à WinRounds manches = victoire.
 --
 --  Déroulement d'une manche :
---   1. Choix des armes (SelectTime) : chacun apparaît DANS SA VOITURE, gelé,
+--   1. Choix des armes (SelectTime) : les attaquants apparaissent DANS LEUR
+--      VOITURE, les défenseurs À PIED dans la zone ; tout le monde est gelé
 --      et choisit 2 armes parmi celles qu'il possède.
 --   2. Placement (PlacementTime) : on peut rouler. Les défenseurs se placent,
 --      les attaquants ne peuvent PAS encore entrer dans la zone.
@@ -26,7 +27,7 @@ Config.EndDelay = 8            -- pause entre deux manches (secondes)
 Config.MatchEndDelay = 15      -- pause après la fin d'un match (secondes)
 Config.SwapSidesEveryRound = true
 
-Config.Vehicle = 'sultan'          -- voiture donnée en début de manche (nom de modèle GTA)
+Config.Vehicle = 'sultan'          -- voiture des attaquants en début de manche (nom de modèle GTA)
 Config.VehicleSpacing = 5.0        -- écart (m) entre les voitures d'une même équipe
 
 Config.AttackSpawnDistance = 70.0  -- (zones de secours) distance des attaquants au-delà du bord

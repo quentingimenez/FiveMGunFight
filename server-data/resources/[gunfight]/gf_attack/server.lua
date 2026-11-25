@@ -168,7 +168,8 @@ local function spawnRole(src, opts)
     end
     core:Spawn(src, {
         x = x, y = y, z = z, heading = h,
-        vehicle = opts.vehicle and Config.Vehicle or nil,
+        -- Seuls les attaquants ont une voiture : les défenseurs apparaissent à pied dans la zone
+        vehicle = (opts.vehicle and roleOf(S.team[src]) == 'attack') and Config.Vehicle or nil,
         weapons = weapons, armour = weapons and core:GetSelectionSettings().armour or nil,
         freeze = opts.freeze, protected = opts.protected,
     })
