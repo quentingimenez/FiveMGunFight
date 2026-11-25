@@ -74,7 +74,10 @@ statistiques : uniquement des données réelles.
 - le mode sélectionné est souligné par la couleur d'accent ;
 - le chef choisit le mode ; les autres membres voient la sélection mais les
   cartes sont verrouillées avec l'indication « Le chef choisit le mode » ;
-- bouton **JOUER** à droite : lance le mode pour toute l'escouade. Il est
+- bouton **JOUER** à droite : lance le mode. Pour **Attaque de zone**, il ouvre
+  une recherche serveur globale (aucune condition de taille d'escouade) et
+  devient **ANNULER** pour le chef qui l'a lancée, avec l'indice
+  « Recherche N/20 ». Pour Redzone, il lance l'escouade comme avant. Il est
   désactivé si le joueur n'est pas chef, si le mode est indisponible ou pendant
   un lancement.
 
@@ -124,12 +127,32 @@ Le personnage existe : le lobby s'affiche directement, sans écran de création.
 ### 3.4 Lancement
 
 1. Le chef choisit un mode (`selectMode`), diffusé à l'escouade.
-2. `play` : le serveur vérifie que le mode est disponible et que l'escouade
-   atteint son minimum de joueurs (`minPlayers`), affiche la transition, puis
-   appelle `exports.gf_core:SetMode` pour chaque membre. Un lancement refusé
-   réaffiche un toast et réactive JOUER.
-3. `gf_core` change le bucket, le spawn et ferme la NUI (`modeChanged`).
-4. Le lobby CEF reste chargé mais masqué ; il réapparaîtra au retour.
+2. **Attaque de zone** : `play` ouvre une **file serveur globale** au lieu de
+   lancer l'escouade. Le chef peut être seul. Tous les joueurs du lobby ayant un
+   personnage sont inscrits automatiquement. Le serveur diffuse `state.queue =
+   { mode = 'attack', size = N, min = 20, max = 30, ownerId = <src> }` et
+   l'indice « Recherche N/20 ». La NUI reste ouverte pendant l'attente.
+   - Un joueur qui quitte le lobby ou déconnecte est retiré de la file ; si la
+     file devient vide, la recherche s'arrête.
+   - Un joueur qui rejoint le lobby avec un personnage pendant la recherche est
+     ajouté automatiquement (`refreshQueue`).
+   - **Choix documenté** : une seule recherche serveur active à la fois ; un
+     nouveau `play` sur une recherche en cours est un simple rappel d'état, pas
+     une seconde file.
+   - Le chef annule avec `selectMode {mode='attack', cancel=true}` (le relais
+     client `play` ne transmet pas `cancel`). La file est vidée et l'état NUI
+     restauré. Le client ne ferme jamais la NUI pendant l'attente.
+   - À `size >= Config.Matchmaking.attackMin` (20, configurable), un thread
+     serveur fige la file et appelle `exports.gf_core:SetMode(member, 'attack')`
+     pour **tous** les membres. `gf_attack.Config.MinPlayers = 20` empêche le
+     démarrage à 2 joueurs.
+3. **Redzone** : comportement inchangé (`minPlayers = 1`), lancement pour
+   l'escouade via `play`.
+4. Dans les deux cas, `party.launching = true` est posé côté serveur et diffusé.
+   Un échec de `SetMode` restaure `launching = false`, rediffuse l'état et
+   affiche un toast ; aucun `close` explicite n'est envoyé avant le spawn.
+5. `gf_core` change le bucket, le spawn et ferme la NUI (`modeChanged`).
+6. Le lobby CEF reste chargé mais masqué ; il réapparaîtra au retour.
 
 ### 3.5 Retour au lobby
 
@@ -192,7 +215,8 @@ Transport : `fetch('https://gf_lobby/<callback>', {method:'POST', body: JSON})`.
 | `leaveParty` | — | quitter l'escouade |
 | `kickMember` | `{id}` | exclure (chef) |
 | `selectMode` | `{mode}` | choisir le mode (chef) |
-| `play` | `{mode}` | lancer (chef) |
+| `selectMode` | `{mode, cancel=true}` | annuler la recherche Attaque (chef) |
+| `play` | `{mode}` | lancer le mode / ouvrir la file Attaque (chef) |
 
 Tous les callbacks répondent `{ok:true}` (ou `{ok:false, error}`) pour clore le
 `fetch`. Le serveur ne fait jamais confiance aux données du client.
@@ -232,10 +256,12 @@ Enveloppe unique : `{type = "...", data = {...}}`.
         character = { name = "Nova", gender = "female", seed = 999, skin = 1 } },
     },
   },
+  queue = nil,  -- ou { mode = "attack", size = 22, min = 20, max = 30,
+                --      ownerId = 12 } pendant une recherche serveur
   modes = {
     { id = "attack", label = "Attaque de zone", short = "ATTAQUE",
       description = "2 équipes, dernière équipe en vie.", icon = "target",
-      players = 0, minPlayers = 2, available = true, placeholder = false },
+      players = 0, minPlayers = 1, available = true, placeholder = false },
     { id = "redzone", label = "Redzone", short = "REDZONE",
       description = "Chacun pour soi dans la zone.", icon = "zone",
       players = 0, minPlayers = 1, available = true, placeholder = false },
@@ -297,8 +323,8 @@ membres présents partagent le même lobby, donc `slot` est toujours présent.
 | `gf_lobby:respondInvite` | partyId, accept | invitation existante et non expirée |
 | `gf_lobby:leaveParty` | — | membre, lobby |
 | `gf_lobby:kickMember` | id cible | chef, cible du groupe |
-| `gf_lobby:selectMode` | mode | chef, mode disponible |
-| `gf_lobby:play` | mode | chef, mode disponible, tous les membres dans le lobby |
+| `gf_lobby:selectMode` | mode, `cancel?` | chef ; si `cancel`, annule la file dont il est propriétaire |
+| `gf_lobby:play` | mode | chef, mode disponible ; Attaque : file serveur sans condition d'escouade ; Redzone : tous les membres dans le lobby |
 | `gf_lobby:requestState` | — | réinscription si le joueur est en lobby |
 
 ### 5.4 Serveur → client
@@ -333,6 +359,7 @@ Le serveur tient :
 Players[src] = { character, partyId, inLobby, lastInvite, lastMode }
 Parties[id]  = { id, leader, members = {src...}, selectedMode, launching }
 Invites[src] = { partyId, from, expiresAt }
+Queue        = { active, mode, owner, members = {[src]=true} }
 ```
 
 Règles :
@@ -346,7 +373,10 @@ Règles :
 - si le chef part, le premier membre restant devient chef ;
 - une invitation expirée est purgée ; accepter une invitation remplace
   l'escouade solo éventuelle ;
-- anti-spam : 2 s entre deux invitations, 1 s entre deux changements de mode.
+- anti-spam : 2 s entre deux invitations, 1 s entre deux changements de mode ;
+- une seule file Attaque active : elle est alimentée par `refreshQueue()` à
+  chaque entrée/sortie du lobby et à la création de personnage ; le seuil est
+  vérifié par un thread serveur toutes les 500 ms.
 
 ### 6.2 Routing buckets
 
@@ -552,15 +582,19 @@ Manuel en jeu :
 3. invitation, acceptation, refus, expiration, escouade pleine ;
 4. changement de chef, exclusion, départ, retour au lobby ;
 5. sélection de mode (chef/membre), lancement, fermeture de la NUI ;
-6. caméra/formation à 1, 2, 3 et 4 joueurs ;
+6. file Attaque : lancement par un chef solo, montée à 20 joueurs, annulation,
+   départ d'un joueur, arrivée d'un nouveau joueur, seuil atteint ;
+7. caméra/formation à 1, 2, 3 et 4 joueurs ;
 7. `/lobbyui`, redémarrage de `gf_lobby`, passage Attaque → lobby ;
-8. deux escouades : aucun joueur visible d'un groupe à l'autre.
+9. deux escouades : aucun joueur visible d'un groupe à l'autre (hors file
+   Attaque, où les joueurs de toutes les escouades sont lancés ensemble).
 
 ## 13. Limites de la v1 et extensions
 
 - Escouade **propre au lobby** : elle est dissoute au lancement et lorsqu'un
-  membre quitte le lobby. Extension : escouade persistante, file d'attente,
-  équipe commune en Attaque de zone.
+  membre quitte le lobby. Attaque de zone utilise désormais une file serveur
+  globale (20–30 joueurs), mais l'escouade reste le conteneur du lobby.
+  Extension : répartition équilibrée en deux équipes de 15 côté `gf_attack`.
 - Pas de liste d'amis Cfx.re ni de présence hors ligne : invitations des joueurs
   présents dans le lobby uniquement. Extension : `txAdmin`/base de données,
   amis persistants.

@@ -3,6 +3,9 @@
 (function () {
   'use strict';
 
+  var BUILD = '7259e64';
+  document.documentElement.setAttribute('data-build', BUILD);
+
   var ICONS = {
     logo:
       '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2.6 27.2 9v14L16 29.4 4.8 23V9L16 2.6Z" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="16" r="6.1" stroke="currentColor" stroke-width="1.4"/><path d="M16 8.2v4.1M16 19.7v4.1M8.2 16h4.1M19.7 16h4.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
@@ -57,6 +60,9 @@
   var bootFallback = null;
   var transitionTimer = null;
   var retryTimer = null;
+  var syncTimer = null;
+  var syncAttempts = 0;
+  var syncDone = false;
 
   function $(selector, root) {
     return (root || document).querySelector(selector);
@@ -177,6 +183,46 @@
     host.appendChild(count);
   }
 
+  function buildBadge(suffix, level) {
+    var badge = $('#build-badge');
+    if (!badge) return;
+    badge.textContent = 'BUILD ' + BUILD + (suffix ? ' · ' + suffix : '');
+    badge.classList.remove('is-sync', 'is-ok', 'is-offline');
+    if (level) badge.classList.add('is-' + level);
+  }
+
+  function stopSyncWatch() {
+    if (syncTimer) {
+      window.clearInterval(syncTimer);
+      syncTimer = null;
+    }
+    syncAttempts = 0;
+  }
+
+  function startSyncWatch() {
+    if (syncDone || syncTimer) return;
+    syncTimer = window.setInterval(function () {
+      if (syncDone || state) {
+        stopSyncWatch();
+        return;
+      }
+      syncAttempts += 1;
+      if (syncAttempts > 3) {
+        buildBadge('HORS LIGNE', 'offline');
+        stopSyncWatch();
+        return;
+      }
+      buildBadge('SYNC', 'sync');
+      send('requestState', {});
+    }, 2000);
+  }
+
+  function markSynced() {
+    syncDone = true;
+    stopSyncWatch();
+    buildBadge('HOTFIX', 'ok');
+  }
+
   function renderProfile() {
     var host = $('#profile-panel');
     if (!host || !state || !state.me) return;
@@ -257,6 +303,7 @@
       return;
     }
     state = next;
+    markSynced();
     revealApp();
     renderStatus();
     renderProfile();
@@ -268,6 +315,9 @@
 
   function closeLobby() {
     state = null;
+    syncDone = false;
+    stopSyncWatch();
+    buildBadge();
     stopHeartbeat();
     hideTransition();
     var app = $('#app');
@@ -334,7 +384,9 @@
       });
     }
 
+    buildBadge();
     send('ready', {});
+    startSyncWatch();
     bootFallback = window.setTimeout(function () {
       if (state) return;
       var status = $('#boot-status');

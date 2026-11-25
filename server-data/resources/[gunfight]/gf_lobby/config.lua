@@ -23,6 +23,14 @@ Config.Character = {
   skins = 5,
 }
 
+-- Recherche serveur globale pour les modes 20-30 joueurs.
+-- Un joueur seul peut lancer la recherche : la taille de l'escouade n'est pas
+-- un critère. Tous les joueurs du lobby avec un personnage sont inscrits.
+Config.Matchmaking = {
+  attackMin = 20, -- seuil de lancement (montée jusqu'à 2 équipes de 15)
+  attackMax = 30, -- plafond d'inscription, configuration documentaire
+}
+
 -- Scene du lobby : les personnages sont alignes face a la camera.
 Config.Stage = {
   x = -1037.7,
@@ -51,7 +59,7 @@ Config.Modes = {
     description = 'Deux equipes, la derniere en vie remporte la manche.',
     icon = 'target',
     resource = 'gf_attack',
-    minPlayers = 2,
+    minPlayers = 1, -- recherche serveur : pas de condition sur l'escouade
     placeholder = false,
   },
   {

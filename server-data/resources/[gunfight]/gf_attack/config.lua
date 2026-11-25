@@ -8,7 +8,7 @@
 -- =============================================================================
 Config = {}
 
-Config.MinPlayers = 2          -- joueurs nécessaires pour lancer automatiquement
+Config.MinPlayers = 20         -- joueurs nécessaires pour lancer automatiquement (file serveur gf_lobby)
 Config.WinRounds = 5           -- manches à gagner pour remporter le match
 Config.PrepTime = 15           -- secondes de préparation (joueurs gelés)
 Config.RoundTime = 180         -- durée max d'une manche (secondes)
