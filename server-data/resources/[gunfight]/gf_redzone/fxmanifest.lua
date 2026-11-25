@@ -13,4 +13,5 @@ client_script 'client.lua'
 dependencies {
     'gf_core',
     'gf_ui',
+    'gf_maps',
 }

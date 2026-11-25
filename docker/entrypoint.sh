@@ -100,4 +100,4 @@ if [ "$TXADMIN" = "true" ]; then
 fi
 
 echo "txAdmin          : désactivé (TXADMIN=false)"
-exec "$SERVER/run.sh" +exec server.cfg
+exec "$SERVER/run.sh" +set onesync on +exec server.cfg

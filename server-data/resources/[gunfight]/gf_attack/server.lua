@@ -31,7 +31,66 @@ resetState()
 -- ---------------------------------------------------------------- Utilitaires
 local function now() return os.time() end
 local function other(t) return t == 'A' and 'B' or 'A' end
-local function zone() return Config.Zones[S.zoneIndex] end
+
+-- Cap (heading GTA) pour regarder du point (x,y) vers (tx,ty)
+local function headingTo(x, y, tx, ty)
+    return (math.deg(math.atan(-(tx - x), ty - y)) + 360.0) % 360.0
+end
+
+-- ---------------------------------------------------------------- Maps
+-- Une map = { name, points{ {x,y,z} }, attackSpawn{x,y,z,h}, defenseSpawn{x,y,z,h} }
+-- On y ajoute center (centre) et radius (rayon englobant) pour l'affichage.
+local function finalizeMap(m)
+    local x, y, z = 0.0, 0.0, 0.0
+    for _, p in ipairs(m.points) do x, y, z = x + p.x, y + p.y, z + p.z end
+    local n = #m.points
+    local c = { x = x / n, y = y / n, z = z / n }
+    local r = 0.0
+    for _, p in ipairs(m.points) do
+        local d = math.sqrt((p.x - c.x) ^ 2 + (p.y - c.y) ^ 2)
+        if d > r then r = d end
+    end
+    m.center, m.radius = c, r
+    return m
+end
+
+-- Zone de secours (config.lua, cercle) -> polygone à 16 côtés
+local function fallbackMap(z)
+    local c = z.center
+    local points = {}
+    for i = 0, 15 do
+        local a = i / 16 * 2 * math.pi
+        points[#points + 1] = { x = c.x + math.cos(a) * z.radius, y = c.y + math.sin(a) * z.radius, z = c.z }
+    end
+    local rad = math.rad(z.attackFrom or 0)
+    local d = z.radius + Config.AttackSpawnDistance
+    local ax, ay = c.x + math.sin(rad) * d, c.y + math.cos(rad) * d
+    return {
+        name = z.name,
+        points = points,
+        attackSpawn = { x = ax, y = ay, z = c.z, h = headingTo(ax, ay, c.x, c.y) },
+        defenseSpawn = { x = c.x, y = c.y, z = c.z, h = 0.0 },
+    }
+end
+
+local function mapList()
+    local ok, maps = pcall(function() return exports.gf_maps:GetActiveMaps('attack') end)
+    if ok and type(maps) == 'table' and #maps > 0 then return maps end
+    local list = {}
+    for _, z in ipairs(Config.Zones) do list[#list + 1] = fallbackMap(z) end
+    return list
+end
+
+local currentMap = nil
+local function loadMap(index)
+    local list = mapList()
+    S.zoneIndex = ((index - 1) % #list) + 1
+    currentMap = finalizeMap(list[S.zoneIndex])
+end
+
+loadMap(S.zoneIndex)
+
+local function zone() return currentMap end
 local function defenders() return other(S.attackers) end
 local function roleOf(t) return t == S.attackers and 'attack' or 'defense' end
 
@@ -65,26 +124,13 @@ local function announceAll(title, sub, ms)
     eachPlayer(function(src) announce(src, title, sub, ms) end)
 end
 
--- Cap (heading GTA) pour regarder du point (x,y) vers (tx,ty)
-local function headingTo(x, y, tx, ty)
-    return (math.deg(math.atan(-(tx - x), ty - y)) + 360.0) % 360.0
-end
-
 local function spawnPos(src)
     local z = zone()
-    local c = z.center
-    if roleOf(S.team[src]) == 'defense' then
-        local a = math.random() * 2 * math.pi
-        local d = math.random() * z.radius * 0.4
-        local x, y = c.x + math.cos(a) * d, c.y + math.sin(a) * d
-        return x, y, c.z, math.random(0, 359) + 0.0
-    end
-    local rad = math.rad(z.attackFrom or 0)
-    local dist = z.radius + Config.AttackSpawnDistance
+    local sp = roleOf(S.team[src]) == 'defense' and z.defenseSpawn or z.attackSpawn
     local spread = Config.SpawnSpread
-    local x = c.x + math.sin(rad) * dist + (math.random() * 2 - 1) * spread
-    local y = c.y + math.cos(rad) * dist + (math.random() * 2 - 1) * spread
-    return x, y, c.z, headingTo(x, y, c.x, c.y)
+    local x = sp.x + (math.random() * 2 - 1) * spread
+    local y = sp.y + (math.random() * 2 - 1) * spread
+    return x, y, sp.z, headingTo(x, y, z.center.x, z.center.y)
 end
 
 local function spawnRole(src, opts)
@@ -106,7 +152,8 @@ local function sendZone(src)
     local z = zone()
     TriggerClientEvent('gf_attack:zone', src, {
         name = z.name,
-        center = { x = z.center.x, y = z.center.y, z = z.center.z },
+        points = z.points,
+        center = z.center,
         radius = z.radius,
         defenders = defenders(),
         phase = S.phase,
@@ -154,6 +201,8 @@ end
 
 -- ---------------------------------------------------------------- Déroulement
 local function startPrep()
+    -- Début de match : on recharge la map (prend en compte les modifications de /editor)
+    if S.round == 0 then loadMap(S.zoneIndex) end
     autobalance()
     S.round = S.round + 1
     S.phase = 'prep'
@@ -224,7 +273,7 @@ local function nextRound()
         S.round = 0
         S.attackers = 'A'
         S.matchOver = false
-        S.zoneIndex = S.zoneIndex % #Config.Zones + 1
+        loadMap(S.zoneIndex + 1)
         for src in pairs(S.stats) do S.stats[src] = { kills = 0, deaths = 0 } end
     elseif Config.SwapSidesEveryRound then
         S.attackers = other(S.attackers)
@@ -428,7 +477,7 @@ end, false)
 RegisterCommand('nextzone', function(src)
     if not core:IsAdmin(src) then return end
     if S.phase ~= 'waiting' then return reply(src, 'Utilise /endmatch avant de changer de zone.') end
-    S.zoneIndex = S.zoneIndex % #Config.Zones + 1
+    loadMap(S.zoneIndex + 1)
     goWaiting()
     reply(src, 'Zone : ' .. zone().name)
 end, false)
@@ -444,3 +493,12 @@ RegisterCommand('setteam', function(src, args)
     placeForPhase(target)
     checkWin()
 end, false)
+
+-- Une map a été créée / modifiée / supprimée avec /editor
+AddEventHandler('gf_maps:updated', function(kind)
+    if kind ~= 'attack' then return end
+    if S.phase == 'waiting' then
+        loadMap(S.zoneIndex)
+        goWaiting()
+    end
+end)

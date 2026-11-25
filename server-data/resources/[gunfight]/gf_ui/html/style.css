@@ -102,6 +102,91 @@ html, body {
     to   { transform: translateX(0); opacity: 1; }
 }
 
+/* ------------------------------------------------------------------ Hitmarker & dégâts */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+}
+
+#hitmarker {
+    position: absolute;
+    left: -14px;
+    top: -14px;
+    width: 28px;
+    height: 28px;
+    opacity: 0;
+}
+#hitmarker i {
+    position: absolute;
+    width: 9px;
+    height: 2px;
+    background: #fff;
+    box-shadow: 0 0 3px rgba(0, 0, 0, .9);
+}
+#hitmarker i:nth-child(1) { left: 0;    top: 4px;  transform: rotate(45deg); }
+#hitmarker i:nth-child(2) { right: 0;   top: 4px;  transform: rotate(-45deg); }
+#hitmarker i:nth-child(3) { left: 0;    bottom: 4px; transform: rotate(-45deg); }
+#hitmarker i:nth-child(4) { right: 0;   bottom: 4px; transform: rotate(45deg); }
+#hitmarker.show { animation: hm .22s ease-out; }
+#hitmarker.kill i { background: #ff3b3b; width: 12px; }
+#hitmarker.kill.show { animation: hm .45s ease-out; }
+
+@keyframes hm {
+    0%   { opacity: 1; transform: scale(1.35); }
+    100% { opacity: 0; transform: scale(1); }
+}
+
+#damage { position: absolute; left: 0; top: 0; }
+.dmg {
+    position: absolute;
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 4px rgba(0, 0, 0, .95), 0 2px 2px rgba(0, 0, 0, .8);
+    white-space: nowrap;
+    pointer-events: none;
+    animation: dmgUp .8s ease-out forwards;
+}
+.dmg.fatal { color: #ff4d4f; font-size: 24px; }
+
+@keyframes dmgUp {
+    0%   { opacity: 0; transform: translate(0, 0) scale(.7); }
+    15%  { opacity: 1; transform: translate(0, -6px) scale(1.15); }
+    100% { opacity: 0; transform: translate(0, -46px) scale(1); }
+}
+
+/* ------------------------------------------------------------------ Multi-kills */
+#medal {
+    position: absolute;
+    top: 62%;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+}
+#medal .m-title {
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-shadow: 0 3px 12px rgba(0, 0, 0, .85);
+}
+#medal .m-sub {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e6ebf3;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .9);
+}
+#medal.pop .m-title { animation: medalPop .35s cubic-bezier(.2, 1.6, .4, 1); }
+
+@keyframes medalPop {
+    0%   { transform: scale(2.2); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+}
+
 /* ------------------------------------------------------------------ Annonces */
 #announce {
     position: absolute;

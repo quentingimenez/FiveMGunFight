@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Éditeur de maps</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="root" class="hidden">
+        <!-- Zone de clic sur la carte (mode édition) -->
+        <div id="canvas" class="hidden"></div>
+
+        <aside id="panel">
+            <header>
+                <div class="brand">Éditeur de maps</div>
+                <button id="btn-close" class="ghost" title="Fermer">✕</button>
+            </header>
+
+            <!-- Liste des maps -->
+            <section id="view-list">
+                <div class="tabs">
+                    <button data-kind="redzone" class="tab active">Redzone</button>
+                    <button data-kind="attack" class="tab">Attaque de zone</button>
+                </div>
+                <button id="btn-new" class="primary wide">+ Nouvelle map</button>
+                <p class="muted">Coche les maps à mettre en jeu. Une map décochée n'est plus jouée (ni proposée au vote plus tard).</p>
+                <div id="active-count" class="count"></div>
+                <ul id="map-list"></ul>
+                <p id="list-empty" class="muted">Aucune map pour l'instant. Les zones par défaut du fichier config.lua sont utilisées.</p>
+            </section>
+
+            <!-- Édition -->
+            <section id="view-edit" class="hidden">
+                <div class="edit-kind"></div>
+                <ol id="steps"></ol>
+                <div class="step-box">
+                    <h2 id="step-title"></h2>
+                    <p id="step-help"></p>
+
+                    <div id="radius-box" class="hidden">
+                        <label>Rayon : <b id="radius-value">80</b> m</label>
+                        <input id="radius" type="range" min="15" max="500" step="1" value="80">
+                    </div>
+
+                    <button id="btn-close-poly" class="secondary wide hidden">Fermer la zone</button>
+
+                    <div id="name-box" class="hidden">
+                        <label for="name">Nom de la map</label>
+                        <input id="name" type="text" maxlength="40" placeholder="Ex. : Parking du port">
+                    </div>
+
+                    <p id="step-status" class="status"></p>
+                </div>
+
+                <div class="nav">
+                    <button id="btn-prev" class="secondary">Précédent</button>
+                    <button id="btn-next" class="primary">Suivant</button>
+                    <button id="btn-save" class="primary hidden">Enregistrer</button>
+                </div>
+                <button id="btn-cancel" class="ghost wide">Annuler les modifications</button>
+
+                <div class="controls">
+                    <div><kbd>Z Q S D</kbd> / <kbd>W A S D</kbd> déplacer la caméra · <kbd>Maj</kbd> plus vite</div>
+                    <div><kbd>Molette</kbd> zoom · <kbd>Clic gauche</kbd> placer · <kbd>Clic droit</kbd> retirer</div>
+                </div>
+            </section>
+        </aside>
+
+        <div id="toast" class="hidden"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -7,6 +7,62 @@
 local protected = false
 local spectator = false
 local spawning = false
+local modeVehicle = nil  -- véhicule donné par le mode (redzone)
+
+-- Supprime le véhicule de mode (touche F en redzone, changement de mode...)
+local function deleteModeVehicle()
+    local veh = modeVehicle
+    modeVehicle = nil
+    if veh and DoesEntityExist(veh) then
+        SetEntityAsMissionEntity(veh, true, true)
+        DeleteVehicle(veh)
+        if DoesEntityExist(veh) then DeleteEntity(veh) end
+    end
+    TriggerServerEvent('gf_core:vehicleGone')
+end
+exports('DeleteModeVehicle', deleteModeVehicle)
+exports('GetModeVehicle', function() return modeVehicle end)
+
+local function giveVehicle(model, x, y, z, heading)
+    local hash = joaat(model)
+    if not IsModelInCdimage(hash) or not IsModelAVehicle(hash) then
+        print(('[gf_core] Modèle de véhicule inconnu : %s'):format(model))
+        return
+    end
+    RequestModel(hash)
+    local timeout = GetGameTimer() + 10000
+    while not HasModelLoaded(hash) and GetGameTimer() < timeout do Wait(0) end
+    if not HasModelLoaded(hash) then return end
+
+    local ped = PlayerPedId()
+    local veh = CreateVehicle(hash, x, y, z, heading, true, false)
+    SetModelAsNoLongerNeeded(hash)
+    if veh == 0 then return end
+
+    SetVehicleOnGroundProperly(veh)
+    SetVehicleNumberPlateText(veh, 'GUNFIGHT')
+    SetVehicleDirtLevel(veh, 0.0)
+    SetVehRadioStation(veh, 'OFF')
+    SetVehicleEngineOn(veh, true, true, false)
+    SetPedIntoVehicle(ped, veh, -1)
+    modeVehicle = veh
+
+    local t = GetGameTimer() + 2000
+    while not NetworkGetEntityIsNetworked(veh) and GetGameTimer() < t do Wait(0) end
+    TriggerServerEvent('gf_core:vehicle', NetworkGetNetworkIdFromEntity(veh))
+    return veh
+end
+
+-- Donne un véhicule de mode au joueur (l'ancien est supprimé) et l'installe dedans.
+-- Utilisé par gf_redzone (points véhicule). Retourne le véhicule créé.
+exports('GiveModeVehicle', function(model, x, y, z, heading)
+    if modeVehicle and DoesEntityExist(modeVehicle) then
+        SetEntityAsMissionEntity(modeVehicle, true, true)
+        DeleteVehicle(modeVehicle)
+    end
+    modeVehicle = nil
+    return giveVehicle(model, x + 0.0, y + 0.0, z + 0.0, (heading or 0.0) + 0.0)
+end)
 
 -- ---------------------------------------------------------------- Utilitaires
 local function loadModel(hash)
@@ -84,6 +140,13 @@ RegisterNetEvent('gf_core:spawn', function(o)
             SetModelAsNoLongerNeeded(model)
         end
 
+        -- L'ancien véhicule est supprimé par le serveur ; on oublie la référence
+        if modeVehicle and DoesEntityExist(modeVehicle) then
+            SetEntityAsMissionEntity(modeVehicle, true, true)
+            DeleteVehicle(modeVehicle)
+        end
+        modeVehicle = nil
+
         local x, y, z = o.x + 0.0, o.y + 0.0, o.z + 0.0
         RequestCollisionAtCoord(x, y, z)
         NetworkResurrectLocalPlayer(x, y, z, (o.heading or 0.0) + 0.0, true, true, false)
@@ -106,15 +169,31 @@ RegisterNetEvent('gf_core:spawn', function(o)
         setProtected((o.protected or o.spectator) and true or false)
         FreezeEntityPosition(ped, (o.freeze or o.spectator) and true or false)
 
+        if o.vehicle and not o.spectator then
+            local p = GetEntityCoords(ped)
+            giveVehicle(o.vehicle, p.x, p.y, p.z, (o.heading or 0.0) + 0.0)
+        end
+
         ShutdownLoadingScreen()
         ShutdownLoadingScreenNui()
         DoScreenFadeIn(400)
         spawning = false
+
+        -- Événement local pour les modes (ex. gf_redzone suit le véhicule)
+        TriggerEvent('gf_core:spawned', { vehicle = modeVehicle })
     end)
 end)
 
 RegisterNetEvent('gf_core:setProtected', function(on)
     setProtected(on)
+end)
+
+RegisterNetEvent('gf_core:modeChanged', function()
+    if modeVehicle and DoesEntityExist(modeVehicle) then
+        SetEntityAsMissionEntity(modeVehicle, true, true)
+        DeleteVehicle(modeVehicle)
+    end
+    modeVehicle = nil
 end)
 
 RegisterNetEvent('gf_core:freeze', function(on)

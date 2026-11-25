@@ -119,11 +119,11 @@ jobs:
             echo "::error::La clé de licence du secret CFX_LICENSE_KEY a été refusée par Cfx.re."
             exit 1
           fi
-          grep -q "Found 11 resources" smoke.log || {
-            echo "::error::Le serveur n'a pas trouvé les 11 ressources attendues."
+          grep -q "Found 12 resources" smoke.log || {
+            echo "::error::Le serveur n'a pas trouvé les 12 ressources attendues."
             exit 1
           }
-          for r in gf_core gf_attack gf_redzone gf_ui; do
+          for r in gf_core gf_maps gf_attack gf_redzone gf_ui; do
             grep -q "Started resource $r" smoke.log || {
               echo "::error::La ressource $r n'a pas démarré."
               exit 1

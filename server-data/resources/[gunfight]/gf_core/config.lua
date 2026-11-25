@@ -27,6 +27,10 @@ Config.Modes = {
 -- (protection simple contre les faux kills envoyés par un tricheur)
 Config.MaxKillDistance = 600.0
 
+-- Multi-kills : délai max (secondes) entre deux kills pour enchaîner
+-- DOUBLÉ, TRIPLÉ, QUADRUPLÉ, QUINTUPLÉ... (remis à zéro si tu meurs)
+Config.MultiKillWindow = 6
+
 -- Régénération naturelle de la vie (false = pas de régénération, plus "gunfight")
 Config.HealthRegen = false
 

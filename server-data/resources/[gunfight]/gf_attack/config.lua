@@ -25,8 +25,11 @@ Config.Teams = {
     B = { label = 'Équipe Bleue', color = '#4ea8ff' },
 }
 
--- Zones jouées à tour de rôle (une nouvelle zone à chaque match).
---   center      : centre de la zone (la hauteur z est corrigée automatiquement)
+-- Les zones se créent EN JEU avec /editor (admin) : contour point par point,
+-- départ des attaquants et des défenseurs. Les zones ci-dessous ne servent que
+-- de SECOURS tant qu'aucune zone d'attaque n'a été créée avec l'éditeur.
+-- Les zones sont jouées à tour de rôle (une nouvelle zone à chaque match).
+--   center     : centre de la zone (la hauteur z est corrigée automatiquement)
 --   radius      : rayon en mètres
 --   attackFrom  : direction d'où arrivent les attaquants, en degrés
 --                 (0 = nord, 90 = est, 180 = sud, 270 = ouest)

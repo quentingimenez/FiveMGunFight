@@ -11,6 +11,30 @@
 
 local Modes = {}      -- [src] = 'lobby' | 'attack' | 'redzone'
 local lastDeath = {}  -- [src] = GetGameTimer() de la dernière mort (anti doublon)
+local Multi = {}      -- [src] = { count, last } pour les multi-kills
+local Vehicles = {}   -- [src] = netId du véhicule de mode (redzone)
+
+-- Supprime le véhicule de mode d'un joueur (s'il en a un)
+local function deleteVehicle(src)
+    local netId = Vehicles[src]
+    Vehicles[src] = nil
+    if not netId then return end
+    local veh = NetworkGetEntityFromNetworkId(netId)
+    if veh ~= 0 and DoesEntityExist(veh) and GetEntityType(veh) == 2 then
+        DeleteEntity(veh)
+    end
+end
+
+-- Le client signale le véhicule qu'il vient de recevoir
+RegisterNetEvent('gf_core:vehicle', function(netId)
+    local src = source
+    if Vehicles[src] and Vehicles[src] ~= netId then deleteVehicle(src) end
+    Vehicles[src] = tonumber(netId)
+end)
+
+RegisterNetEvent('gf_core:vehicleGone', function()
+    Vehicles[source] = nil
+end)
 
 -- ---------------------------------------------------------------- Utilitaires
 local function getMode(src)
@@ -41,8 +65,10 @@ end
 
 --- Fait apparaître un joueur.
 --- opts = { x, y, z, heading, loadout = 'attack'|'redzone'|nil,
----          protected = bool, freeze = bool, spectator = bool }
+---          protected = bool, freeze = bool, spectator = bool,
+---          vehicle = 'modele' (le joueur apparaît dans ce véhicule) }
 local function spawn(src, opts)
+    deleteVehicle(src) -- l'ancien véhicule disparaît à chaque réapparition
     Player(src).state:set('gf_protected', (opts.protected or opts.spectator) and true or false, true)
     TriggerClientEvent('gf_core:spawn', src, opts)
 end
@@ -76,6 +102,8 @@ local function setMode(src, mode)
     if old == mode then return false end
 
     if old then TriggerEvent('gf:modeLeft', src, old) end
+    deleteVehicle(src)
+    Multi[src] = nil
 
     Modes[src] = mode
     local state = Player(src).state
@@ -85,6 +113,7 @@ local function setMode(src, mode)
 
     TriggerClientEvent('gf_ui:hud', src, nil)
     TriggerClientEvent('gf_ui:scoreboard', src, nil)
+    TriggerClientEvent('gf_ui:killfeed', src, nil) -- le kill feed est propre à chaque mode
     TriggerClientEvent('gf_core:modeChanged', src, mode)
 
     if mode == 'lobby' then
@@ -104,6 +133,7 @@ exports('SetProtected', setProtected)
 exports('Freeze', freeze)
 exports('IsAdmin', isAdmin)
 exports('Notify', notify)
+exports('DeleteVehicle', deleteVehicle)
 
 -- ---------------------------------------------------------------- Démarrage
 CreateThread(function()
@@ -132,6 +162,8 @@ AddEventHandler('playerDropped', function()
     local old = Modes[src]
     Modes[src] = nil
     lastDeath[src] = nil
+    Multi[src] = nil
+    deleteVehicle(src)
     if old then TriggerEvent('gf:modeLeft', src, old) end
 end)
 
@@ -165,6 +197,20 @@ local function handleDeath(victim, killer, weapon)
     end
 
     TriggerEvent('gf:playerKilled', victim, killer, weapon, mode)
+
+    -- Multi-kills (DOUBLÉ, TRIPLÉ, ...) : kills enchaînés sans mourir
+    Multi[victim] = nil
+    if killer then
+        local m = Multi[killer]
+        if m and now - m.last <= Config.MultiKillWindow * 1000 then
+            m.count = m.count + 1
+            m.last = now
+        else
+            m = { count = 1, last = now }
+            Multi[killer] = m
+        end
+        TriggerClientEvent('gf_ui:kill', killer, { victim = GetPlayerName(victim), count = m.count })
+    end
 
     -- Kill feed pour tous les joueurs du même mode
     local entry = {
@@ -219,6 +265,24 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
     end
     if sState.gf_team and sState.gf_team == vState.gf_team and sender ~= victim then
         CancelEvent() return
+    end
+
+    -- Règle propre au mode (ex. redzone : tirs uniquement dans la zone).
+    -- La ressource du mode peut exporter AllowDamage(sender, victim) -> false pour bloquer.
+    local res = Config.Modes[sMode] and Config.Modes[sMode].resource
+    if res and GetResourceState(res) == 'started' then
+        local ok, allowed = pcall(function() return exports[res]:AllowDamage(sender, victim) end)
+        if ok and allowed == false then
+            CancelEvent() return
+        end
+    end
+
+    -- Marqueur de dégâts pour le tireur
+    if sender ~= victim then
+        TriggerClientEvent('gf_ui:hit', sender, {
+            damage = math.floor(tonumber(data.weaponDamage) or 0),
+            fatal = data.willKill and true or false,
+        })
     end
 end)
 

@@ -7,8 +7,17 @@ Deux modes de jeu :
   Pas de réapparition pendant la manche : **la dernière équipe en vie gagne**.
   Si le temps est écoulé, la défense gagne. Les rôles s'inversent à chaque manche,
   premier à 5 manches gagne le match.
-- **Redzone** (`/redzone`) : chacun pour soi dans une zone rouge, réapparition rapide,
-  seuls les kills **dans** la zone comptent, classement en direct, la zone change toutes les 15 min.
+- **Redzone** (`/redzone`) : chacun pour soi. Une seule partie à la fois (10 min).
+  On apparaît **à pied** près de la zone, on va au **point véhicule** (marqueur bleu) et on
+  appuie sur **E** pour monter dans sa voiture, on roule jusqu'à la zone rouge, on appuie sur
+  **F** : la voiture disparaît et on se bat. On ne peut tirer et être touché **que dans la zone**.
+  À la mort, retour au point d'apparition, à pied.
+  À la fin de la partie : podium, puis nouvelle partie sur la map suivante.
+
+Sur tous les modes : chiffre de dégâts + son à chaque touche, son de kill, messages
+**DOUBLÉ / TRIPLÉ / QUADRUPLÉ / QUINTUPLÉ…** et kill feed propre au mode (en haut à droite).
+
+Les maps (redzones et zones d'attaque) se créent **en jeu** avec l'éditeur `/editor`.
 
 ---
 
@@ -70,31 +79,67 @@ Pour connaître l'état du serveur à tout moment : double-clic sur **`status.ba
 | `/endmatch` | admin | arrête le match, scores à zéro |
 | `/nextzone` | admin | zone d'attaque suivante (hors match) |
 | `/setteam [id] [A\|B]` | admin | change l'équipe d'un joueur |
-| `/rotatezone` | admin | change la zone de la Redzone |
-| `/resetredzone` | admin | remet le classement Redzone à zéro |
+| `/endgame` | admin | termine la partie Redzone en cours (podium puis map suivante) |
+| `/nextmap` | admin | relance une partie Redzone sur la map suivante |
 | `/setmode [id] [lobby\|attack\|redzone]` | admin | déplace un joueur |
+| `/editor` ou `/maps` | admin | éditeur et liste des maps (voir ci-dessous) |
+| touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
+| touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
 
 > **Tester seul** : `/attack` puis `/startround`. Comme l'autre équipe est vide,
 > la manche ne se termine qu'au chrono (mode test).
 
-## 5. Personnaliser
+## 5. Créer des maps en jeu (`/editor`)
 
-Tout se règle dans les fichiers `config.lua`, sans toucher au reste :
+Tape `/editor` (admin). Tu passes au lobby et un panneau s'ouvre à gauche avec deux onglets :
+**Redzone** et **Attaque de zone**. Choisis « + Nouvelle… » ou « Modifier » sur une map existante.
+
+La caméra passe en **vue du ciel** :
+- **Z Q S D** (ou W A S D) : déplacer la caméra, **Maj** pour aller plus vite
+- **Molette** : zoomer / dézoomer
+- **Clic gauche** : placer · **Clic droit** : retirer le dernier élément
+
+**Redzone** (4 étapes)
+1. *Cercle* : clic pour placer le centre ; taille avec le curseur ou **Maj + molette**.
+2. *Points d'apparition* (vert) : clic pour chaque point où les joueurs apparaissent **à pied**
+   (en dehors du cercle).
+3. *Points véhicule* (bleu) : clic pour chaque point où l'on prend sa voiture avec **E**,
+   près des points d'apparition. Les voitures sont automatiquement tournées vers la zone.
+4. *Nom* puis **Enregistrer**.
+
+**Attaque de zone** (4 étapes)
+1. *Délimitation* : clic pour chaque coin de la zone, dans l'ordre. Clique sur le premier point
+   (jaune) ou sur « Fermer la zone » pour la refermer.
+2. *Départ des attaquants* : un clic, en dehors de la zone.
+3. *Départ des défenseurs* : un clic, à l'intérieur de la zone.
+4. *Nom* puis **Enregistrer**.
+
+Les maps sont sauvegardées dans `server-data/resources/[gunfight]/gf_maps/data/maps.json`
+(pense à le sauvegarder !). Une nouvelle map est utilisée à la **prochaine partie / prochain match**.
+Tant qu'aucune map n'est cochée pour un mode, les zones de secours des `config.lua` sont utilisées.
+
+**Maps en jeu / retirées** : dans la liste (`/maps`), chaque map a une **case à cocher**.
+Cochée = la map est jouée (et sera proposée au vote plus tard). Décochée = elle reste
+sauvegardée mais n'est plus jouée. Le changement compte à partir de la prochaine partie.
+
+## 6. Personnaliser
+
+Les autres réglages sont dans les fichiers `config.lua` :
 
 | Fichier | Contenu |
 |---|---|
-| `server-data/resources/[gunfight]/gf_core/config.lua` | lobby, armes, gilet, régénération |
-| `server-data/resources/[gunfight]/gf_attack/config.lua` | zones d'attaque, durées, manches gagnantes, couleurs d'équipes |
-| `server-data/resources/[gunfight]/gf_redzone/config.lua` | zones redzone, délai de réapparition, rotation |
+| `server-data/resources/[gunfight]/gf_core/config.lua` | lobby, armes, gilet, régénération, délai des multi-kills |
+| `server-data/resources/[gunfight]/gf_attack/config.lua` | durées, manches gagnantes, couleurs d'équipes, zones de secours |
+| `server-data/resources/[gunfight]/gf_redzone/config.lua` | durée de partie, véhicule, délai de réapparition, zones de secours |
 
-**Créer une zone** : va à l'endroit voulu en jeu, tape `/pos`, copie le `vector3(...)` affiché
-dans la liste `Config.Zones` du mode voulu.
+Le volume des sons de touche et de kill se règle en haut de
+`gf_ui/html/app.js` (`const VOLUME = 0.35`).
 
 **Appliquer un changement** sans tout redémarrer : double-clic sur **`console.bat`**, puis tape
 `restart gf_attack` (ou le nom de la ressource modifiée). Pour quitter la console sans arrêter
 le serveur : **Ctrl+P puis Ctrl+Q**.
 
-## 6. Fichiers du projet
+## 7. Fichiers du projet
 
 ```
 Dockerfile              image du serveur (Debian + FXServer Linux officiel)
@@ -112,7 +157,8 @@ server-data/
     gf_core     modes, apparition, armes, morts, anti-tir sur coéquipier
     gf_attack   mode Attaque de zone
     gf_redzone  mode Redzone
-    gf_ui       interface : HUD, kill feed, annonces, classement
+    gf_maps     éditeur de maps en jeu (/editor) + sauvegarde data/maps.json
+    gf_ui       interface : HUD, kill feed, dégâts, multi-kills, sons, classement
 ```
 
 Chaque mode a son propre « monde » (routing bucket) : les joueurs du lobby, de
@@ -120,7 +166,7 @@ l'Attaque et de la Redzone ne se voient pas. Le score et les victoires sont déc
 **uniquement par le serveur** ; les tirs sur coéquipiers ou joueurs protégés sont annulés
 côté serveur.
 
-## 7. Base de données MariaDB
+## 8. Base de données MariaDB
 
 Le serveur FiveM n'en a pas besoin pour tourner : elle est prête pour la phase 2
 (statistiques permanentes via `oxmysql`). Ce qui est déjà en place :
@@ -146,7 +192,7 @@ Sauvegarder la base :
 docker compose exec mariadb mariadb-dump -u root -p gunfight > sauvegarde.sql
 ```
 
-## 8. Panneau web txAdmin
+## 9. Panneau web txAdmin
 
 txAdmin est **le lanceur** du serveur : au démarrage, FXServer se met en « mode moniteur »,
 txAdmin ouvre son panneau web sur le port 40120, puis lance lui-même le serveur de jeu. C'est
@@ -178,7 +224,7 @@ utiliser `docker compose down -v` (**attention : efface aussi la base de donnée
 txAdmin donne aussi un accès à distance (HTTP) aux personnes autorisées : garde des mots de
 passe forts et n'ouvre le port 40120 que si tu en as besoin.
 
-## 9. Intégration continue (GitHub Actions)
+## 10. Intégration continue (GitHub Actions)
 
 Le dépôt contient un workflow (`.github/workflows/docker.yml`) qui, à chaque envoi sur
 `main` :
@@ -186,7 +232,7 @@ Le dépôt contient un workflow (`.github/workflows/docker.yml`) qui, à chaque 
 1. construit l'image Docker ;
 2. démarre la pile complète avec une clé de licence fournie par le secret
    **`CFX_LICENSE_KEY`** (avec `TXADMIN=false`, pour tester le serveur de jeu directement) ;
-3. vérifie que les 11 ressources sont trouvées (`Found 11 resources`) et que les quatre
+3. vérifie que les 12 ressources sont trouvées (`Found 12 resources`) et que les cinq
    ressources de jeu démarrent ;
 4. envoie l'image sur GitHub Container Registry (`ghcr.io/<compte>/fivem-gunfight`).
 
@@ -199,7 +245,7 @@ gh secret set CFX_LICENSE_KEY
 Le vrai serveur de jeu, lui, tourne avec la clé de ton fichier `.env` : celle du secret
 sert uniquement au test automatique.
 
-## 10. Mettre le serveur en ligne (VPS)
+## 11. Mettre le serveur en ligne (VPS)
 
 1. Loue un VPS Linux (Ubuntu/Debian) avec disque NVMe. Ordre de grandeur :
    **4 vCPU / 8 Go** pour une trentaine de joueurs simultanés, **8 vCPU / 16 Go**
@@ -217,7 +263,7 @@ sert uniquement au test automatique.
 
 Mettre à jour FXServer : `docker compose build --no-cache` puis `docker compose up -d`.
 
-## 11. Problèmes fréquents
+## 12. Problèmes fréquents
 
 | Symptôme | Solution |
 |---|---|
@@ -232,6 +278,14 @@ Mettre à jour FXServer : `docker compose build --no-cache` puis `docker compose
 | Le mode ne démarre pas | il faut 2 joueurs (un par équipe) ou `/startround` en admin |
 
 ## Pour la suite (phase 2)
+
+- **Vote de map** : en fin de partie, vote entre 9 maps tirées parmi les maps **cochées**
+  (Redzone et Attaque de zone). La case à cocher de `/maps` sert déjà à choisir les maps votables.
+- **Menu de lobby permanent** (style Fortnite) : choix du mode, groupe d'amis / invitations,
+  lancement de partie. Les commandes `/attack`, `/redzone`, `/lobby` seront remplacées par ce
+  menu, qui passera par `exports.gf_core:SetMode` (déjà prévu pour ça). Un groupe d'amis
+  devra être placé dans la même équipe en Attaque de zone.
+
 
 - `gf_stats` : statistiques permanentes (kills, victoires) dans MariaDB avec **oxmysql**
   — la base est déjà prête dans `docker-compose.yml`, la chaîne de connexion

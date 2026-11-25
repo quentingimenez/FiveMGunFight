@@ -38,7 +38,29 @@ RegisterNetEvent('gf_ui:announce', function(d)
     SendNUIMessage({ type = 'announce', data = d })
 end)
 
+-- Touché : chiffre de dégâts + marqueur + son
+RegisterNetEvent('gf_ui:hit', function(d)
+    SendNUIMessage({ type = 'hit', data = d })
+end)
+
+-- Kill : son + message (DOUBLÉ, TRIPLÉ, ...)
+RegisterNetEvent('gf_ui:kill', function(d)
+    SendNUIMessage({ type = 'kill', data = d })
+end)
+
+-- Affiche le classement pendant X ms (fin de partie)
+RegisterNetEvent('gf_ui:scoreboard_show', function(ms)
+    SendNUIMessage({ type = 'scoreboard_visible', visible = true })
+    SetTimeout(ms or 8000, function()
+        SendNUIMessage({ type = 'scoreboard_visible', visible = false })
+    end)
+end)
+
 RegisterNetEvent('gf_ui:killfeed', function(e)
+    if not e then
+        SendNUIMessage({ type = 'killfeed_clear' })
+        return
+    end
     local me = GetPlayerName(PlayerId())
     e.weaponLabel = e.weapon and labels[e.weapon] or nil
     e.involvesMe = (e.killer == me) or (e.victim == me)

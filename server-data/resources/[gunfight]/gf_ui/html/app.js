@@ -124,12 +124,103 @@ function renderScoreboard(d) {
     });
 }
 
+// ------------------------------------------------------------------ Sons (générés, pas de fichier)
+const VOLUME = 0.35; // volume général des sons (0 à 1)
+let audio = null;
+
+function tone(freq, start, duration, type = 'sine', gain = 1, endFreq = null) {
+    try {
+        audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+        if (audio.state === 'suspended') audio.resume();
+        const t0 = audio.currentTime + start;
+        const osc = audio.createOscillator();
+        const g = audio.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t0);
+        if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, t0 + duration);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(VOLUME * gain, t0 + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+        osc.connect(g).connect(audio.destination);
+        osc.start(t0);
+        osc.stop(t0 + duration + 0.02);
+    } catch (e) { /* audio indisponible */ }
+}
+
+// Petit « tic » sec à chaque touche
+function playHit() {
+    tone(1800, 0, 0.045, 'square', 0.25);
+    tone(3200, 0, 0.03, 'sine', 0.2);
+}
+
+// « Ding » de kill, plus aigu à chaque kill enchaîné
+function playKill(count) {
+    const k = Math.pow(1.122, Math.min(count, 8) - 1); // +1 ton par kill
+    tone(660 * k, 0, 0.12, 'triangle', 0.8);
+    tone(990 * k, 0.07, 0.22, 'sine', 0.7);
+    if (count >= 2) tone(1320 * k, 0.14, 0.25, 'sine', 0.5);
+}
+
+// ------------------------------------------------------------------ Hitmarker & dégâts
+function showHit(d) {
+    const hm = $('#hitmarker');
+    hm.classList.remove('show', 'kill');
+    void hm.offsetWidth;
+    if (d.fatal) hm.classList.add('kill');
+    hm.classList.add('show');
+
+    if (d.damage > 0) {
+        const n = el('div', 'dmg' + (d.fatal ? ' fatal' : ''), d.damage);
+        n.style.left = `${18 + Math.random() * 26}px`;
+        n.style.top = `${-34 + Math.random() * 22}px`;
+        $('#damage').appendChild(n);
+        setTimeout(() => n.remove(), 850);
+    }
+    playHit();
+}
+
+// ------------------------------------------------------------------ Multi-kills
+const MULTI = {
+    2: { text: 'DOUBLÉ',     color: '#ffd84d' },
+    3: { text: 'TRIPLÉ',     color: '#ffa23d' },
+    4: { text: 'QUADRUPLÉ',  color: '#ff6b3d' },
+    5: { text: 'QUINTUPLÉ',  color: '#ff3b5c' },
+    6: { text: 'SEXTUPLÉ',   color: '#e23bff' },
+};
+
+let medalTimer = null;
+function showKill(d) {
+    const medal = $('#medal');
+    const count = d.count || 1;
+    const m = count >= 7 ? { text: `INARRÊTABLE ×${count}`, color: '#b13bff' } : MULTI[count];
+
+    $('.m-title', medal).textContent = m ? m.text : 'ÉLIMINÉ';
+    $('.m-title', medal).style.color = m ? m.color : '#ffffff';
+    $('.m-title', medal).style.fontSize = m ? '' : '24px';
+    $('.m-sub', medal).textContent = d.victim ? `✖ ${d.victim}` : '';
+
+    medal.classList.remove('hidden', 'pop');
+    void medal.offsetWidth;
+    medal.classList.add('pop');
+    clearTimeout(medalTimer);
+    medalTimer = setTimeout(() => medal.classList.add('hidden'), m ? 2600 : 1600);
+
+    const hm = $('#hitmarker');
+    hm.classList.remove('show');
+    void hm.offsetWidth;
+    hm.classList.add('kill', 'show');
+    playKill(count);
+}
+
 // ------------------------------------------------------------------ Messages du jeu
 window.addEventListener('message', (event) => {
     const msg = event.data || {};
     switch (msg.type) {
         case 'hud': renderHud(msg.data); break;
         case 'killfeed': addKill(msg.data); break;
+        case 'killfeed_clear': $('#killfeed').replaceChildren(); break;
+        case 'hit': showHit(msg.data || {}); break;
+        case 'kill': showKill(msg.data || {}); break;
         case 'announce': announce(msg.data); break;
         case 'scoreboard': renderScoreboard(msg.data); break;
         case 'scoreboard_visible': $('#scoreboard').classList.toggle('hidden', !msg.visible); break;
