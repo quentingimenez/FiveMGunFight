@@ -154,7 +154,7 @@ la documentation et les exemples.
 ### Lobby et personnage
 
 1. Première connexion : l'écran de création doit apparaître (nom, genre,
-   carnation, style) puis le lobby avec le personnage visible.
+   parents, tenue, tatouages) puis le lobby avec le personnage visible.
 2. Vérifie la caméra fixe, l'escouade (1/4), la barre de modes et le bouton
    **JOUER**. Les modes **Gun Game** et **TDM** doivent afficher « bientôt ».
 3. Pour recommencer la création : un admin lance `/resetchar [id]`.

@@ -58,6 +58,7 @@
   var handlers = Object.create(null);
   var state = null;
   var ready = false;
+  var screenOverride = null;
   var heartbeatTimer = null;
   var bootFallback = null;
   var transitionTimer = null;
@@ -317,7 +318,7 @@
     revealApp();
     renderStatus();
     renderProfile();
-    setScreen(next.me.character ? 'lobby' : 'creator');
+    if (!screenOverride) setScreen(next.me.character ? 'lobby' : 'creator');
     if (next.party.launching !== true) hideTransition();
     startHeartbeat();
     dispatch('state', next);
@@ -325,6 +326,7 @@
 
   function closeLobby() {
     state = null;
+    screenOverride = null;
     syncDone = false;
     stopSyncWatch();
     buildBadge();
@@ -415,6 +417,16 @@
     toast: toast,
     showTransition: showTransition,
     hideTransition: hideTransition,
+    // L'éditeur de personnage prend la main sur l'écran tant qu'il est ouvert :
+    // les états d'escouade qui arrivent entre-temps ne doivent pas le fermer.
+    setScreen: function (screen) {
+      screenOverride = screen;
+      setScreen(screen);
+    },
+    releaseScreen: function () {
+      screenOverride = null;
+      setScreen(state && state.me && state.me.character ? 'lobby' : 'creator');
+    },
     get state() {
       return state;
     },

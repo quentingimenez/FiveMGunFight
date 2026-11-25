@@ -21,6 +21,9 @@ Config.Character = {
   nameMin = 3,
   nameMax = 20,
   skins = 5,
+  -- Apparence avancée : plafonds appliqués côté client et côté serveur.
+  maxTattoos = 24,
+  maxTattoosPerZone = 4,
 }
 
 -- Recherche serveur globale pour les modes 20-30 joueurs.
