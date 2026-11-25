@@ -6,6 +6,11 @@
 # =============================================================================
 set -e
 
+# Les fichiers générés par ce script (secrets.cfg) contiennent la clé de licence,
+# le mot de passe MySQL et les identifiants admin : ils ne doivent être lisibles
+# que par leur propriétaire (root dans le conteneur).
+umask 077
+
 DATA=/opt/fivem/server-data
 SERVER=/opt/fivem/server
 
@@ -75,6 +80,27 @@ esac
     done
   fi
 } > "$DATA/secrets.cfg"
+
+# Le umask ne s'applique qu'à la création : lors d'une mise à jour, ">" réutilise
+# le mode du fichier déjà présent (644 s'il a été créé par une ancienne version).
+# Le chmod peut échouer sans conséquence sur certains montages Windows.
+chmod 600 "$DATA/secrets.cfg" 2>/dev/null || true
+
+# En production, gf_maps/data est un volume. Docker recopie le contenu de
+# l'image dans un volume nommé neuf, mais un volume créé vide (ancien
+# déploiement, volume préparé à la main) n'a pas de maps.json : on l'amorce avec
+# la copie de référence, sinon l'éditeur de maps repartirait de zéro.
+# GF_SEED_MAPS vaut "true" uniquement dans docker-compose.prod.yml ; en dev, le
+# dossier du dépôt est monté.
+MAPS_DATA="$DATA/resources/[gunfight]/gf_maps/data"
+MAPS_DEFAUT="/opt/fivem/defaults/resources/[gunfight]/gf_maps/data"
+if [ "${GF_SEED_MAPS:-false}" = "true" ] && [ ! -f "$MAPS_DATA/maps.json" ]; then
+  mkdir -p "$MAPS_DATA"
+  if [ -f "$MAPS_DEFAUT/maps.json" ]; then
+    cp "$MAPS_DEFAUT/maps.json" "$MAPS_DATA/maps.json"
+    echo "maps.json amorcé depuis le modèle de l'image"
+  fi
+fi
 
 echo "secrets.cfg généré (joueurs max : $MAX_PLAYERS)"
 echo "Version FXServer : $(cat "$SERVER/FX_VERSION.txt" 2>/dev/null)"

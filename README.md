@@ -55,6 +55,16 @@ Les maps (redzones et zones d'attaque) se créent **en jeu** avec l'éditeur `/e
 Pour connaître l'état du serveur à tout moment : double-clic sur **`status.bat`**
 (conteneurs, santé de la base, dernières lignes de journal).
 
+`start.bat`, `stop.bat` et `status.bat` combinent déjà le socle et la surcouche
+de développement. Pour piloter Docker à la main, garde toujours **les deux**
+fichiers (le socle seul ne définit ni image ni build et ne peut pas démarrer) :
+
+```
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f fxserver
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+```
+
 ## 3. Devenir administrateur
 
 1. Connecte-toi une fois au serveur. Dans les journaux (fenêtre de `start.bat`) tu verras :
@@ -142,16 +152,20 @@ le serveur : **Ctrl+P puis Ctrl+Q**.
 ## 7. Fichiers du projet
 
 ```
-Dockerfile              image du serveur (Debian + FXServer Linux officiel)
-docker-compose.yml      serveur FiveM + base de données MariaDB
-docker/entrypoint.sh    démarrage : crée secrets.cfg à partir de .env
+Dockerfile              image du serveur (Debian + FXServer + server-data par défaut)
+docker-compose.yml      socle commun : fxserver + MariaDB (ne se lance jamais seul)
+docker-compose.dev.yml  surcouche dev : build local et montage de ./server-data
+docker-compose.prod.yml surcouche prod : image GHCR, volumes gunfight-prod-*
+docker/entrypoint.sh    démarrage : secrets.cfg, amorçage de maps.json en prod
 docker/mariadb.cnf      réglages MariaDB (cache, connexions, encodage)
 docker/db/init/         scripts SQL exécutés au tout premier démarrage
 .env.example            modèle de configuration (.env = ta vraie config, secrète)
 start.bat / stop.bat / status.bat / console.bat
 .github/workflows/      intégration continue (qualité, image Docker, test de démarrage)
+.github/dependabot.yml  mises à jour des actions et des images Docker
 .github/                modèle de pull request, CODEOWNERS, règles de branche
 scripts/verifier.sh     contrôles statiques (Lua, JSON, JS, shell, compose)
+scripts/sauvegarder.sh  sauvegarde de la production (base, txdata, maps)
 scripts/proteger-branche.sh  applique la protection de main (plan GitHub Pro requis)
 tests/                  tests automatiques du dépôt (unittest)
 docs/                   architecture, qualité, protection de branche
@@ -191,14 +205,18 @@ Le serveur FiveM n'en a pas besoin pour tourner : elle est prête pour la phase 
 Ouvrir la console SQL :
 
 ```
-docker compose exec mariadb mariadb -u gunfight -p gunfight
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec mariadb mariadb -u gunfight -p gunfight
 ```
 
-Sauvegarder la base :
+Sauvegarder la base en développement :
 
 ```
-docker compose exec mariadb mariadb-dump -u root -p gunfight > sauvegarde.sql
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec mariadb \
+  mariadb-dump -u root -p gunfight > sauvegarde.sql
 ```
+
+En production, utilise plutôt [`scripts/sauvegarder.sh`](scripts/sauvegarder.sh) :
+il sauvegarde la base **et** les volumes `txdata` et `maps` (voir section 12).
 
 ## 9. Panneau web txAdmin
 
@@ -208,10 +226,12 @@ le fonctionnement normal de FiveM (le même que sous Windows), il n'y a rien à 
 
 1. Ouvre **http://127.0.0.1:40120** (`localhost` peut viser l'IPv6 sur Windows et échouer).
 2. Le **code PIN** est affiché à chaque démarrage dans les journaux :
-   `docker compose logs fxserver | Select-String "PIN"`.
+   `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs fxserver | Select-String "PIN"`.
 3. Crée ton compte administrateur, puis, à l'étape « Existing Server Data », choisis le
-   dossier **`/opt/fivem/server-data`** (c'est le volume de ce dépôt, avec ton `server.cfg`).
-4. Enregistre : le serveur de jeu démarre juste après et apparaît dans `docker compose logs -f`.
+   dossier **`/opt/fivem/server-data`** (les données du serveur : montées depuis le dépôt
+   en développement, fournies par l'image en production).
+4. Enregistre : le serveur de jeu démarre juste après et apparaît dans
+   `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f fxserver`.
 
 Ce premier réglage n'est à faire qu'une fois : ensuite txAdmin redémarre le serveur tout seul.
 
@@ -225,53 +245,77 @@ Particularités du mode moniteur :
 - les commandes tapées dans `console.bat` vont au **mode moniteur**, pas au serveur de jeu :
   utilise la console de txAdmin pour les commandes de jeu.
 
-Ses comptes administrateurs et sa configuration sont conservés dans le volume `txdata`
-(`/opt/fivem/txData`) : un `docker compose down` ne les efface pas. Pour repartir de zéro,
-utiliser `docker compose down -v` (**attention : efface aussi la base de données**).
+Ses comptes administrateurs et sa configuration sont conservés dans le volume `gunfight_txdata`
+en développement (`gunfight-prod-txdata` en production), monté sur `/opt/fivem/txData` :
+un `docker compose -f docker-compose.yml -f docker-compose.dev.yml down` ne les efface pas.
+Pour repartir de zéro, ajoute `-v` (**attention : efface aussi la base de données et les maps ;
+ne le fais jamais sur les volumes de production sans sauvegarde**).
 
-txAdmin donne aussi un accès à distance (HTTP) aux personnes autorisées : garde des mots de
-passe forts et n'ouvre le port 40120 que si tu en as besoin.
+Le port 40120 n'est publié que sur **127.0.0.1** : le panneau reste invisible depuis le
+réseau, même sur un VPS. Pour y accéder depuis ton PC quand le serveur tourne ailleurs,
+utilise un tunnel SSH (le trafic est chiffré, aucun port de plus à ouvrir) :
+
+```
+ssh -L 40120:127.0.0.1:40120 utilisateur@IP_DU_VPS
+```
+
+puis ouvre http://127.0.0.1:40120 sur ton PC. Un reverse proxy TLS (Caddy, nginx) est
+l'autre option si plusieurs personnes doivent y accéder ; dans les deux cas, garde des
+mots de passe forts et active la double authentification de txAdmin.
 
 ## 10. Intégration continue (GitHub Actions)
 
-Le dépôt contient deux workflows, déclenchés à chaque **pull request** vers `main` et à
-chaque envoi sur `main` :
+Le dépôt contient deux workflows : **Qualité** tourne sur chaque pull request vers
+`main` et chaque envoi sur `main` ; **Image Docker** tourne aux mêmes moments et aussi
+sur les tags `v*`, qui publient l'image :
 
 | Workflow | Fichier | Rôle |
 |---|---|---|
 | **Qualité** | `.github/workflows/qualite.yml` | tests du dépôt + contrôles statiques |
-| **Image Docker** | `.github/workflows/docker.yml` | construit l'image et vérifie que le serveur démarre |
+| **Image Docker** | `.github/workflows/docker.yml` | construit ou publie l'image, puis vérifie le démarrage réel |
 
 **Qualité** installe Lua 5.4, Node et shellcheck, puis lance :
 
 1. `bash scripts/verifier.sh` : syntaxe Lua (`luac -p`), JSON valide, JavaScript
    (`node --check`), scripts shell (`sh -n`/`bash -n` + `shellcheck -S error`) et
-   `docker compose config` ;
+   validation des **deux** combinaisons Compose (`socle + dev` et `socle + prod`) ;
 2. `python3 -m unittest discover -s tests -v` : les tests de `tests/` (manifestes,
-   configuration du serveur, maps, documentation, absence de secrets suivis).
+   configuration du serveur, maps, documentation, environnements Compose, chaîne CI,
+   absence de secrets suivis).
 
-**Image Docker** construit l'image, démarre la pile complète avec une clé de licence
-fournie par le secret **`CFX_LICENSE_KEY`** (avec `TXADMIN=false`, pour tester le serveur
-de jeu directement), vérifie que les 12 ressources sont trouvées (`Found 12 resources`) et
-que les cinq ressources de jeu démarrent, puis envoie l'image sur GitHub Container
-Registry (`ghcr.io/<compte>/fivem-gunfight`).
+**Image Docker** construit l'image et lance le job **`Vérifier le démarrage des
+ressources`** :
 
-Le test de démarrage est ignoré si le secret n'est pas configuré. Pour l'ajouter :
+- sur une **pull request**, l'image est construite localement (sans envoi au registre)
+  puis démarrée avec `TXADMIN=false` ;
+- sur `main` et les tags, l'image est publiée sur GitHub Container Registry
+  (`ghcr.io/<compte>/fivemgunfight`), puis le job télécharge et démarre cette image.
+
+Le test vérifie que toutes les ressources attendues sont trouvées et que les cinq
+ressources de jeu `gf_*` démarrent réellement. Il utilise le secret dédié
+**`CFX_LICENSE_KEY`** (une clé de test, distincte de celle du serveur de production) :
 
 ```
 gh secret set CFX_LICENSE_KEY
 ```
 
-Le vrai serveur de jeu, lui, tourne avec la clé de ton fichier `.env` : celle du secret
-sert uniquement au test automatique.
+Sans ce secret (PR d'un fork ou de Dependabot, secret non configuré), le job affiche une
+note et saute les étapes de démarrage : il reste vert, et les autres vérifications
+continuent de bloquer la fusion.
+
+Les actions GitHub sont **épinglées par un SHA de commit** et les images Docker par un
+**digest** : une mise à jour ne peut pas arriver par surprise. `.github/dependabot.yml`
+ouvre chaque semaine une PR pour les actions et pour les images ; les versions de
+MariaDB ≥ 11.5 sont volontairement ignorées et restent une décision manuelle.
 
 ### Ces contrôles bloquent-ils le merge ?
 
-Oui, **dès que la protection de `main` est active** : les deux vérifications
-(« Qualité du dépôt » et « Construire et publier l'image ») sont déclarées comme *checks
-obligatoires*, avec une approbation et la résolution des conversations. Tant que le dépôt
-reste privé sur le plan gratuit de GitHub, la protection n'est pas disponible : c'est le
-seul point à activer, voir [docs/protection-branche.md](docs/protection-branche.md).
+Oui, **dès que la protection de `main` est active** : les trois vérifications
+(« Qualité du dépôt », « Construire et publier l'image » et « Vérifier le démarrage des
+ressources ») sont déclarées comme *checks obligatoires*, avec une approbation et la
+résolution des conversations. Tant que le dépôt reste privé sur le plan gratuit de
+GitHub, la protection n'est pas disponible : c'est le seul point à activer, voir
+[docs/protection-branche.md](docs/protection-branche.md).
 
 ## 11. Contribuer au code
 
@@ -301,21 +345,93 @@ Détails complets : [CONTRIBUTING.md](CONTRIBUTING.md) et [docs/](docs/README.md
 
 ## 12. Mettre le serveur en ligne (VPS)
 
+La production **ne clone pas le dépôt et ne construit rien** : elle télécharge l'image
+publiée sur GitHub Container Registry (GHCR) par la CI. Le dossier de déploiement ne
+contient que :
+
+- `docker-compose.yml` et `docker-compose.prod.yml` ;
+- `.env.example` (modèle) et `.env` (configuration, dont `IMAGE_REF`) ;
+- `docker/` (`mariadb.cnf` et `db/init/`, montés par le socle) ;
+- `scripts/sauvegarder.sh` (facultatif, mais recommandé).
+
+`server-data/` n'est **pas** copié : il vient de l'image. Seul le volume des maps est
+conservé séparément pour que les maps créées en jeu survivent aux mises à jour.
+
 1. Loue un VPS Linux (Ubuntu/Debian) avec disque NVMe. Ordre de grandeur :
    **4 vCPU / 8 Go** pour une trentaine de joueurs simultanés, **8 vCPU / 16 Go**
    pour viser plusieurs centaines de places.
 2. Installe Docker : `curl -fsSL https://get.docker.com | sh`
-3. Copie ce dossier sur le VPS (WinSCP, `scp` ou ce dépôt Git **privé**).
-4. Sur le VPS : `cp .env.example .env`, remplis `.env`, puis :
+3. Crée un dossier de déploiement (par exemple `/opt/gunfight`) et copies-y les fichiers
+   listés ci-dessus depuis ton poste (WinSCP, `scp`). Git n'est pas nécessaire sur le VPS.
+4. L'image GHCR est **privée** : connecte-toi avec un token GitHub limité à
+   `read:packages` (Settings → Developer settings → Personal access tokens).
    ```
-   docker compose up -d --build
-   docker compose logs -f fxserver
+   echo "$GHCR_TOKEN" | docker login ghcr.io -u TON_COMPTE --password-stdin
    ```
-5. Ouvre les ports **30120 TCP et UDP** dans le pare-feu du VPS
-   (et 40120 TCP seulement si tu accèdes à txAdmin à distance).
-6. Les joueurs se connectent avec `connect IP_DU_VPS` (ou via la liste des serveurs FiveM).
+   Ne mets jamais ce token dans `.env`, dans une commande enregistrée ou dans le dépôt.
+5. `cp .env.example .env`, remplis `LICENSE_KEY`, `MAX_PLAYERS` et les mots de passe
+   `MARIADB_*`, puis décommente `IMAGE_REF` et mets le tag publié, par exemple :
+   ```
+   IMAGE_REF=ghcr.io/compte/fivemgunfight:v1.2.3
+   ```
+6. Télécharge l'image et démarre la pile :
+   ```
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f fxserver
+   ```
+7. Ouvre seulement les ports **30120 TCP et UDP** dans le pare-feu du VPS : c'est tout
+   pour le jeu. txAdmin (40120) n'écoute que sur la boucle locale ; pour y accéder, vois
+   le tunnel SSH de la section 9.
+8. Les joueurs se connectent avec `connect IP_DU_VPS` (ou via la liste des serveurs FiveM).
 
-Mettre à jour FXServer : `docker compose build --no-cache` puis `docker compose up -d`.
+Les volumes de production s'appellent **`gunfight-prod-txdata`** (comptes txAdmin),
+**`gunfight-prod-dbdata`** (base MariaDB) et **`gunfight-prod-maps`** (`maps.json`). Ils
+sont distincts de ceux du développement (`gunfight_txdata`, `gunfight_dbdata`) : lancer
+le mauvais fichier Compose ne peut donc pas écrire dans l'autre environnement.
+
+Au premier démarrage, la base est initialisée par MariaDB et Docker recopie le contenu
+de l'image dans le volume `maps` neuf. Si le volume existait déjà mais sans `maps.json`
+(volume préparé à la main, ancien déploiement), `docker/entrypoint.sh` copie le modèle
+fourni par l'image (amorçage automatique, activé par `GF_SEED_MAPS: "true"` dans la
+surcouche prod). Ne supprime pas ces volumes : `down -v` efface la base, txAdmin et les
+maps. Si tu reprends des données d'un ancien déploiement, copie-les dans les volumes,
+conteneurs arrêtés, **avant** le premier démarrage.
+
+**Mise à jour** : quand un tag `v*` est publié, la CI produit l'image correspondante.
+Change `IMAGE_REF` dans `.env`, puis `pull` et `up -d` avec la surcouche prod. Aucun
+build n'est nécessaire.
+
+**Retour arrière** : remets l'ancien tag dans `IMAGE_REF`, puis `pull` et `up -d` avec la
+surcouche prod. Les volumes ne sont pas supprimés par ce changement d'image.
+
+### Sauvegarde et restauration
+
+Depuis le dossier de déploiement (avec `.env` et les deux fichiers Compose) :
+
+```
+bash scripts/sauvegarder.sh
+```
+
+Le script crée `backups/<horodatage>/` avec trois archives : `base.sql.gz` (dump
+MariaDB), `txdata.tar.gz` (volume txAdmin) et `maps.tar.gz` (données `gf_maps`), puis
+purge les sauvegardes de plus de 14 jours. Il utilise la surcouche prod et exige
+`IMAGE_REF`.
+
+Pour restaurer, arrête d'abord `fxserver` (pour que la base et les maps ne bougent plus) :
+
+```
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop fxserver
+gunzip -c backups/<horodatage>/base.sql.gz | \
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T mariadb \
+  sh -c 'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'
+```
+
+Pour `txdata` et `maps`, extrais chaque archive dans un conteneur jetable avec le volume
+correspondant monté (`tar -xzf ... -C /data`), puis relance `up -d`. Ces commandes de
+restauration ne sont pas automatisées : répète-les sur une copie avant d'en dépendre en
+production.
 
 ## 13. Problèmes fréquents
 
@@ -326,10 +442,16 @@ Mettre à jour FXServer : `docker compose build --no-cache` puis `docker compose
 | Erreur de licence / « too many slots » | `MAX_PLAYERS` dépasse la limite de ta clé (48 sans Element Club) |
 | `Could not authenticate server license key` | clé invalide, révoquée ou mal copiée (`\r` : réenregistre `.env` en UTF-8 sans retour chariot) |
 | Ressource `sessionmanager` / `hardcap` introuvable | n'existe plus dans les versions récentes de FXServer : les lignes ont été retirées de `server.cfg`, ne pas les remettre |
-| `mariadb` reste `unhealthy` | regarde `docker compose logs mariadb` ; si le disque est plein ou le volume corrompu, `docker compose down -v` puis relance |
+| `docker compose up` échoue : « service fxserver has neither an image nor a build context » | le socle seul ne démarre pas : ajoute `-f docker-compose.dev.yml` (local) ou `-f docker-compose.prod.yml` (VPS) ; `start.bat` le fait déjà |
+| `IMAGE_REF` manquante ou vide (prod) | renseigne `IMAGE_REF=ghcr.io/...:tag` dans `.env` ; en développement, utilise la surcouche dev, qui n'en a pas besoin |
+| `mariadb` reste `unhealthy` | regarde `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs mariadb` ; si le disque est plein ou le volume corrompu, `down -v` puis relance (**efface les données**) |
 | Impossible de se connecter | vérifie dans les journaux qu'il n'y a pas d'erreur rouge ; essaie `connect 127.0.0.1` |
 | Le port 30120 est déjà utilisé | un autre serveur FiveM tourne sur la machine : arrête-le |
 | Le mode ne démarre pas | il faut 2 joueurs (un par équipe) ou `/startround` en admin |
+| `fxserver` reste `unhealthy` | normal en mode moniteur tant que txAdmin n'est pas configuré : termine l'assistant du panneau, le healthcheck passe ensuite au vert |
+| Comptes txAdmin, base ou maps vides en production | vérifie `docker volume ls` : la prod utilise `gunfight-prod-*`, pas `gunfight_txdata`/`gunfight_dbdata` ; un `up` avec la surcouche dev ne voit pas les données de prod |
+| `denied` ou `manifest unknown` au `pull` | l'image GHCR est privée : reconnecte-toi avec un token `read:packages` (`docker login ghcr.io`) |
+| Le smoke est « sauté » sur une PR | normal sans secret `CFX_LICENSE_KEY` (PR de fork ou Dependabot) : la CI le signale sans échouer |
 
 ## Pour la suite (phase 2)
 

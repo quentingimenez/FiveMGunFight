@@ -1,0 +1,30 @@
+# =============================================================================
+#  Production : image publiée sur GHCR, aucune dépendance au dépôt Git.
+#
+#  Dans .env, renseigne IMAGE_REF (ex. ghcr.io/compte/fivemgunfight:v1.2.3),
+#  puis :
+#    docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+#  server-data vient de l'image ; seul gf_maps/data est un volume, pour que les
+#  maps créées avec l'éditeur survivent aux mises à jour.
+# =============================================================================
+services:
+  fxserver:
+    image: ${IMAGE_REF:?Definis IMAGE_REF dans .env (voir README, section 12)}
+    environment:
+      # Volume maps vide au premier démarrage : on le remplit avec le maps.json
+      # de l'image (voir docker/entrypoint.sh).
+      GF_SEED_MAPS: "true"
+    volumes:
+      - maps:/opt/fivem/server-data/resources/[gunfight]/gf_maps/data
+
+volumes:
+  # Volumes distincts de ceux du dev : un `up` lancé avec le mauvais fichier ne
+  # peut pas écrire dans la base ou les maps de l'autre environnement.
+  txdata:
+    name: gunfight-prod-txdata
+  dbdata:
+    name: gunfight-prod-dbdata
+  maps:
+    name: gunfight-prod-maps

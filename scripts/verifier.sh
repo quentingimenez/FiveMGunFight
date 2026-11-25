@@ -151,12 +151,40 @@ else
     cp .env.example .env
     env_temporaire=1
   fi
-  if sortie="$(docker compose config -q 2>&1)"; then
-    ok "docker-compose.yml valide"
+
+  # Le socle seul ne définit ni build ni image pour fxserver : on valide les
+  # deux combinaisons réellement utilisées (développement puis production).
+  if sortie="$(docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q 2>&1)"; then
+    ok "socle + dev valides"
   else
-    echec "docker-compose.yml"
+    echec "socle + dev"
     printf '%s\n' "$sortie" | details
   fi
+
+  # La surcouche prod exige IMAGE_REF : on fournit une valeur de test si ni
+  # l'environnement ni .env n'en définissent une, sans écraser la leur.
+  image_ref_temporaire=0
+  image_ref_definie=0
+  if [ -n "${IMAGE_REF:-}" ]; then
+    image_ref_definie=1
+  elif [ -f .env ] && grep -Eq '^[[:space:]]*IMAGE_REF=[^[:space:]]' .env; then
+    image_ref_definie=1
+  fi
+  if [ "$image_ref_definie" -eq 0 ]; then
+    IMAGE_REF="exemple.invalid/gunfight:test"
+    export IMAGE_REF
+    image_ref_temporaire=1
+  fi
+  if sortie="$(docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q 2>&1)"; then
+    ok "socle + prod valides"
+  else
+    echec "socle + prod"
+    printf '%s\n' "$sortie" | details
+  fi
+  if [ "$image_ref_temporaire" -eq 1 ]; then
+    unset IMAGE_REF
+  fi
+
   if [ "$env_temporaire" -eq 1 ]; then
     rm -f .env
   fi

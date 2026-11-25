@@ -3,7 +3,7 @@
 ## Principe
 
 Aucune pull request ne peut être fusionnée si une vérification échoue. La CI ne
-se contente pas de « lancer des tests » : les deux workflows sont déclarés comme
+se contente pas de « lancer des tests » : les trois checks sont déclarés comme
 **status checks requis** sur la branche `main` (voir
 [`protection-branche.md`](protection-branche.md)).
 
@@ -13,12 +13,17 @@ se contente pas de « lancer des tests » : les deux workflows sont déclarés c
 |---|---|---|---|
 | `.github/workflows/qualite.yml` | `Qualité du dépôt` | chaque pull request, chaque envoi sur `main` | 1 à 2 min |
 | `.github/workflows/docker.yml` | `Construire et publier l'image` | chaque pull request, chaque envoi sur `main`, tags `v*` | 3 à 8 min |
-| `.github/workflows/docker.yml` | `Vérifier le démarrage des ressources` | envoi sur `main` et tags (pas les PR) | jusqu'à 10 min |
+| `.github/workflows/docker.yml` | `Vérifier le démarrage des ressources` | chaque pull request, chaque envoi sur `main`, tags `v*` | 10 à 20 min |
 
-Le job de démarrage réel (`smoke`) est volontairement hors des pull requests :
-il télécharge l'image, démarre FXServer avec une vraie clé de licence et tourne
-plusieurs minutes. Il protège `main` après fusion ; la pull request, elle, est
-bloquée par les tests statiques et la construction d'image.
+Le job de démarrage réel (`smoke`) tourne désormais **aussi sur les pull
+requests** : il construit l'image localement, démarre FXServer avec une vraie
+clé de licence et vérifie que les ressources `gf_*` démarrent. Sur `main` et les
+tags, il télécharge l'image publiée sur GHCR à la place. C'est le seul contrôle
+qui exécute réellement le serveur ; il bloque donc la fusion comme les autres.
+
+Il est limité par une `concurrency` (`smoke-licence`, sans annulation) : la clé
+de licence CI est partagée, deux smoke tests ne doivent pas tourner en même
+temps.
 
 ## Les vérifications statiques (`scripts/verifier.sh`)
 
@@ -28,10 +33,10 @@ rouge.
 | Étape | Outil | Ce qu'elle attrape |
 |---|---|---|
 | Syntaxe Lua | `luac -p` | erreur de syntaxe, `end` manquant, chaîne non fermée — la ressource refuserait de démarrer |
-| JSON valide | `python -m json` | virgule en trop dans `maps.json`, fichier tronqué |
+| JSON valide | Python (`json.load`) | virgule en trop dans `maps.json`, fichier tronqué |
 | Syntaxe JavaScript | `node --check` | erreur dans `gf_ui/html/app.js` qui casse toute l'interface NUI |
 | Scripts shell | `sh -n` / `bash -n` + `shellcheck -S error` | `entrypoint.sh` cassé : le conteneur ne démarre plus du tout |
-| Compose | `docker compose config -q` | YAML invalide, référence de volume inexistante, variable mal écrite |
+| Compose | `docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q` et idem avec `docker-compose.prod.yml` | YAML invalide, référence de volume inexistante, variable mal écrite, surcouche qui ne se combine plus au socle |
 
 Un outil absent sur ta machine provoque un message « ignore », jamais un faux
 succès silencieux. En CI, tous les outils sont installés : rien n'est ignoré.
@@ -44,6 +49,9 @@ succès silencieux. En CI, tous les outils sont installés : rien n'est ignoré.
 |---|---|
 | `ManifestesFiveM` | chaque dossier de ressource a un `fxmanifest.lua`, avec `fx_version` et le jeu déclaré ; chaque fichier cité (scripts, `ui_page`, `files`) existe réellement |
 | `ConfigurationServeur` | les cinq ressources `gf_*` sont démarrées dans `server.cfg` ; `sessionmanager`/`hardcap` n'y reviennent pas ; `.env.example` contient toutes les clés attendues et aucun secret ; `.gitignore` et `.dockerignore` protègent `.env`, `secrets.cfg` et le cache |
+| `InfraDocker` | txAdmin limité à 127.0.0.1, healthcheck FXServer, plafonds mémoire des deux services, nom de projet Compose, `secrets.cfg` en 600, `FROM` Debian épinglé par digest, image MariaDB épinglée par digest, `GF_SEED_MAPS`/`MAPS_DEFAUT` dans l'entrypoint |
+| `EnvironnementsCompose` | les trois fichiers Compose existent ; le dev construit l'image et monte `./server-data` ; la prod utilise `${IMAGE_REF}`, le volume `maps` et les volumes `gunfight-prod-*` distincts ; le socle ne déclare ni `build` ni `image` pour `fxserver` |
+| `ChaineCI` | toutes les actions sont épinglées par SHA ; Dependabot suit les actions et les images et ignore MariaDB ≥ 11.5 ; le check de démarrage figure dans la protection de branche ; `docker.yml` déclenche le smoke sur les pull requests |
 | `MapsEnJeu` | structure de `maps.json` : noms, rayons positifs, polygones d'au moins trois sommets, points de départ présents, identifiants uniques |
 | `Documentation` | les documents (`README`, `CONTRIBUTING`, `SECURITY`, `docs/`, modèle de PR, `CODEOWNERS`) existent et ne sont pas vides ; le README cite chaque ressource ; chaque workflow déclare `on:` et `jobs:` |
 | `DepotGit` | aucun fichier secret n'est suivi par Git (`git ls-files`) |
@@ -78,18 +86,47 @@ Règle : **un test doit échouer sur un vrai défaut et passer sur `main`**.
 Toute nouvelle vérification doit être mentionnée dans ce document et dans
 [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
+## Dépendances : épinglage et Dependabot
+
+Règle du dépôt : **toute action GitHub est épinglée par un SHA de commit de
+40 caractères hexadécimaux, toute image Docker par un digest `sha256:`**. Un tag
+(`@v5`, `:11.4`) est déplaçable : il ne garantit pas que la CI ou la production
+exécutera le même code demain.
+
+- Les actions des workflows portent un commentaire lisible (`# v5`) à côté du
+  SHA, pour savoir quelle version est épinglée.
+- Le `FROM` du Dockerfile et l'image MariaDB du socle sont épinglés par digest.
+- Les montées de version arrivent par des pull requests, jamais par un tag qui
+  glisse silencieusement.
+
+`.github/dependabot.yml` vérifie chaque semaine (lundi 06:00, Europe/Paris) les
+deux écosystèmes :
+
+| Écosystème | Portée | Limite |
+|---|---|---|
+| `github-actions` | toutes les actions des workflows, groupées en une PR | 5 PR ouvertes |
+| `docker` | images du Dockerfile et des fichiers Compose, groupées en une PR | 5 PR ouvertes |
+
+MariaDB est exclue à partir de **11.5** : le socle reste sur la branche LTS
+11.4, et un changement de version se décide et se teste à part. Une PR Dependabot
+passe par la même CI que les autres ; elle ne se fusionne que verte.
+
 ## Secret de la CI
 
 `CFX_LICENSE_KEY` (Settings → Secrets and variables → Actions) permet au job
-`smoke` de démarrer un vrai serveur. Sans ce secret, le job affiche une note
-« test ignoré » et ne bloque rien ; les autres jobs, eux, restent bloquants.
+`smoke` de démarrer un vrai serveur. C'est une clé **dédiée aux tests**, pas
+celle de la production : elle peut être révoquée ou remplacée sans toucher au
+serveur en ligne.
 
 ```bash
 gh secret set CFX_LICENSE_KEY
 ```
 
-La clé de la CI ne sert qu'aux tests : le serveur de production utilise celle de
-`.env`. Ne jamais réutiliser un même secret dans un fichier versionné.
+Sans ce secret (PR d'un fork, PR de Dependabot, secret non configuré), le job
+affiche une note, saute les étapes de démarrage et reste **vert** : la fusion
+n'est donc pas bloquée par une limite externe, mais le démarrage n'a pas été
+vérifié. Les deux autres checks restent bloquants. La clé de production, elle,
+reste dans le `.env` du VPS et n'est jamais versionnée.
 
 ## Consulter et relancer un run
 

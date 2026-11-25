@@ -1,7 +1,14 @@
 name: Docker
 
 # Construit l'image à chaque envoi, la publie sur GitHub Container Registry,
-# puis vérifie qu'elle démarre réellement avec les 12 ressources du serveur.
+# puis vérifie qu'elle démarre réellement avec toutes les ressources du serveur.
+# Le test de démarrage tourne aussi sur les pull requests : dans ce cas, aucune
+# image n'étant publiée, il la construit localement.
+#
+# Le secret CFX_LICENSE_KEY doit être une clé CI dédiée, jamais la clé du
+# serveur de production : seule cette vérification l'utilise. Les pull requests
+# Dependabot (et celles venues d'un fork) n'ont pas accès aux secrets Actions :
+# le job affiche alors une note et réussit sans rien lancer.
 on:
   push:
     branches: [main]
@@ -12,24 +19,31 @@ on:
 
 permissions:
   contents: read
-  packages: write
-
-env:
-  IMAGE: ghcr.io/${{ github.repository }}
-  CFX_LICENSE_KEY: ${{ secrets.CFX_LICENSE_KEY }}
 
 jobs:
   image:
     name: Construire et publier l'image
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v5
+      - name: Récupérer le dépôt
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: docker/setup-buildx-action@v3
+      # GHCR refuse une référence contenant des majuscules : on calcule une fois
+      # pour toutes la version minuscule du nom du dépôt.
+      - name: Calculer le nom d'image en minuscules
+        run: |
+          echo "IMAGE_LC=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Configurer Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Connexion à GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -37,53 +51,95 @@ jobs:
 
       - name: Étiquettes de l'image
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ env.IMAGE_LC }}
+          # L'étiquette ci-<sha long> est aussi utilisée par le job smoke.
           tags: |
             type=ref,event=branch
             type=ref,event=tag
             type=sha,format=long,prefix=ci-
 
+      # FX_URL et FX_SHA256 sont des variables de dépôt optionnelles (vides par
+      # défaut) : les définir fige la version de FXServer téléchargée.
       - name: Build et push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            FX_URL=${{ vars.FX_URL }}
+            FX_SHA256=${{ vars.FX_SHA256 }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   smoke:
     name: Vérifier le démarrage des ressources
     needs: image
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    # Une seule vérification à la fois : la clé de licence CI est partagée par
+    # tous les runs. On met en file plutôt que d'annuler le run en cours.
+    concurrency:
+      group: smoke-licence
+      cancel-in-progress: false
     env:
       CFX_LICENSE_KEY: ${{ secrets.CFX_LICENSE_KEY }}
     steps:
-      - name: Secret absent, test ignoré
-        if: env.CFX_LICENSE_KEY == ''
-        run: |
-          echo "::notice::Le secret CFX_LICENSE_KEY n'est pas configuré : test de démarrage ignoré."
+      - name: Récupérer le dépôt
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - name: Connexion à GHCR
-        if: env.CFX_LICENSE_KEY != ''
-        uses: docker/login-action@v3
+      - name: Calculer le nom d'image en minuscules
+        run: |
+          echo "IMAGE_LC=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      # Le runner ne reçoit jamais la clé sur une PR de fork ou de Dependabot :
+      # on le constate ici, puis les étapes suivantes se contentent de vérifier
+      # que le test est disponible.
+      - name: Détecter la clé de licence CI
+        run: |
+          if [ -z "${CFX_LICENSE_KEY:-}" ]; then
+            echo "::notice::Le secret CFX_LICENSE_KEY n'est pas disponible (PR de fork, Dependabot ou secret non configuré) : test de démarrage ignoré."
+            echo "disponible=false" >> "$GITHUB_ENV"
+          else
+            echo "disponible=true" >> "$GITHUB_ENV"
+          fi
+
+      # Même étiquette que celle publiée par le job image (metadata-action) :
+      # ci-<sha long>, grâce à type=sha,format=long,prefix=ci-.
+      - name: Construire l'image localement (pull request)
+        if: github.event_name == 'pull_request' && env.disponible == 'true'
+        run: |
+          set -euo pipefail
+          docker build --tag "$IMAGE_LC:ci-${{ github.sha }}" .
+
+      - name: Connexion à GHCR (envoi ou tag)
+        if: github.event_name != 'pull_request' && env.disponible == 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Lancer le serveur
-        if: env.CFX_LICENSE_KEY != ''
+      - name: Récupérer l'image publiée (envoi ou tag)
+        if: github.event_name != 'pull_request' && env.disponible == 'true'
         run: |
           set -euo pipefail
-          IMAGE_LC="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
           docker pull "$IMAGE_LC:ci-${{ github.sha }}"
+
+      - name: Démarrer le serveur
+        if: env.disponible == 'true'
+        run: |
+          set -euo pipefail
           docker run -d --name smoke \
+            --init \
+            --memory 4g \
+            -p 30120:30120 \
             -e LICENSE_KEY="$CFX_LICENSE_KEY" \
             -e TXADMIN=false \
             -e SERVER_NAME="Gunfight CI" \
@@ -93,43 +149,62 @@ jobs:
             -e MARIADB_PASSWORD=ci_password \
             "$IMAGE_LC:ci-${{ github.sha }}"
 
-      - name: Attendre le chargement des ressources
-        if: env.CFX_LICENSE_KEY != ''
+      # On attend à la fois la réponse HTTP (le serveur accepte des joueurs) et
+      # le démarrage de nos ressources. Sortie immédiate dès que les deux sont
+      # vraies, sinon échec au bout de 180 secondes.
+      - name: Attendre le démarrage
+        if: env.disponible == 'true'
         run: |
           set -uo pipefail
-          for _ in $(seq 1 60); do
-            if docker logs smoke 2>&1 | grep -q "Started resource gf_"; then
-              echo "Ressources démarrées."
-              break
+          demarre=false
+          for i in $(seq 1 60); do
+            if [ "$(docker inspect -f '{{.State.Running}}' smoke 2>/dev/null || true)" != "true" ]; then
+              echo "::error::Le conteneur smoke s'est arrêté avant de répondre."
+              docker logs --tail 200 smoke || true
+              exit 1
             fi
-            if [ "$(docker inspect -f '{{.State.Running}}' smoke 2>/dev/null)" != "true" ]; then
-              echo "Conteneur arrêté prématurément."
+            if curl -fsS --max-time 2 "http://127.0.0.1:30120/dynamic.json" >/dev/null 2>&1 \
+              && docker logs smoke 2>&1 | grep "Started resource gf_core" >/dev/null; then
+              echo "Serveur démarré après $((i * 3)) s."
+              demarre=true
               break
             fi
             sleep 3
           done
-          docker logs smoke > smoke.log 2>&1 || true
-          cat smoke.log
+          if [ "$demarre" != "true" ]; then
+            echo "::error::Le serveur n'a pas répondu dans les 180 secondes."
+            docker logs --tail 200 smoke || true
+            exit 1
+          fi
 
       - name: Vérifier les journaux
-        if: env.CFX_LICENSE_KEY != ''
+        if: env.disponible == 'true'
         run: |
           set -euo pipefail
+          docker logs smoke > smoke.log 2>&1 || true
           if grep -q "Could not authenticate server license key" smoke.log; then
             echo "::error::La clé de licence du secret CFX_LICENSE_KEY a été refusée par Cfx.re."
             exit 1
           fi
-          grep -q "Found 12 resources" smoke.log || {
-            echo "::error::Le serveur n'a pas trouvé les 12 ressources attendues."
+          # Le nombre de ressources dépend du dépôt : le calculer évite qu'un
+          # ajout de ressource fasse échouer ce test avec un 12 codé en dur.
+          attendu="$(find server-data/resources -name fxmanifest.lua | wc -l | tr -d ' ')"
+          if ! grep -q "Found ${attendu} resources" smoke.log; then
+            echo "::error::Le serveur n'a pas trouvé les ${attendu} ressources attendues."
+            tail -n 200 smoke.log
             exit 1
-          }
+          fi
           for r in gf_core gf_maps gf_attack gf_redzone gf_ui; do
-            grep -q "Started resource $r" smoke.log || {
+            if ! grep -q "Started resource $r" smoke.log; then
               echo "::error::La ressource $r n'a pas démarré."
+              tail -n 200 smoke.log
               exit 1
-            }
+            fi
           done
+          echo "Les ${attendu} ressources ont été trouvées et les ressources gunfight ont démarré."
 
+      # Même si une étape précédente a échoué : le conteneur ne doit pas rester
+      # sur le runner, et son nom doit être libre au prochain run.
       - name: Nettoyer
         if: always()
         run: docker rm -f smoke || true

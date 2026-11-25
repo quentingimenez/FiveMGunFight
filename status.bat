@@ -2,6 +2,8 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 title Etat du serveur Gunfight
+rem Même combinaison de fichiers que start.bat (socle + développement)
+set COMPOSE_FILE=docker-compose.yml;docker-compose.dev.yml
 
 where docker >nul 2>nul
 if errorlevel 1 (

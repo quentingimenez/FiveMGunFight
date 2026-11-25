@@ -83,8 +83,9 @@ bash scripts/verifier.sh
   étape s'affiche « ignoré » ; c'est la CI (Ubuntu) qui tranche.
 - Si le sujet touche `Dockerfile`, `docker-compose*.yml`, `docker/entrypoint.sh`
   ou `server-data/server.cfg` : construire et démarrer réellement l'image
-  (`docker compose build`, `docker compose up -d`, puis `docker compose logs -f
-  fxserver` jusqu'à « Started resource gf_ »), et tester le comportement en jeu.
+  (`docker compose -f docker-compose.yml -f docker-compose.dev.yml build`, puis
+  `... up -d`, puis `... logs -f fxserver` jusqu'à « Started resource gf_ »),
+  et tester le comportement en jeu.
 - Un contrôle rouge se corrige, jamais ne se contourne.
 - Une relecture de diff ne prouve rien : la modification doit être **exécutée**
   en local (§ 4.3) avant d'être proposée.
@@ -158,8 +159,9 @@ gh pr checks --watch
 gh pr view --json number,state,mergeable,statusCheckRollup
 ```
 
-- Attendre la fin de **tous** les checks : `Qualité du dépôt` (1–2 min) et
-  `Construire et publier l'image` (3–8 min).
+- Attendre la fin de **tous** les checks : `Qualité du dépôt` (1–2 min),
+  `Construire et publier l'image` (3–8 min) et `Vérifier le démarrage des
+  ressources` (10–20 min, sauté avec une note si le secret CI est absent).
 - **Rouge** : corriger sur la même branche, commit additionnel, `git push`, puis
   relancer le suivi. Pas de réécriture d'historique après le début de la revue,
   pas de force-push, pas de désactivation ni de contournement d'un check
@@ -193,9 +195,10 @@ git status -sb
 git rev-parse HEAD origin/main           # les deux sha doivent être identiques
 ```
 
-Puis surveiller le run de `main` : le test de démarrage réel ne tourne que
-là (`gh run list --branch main --limit 1`). S'il est rouge, ouvrir une pull
-request de correction immédiatement — jamais de commit direct sur `main`.
+Puis surveiller le run de `main` : le test de démarrage réel y tourne aussi,
+comme sur chaque pull request (`gh run list --branch main --limit 1`). S'il est
+rouge, ouvrir une pull request de correction immédiatement — jamais de commit
+direct sur `main`.
 
 ## 5. Interdits
 
@@ -247,9 +250,11 @@ répondre par des commits sur la même branche, puis fusionner une fois les
 
 - Dépôt : `WardenPro/FiveMGunFight` (privé), `gh` authentifié et autorisé.
 - CI : `.github/workflows/qualite.yml` (job `Qualité du dépôt`) et
-  `.github/workflows/docker.yml` (job `Construire et publier l'image`), tous
-  deux déclenchés sur chaque pull request. Le job `Vérifier le démarrage des
-  ressources` ne tourne que sur `main` et les tags.
+  `.github/workflows/docker.yml` (jobs `Construire et publier l'image` et
+  `Vérifier le démarrage des ressources`), tous déclenchés sur chaque pull
+  request. Le smoke construit l'image localement sur une PR, et télécharge
+  l'image publiée sur `main` et les tags ; sans le secret CI, il est sauté avec
+  une note.
 - Protection GitHub : inactive à cause du plan gratuit ; options de fusion déjà
   en place (squash autorisé, branche supprimée après fusion). Voir
   `docs/protection-branche.md`.

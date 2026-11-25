@@ -7,27 +7,79 @@ flowchart LR
   J["Joueurs<br/>FiveM"] -->|"30120 TCP/UDP"| S["Conteneur fxserver<br/>FXServer + txAdmin"]
   T["Navigateur<br/>admin"] -->|"40120 TCP<br/>txAdmin"| S
   S -->|"mysql://gunfight@mariadb"| D[("Conteneur mariadb<br/>volume dbdata")]
-  S --- V[("Volume monté<br/>server-data/")]
+  S -->|"dev : bind mount"| V[("server-data/ du dépôt")]
+  S -->|"prod : image GHCR"| I[("server-data embarqué<br/>dans l'image")]
   S --- X[("Volume txdata<br/>comptes txAdmin")]
+  S --- M[("Volume maps<br/>maps.json")]
 ```
 
 Le serveur est un empilement de trois choses :
 
-1. une **image Docker** qui contient uniquement FXServer (téléchargé depuis
-   Cfx.re) et un script de démarrage ;
-2. un dossier **`server-data/`** monté dans le conteneur : c'est là que vivent
-   `server.cfg` et les ressources Lua, donc ton code, modifiable sans
-   reconstruire l'image ;
+1. une **image Docker** qui contient FXServer (téléchargé depuis Cfx.re), un
+   script de démarrage et un **`server-data/` par défaut** (copié dans
+   `/opt/fivem/defaults/` et `/opt/fivem/server-data/`) ;
+2. le dossier **`server-data/`** : monté depuis le dépôt en développement pour
+   modifier `server.cfg` et les ressources Lua sans reconstruire l'image ; en
+   production, c'est celui de l'image, et seules les maps sont un volume ;
 3. un conteneur **MariaDB** prêt pour la phase 2 (statistiques), sans port
    exposé.
+
+## Trois fichiers Compose
+
+Le socle ne se lance **jamais seul** : il ne déclare ni `build` ni `image` pour
+`fxserver`, précisément pour qu'une commande incomplète échoue au lieu de
+démarrer une pile ambiguë.
+
+| Fichier | Rôle |
+|---|---|
+| `docker-compose.yml` | socle commun : services `fxserver` et `mariadb`, réseau, healthchecks, plafonds mémoire, volumes `txdata` et `dbdata` (noms `gunfight_txdata` / `gunfight_dbdata`), variables communes |
+| `docker-compose.dev.yml` | surcouche développement : `build: .` et bind mount `./server-data:/opt/fivem/server-data` ; garde les volumes du socle, donc une installation existante continue de fonctionner |
+| `docker-compose.prod.yml` | surcouche production : `image: ${IMAGE_REF:?...}`, `GF_SEED_MAPS: "true"`, volume `maps` monté sur `resources/[gunfight]/gf_maps/data`, volumes renommés `gunfight-prod-*`, aucun bind mount de `server-data/` |
+
+| Élément | Développement (socle + dev) | Production (socle + prod) |
+|---|---|---|
+| Image de `fxserver` | construite localement (`build: .`) | téléchargée depuis GHCR (`IMAGE_REF`) |
+| `server-data/` | bind mount du dépôt | fourni par l'image, aucun bind mount |
+| Maps | `server-data/resources/[gunfight]/gf_maps/data/` du dépôt | volume `maps` monté sur ce même chemin |
+| `GF_SEED_MAPS` | `"false"` (les maps du dépôt sont déjà là) | `"true"` (amorce `maps.json` si le volume n'en a pas) |
+| Volume txAdmin | `gunfight_txdata` | `gunfight-prod-txdata` |
+| Volume MariaDB | `gunfight_dbdata` | `gunfight-prod-dbdata` |
+| Volume maps | aucun | `gunfight-prod-maps` |
+| Lancement | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build` | `docker compose -f docker-compose.yml -f docker-compose.prod.yml pull` puis `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` |
+
+Les volumes de production portent des noms distincts : un `up` lancé avec le
+mauvais fichier ne peut pas écrire dans la base ou les maps de l'autre
+environnement. `start.bat` / `stop.bat` / `status.bat` utilisent toujours
+`docker-compose.yml` + `docker-compose.dev.yml`.
+
+## Amorçage de `maps.json`
+
+En production, `gf_maps/data` est monté depuis le volume `maps`. Docker recopie
+le contenu de l'image dans un volume nommé **neuf**, mais un volume créé vide
+(volume préparé à la main, déploiement antérieur au volume) peut ne pas contenir
+de `maps.json`. Après avoir généré `secrets.cfg`, `docker/entrypoint.sh` vérifie
+donc `$DATA/resources/[gunfight]/gf_maps/data/maps.json`. Si `GF_SEED_MAPS=true`
+et que le fichier manque, il copie le modèle de l'image depuis
+`/opt/fivem/defaults/resources/[gunfight]/gf_maps/data/maps.json` et affiche
+« maps.json amorcé depuis le modèle de l'image ».
+
+- En développement, `GF_SEED_MAPS` vaut `"false"` : le dossier du dépôt est
+  monté, il n'y a rien à amorcer.
+- En production, l'amorçage ne remplace **jamais** un `maps.json` existant : une
+  mise à jour de l'image ne touche pas aux maps créées en jeu.
+- Pour repartir des maps par défaut, il faut vider le volume `maps` (après
+  sauvegarde) : le prochain démarrage y recopie le contenu de l'image, donc le
+  `maps.json` par défaut.
 
 ## Composants
 
 | Fichier | Rôle |
 |---|---|
-| `Dockerfile` | Debian `bookworm-slim`, télécharge FXServer du canal `recommended` (ou `FX_CHANNEL`/`FX_URL`), garde l'URL dans `FX_VERSION.txt`, copie `server-data/` par défaut, expose 30120/TCP-UDP et 40120/TCP |
-| `docker-compose.yml` | deux services : `fxserver` (construit localement, `env_file: .env`, volumes `./server-data` et `txdata`) et `mariadb:11.4` (volume `dbdata`, `docker/mariadb.cnf`, scripts de `docker/db/init/`) ; le serveur attend que la base soit `healthy` |
-| `docker/entrypoint.sh` | valide `LICENSE_KEY`, génère `server-data/secrets.cfg` à partir de `.env` (en retirant les `\r` de Windows), puis lance FXServer |
+| `Dockerfile` | Debian `bookworm-slim` épinglé par digest, télécharge FXServer du canal `recommended` (ou `FX_CHANNEL`/`FX_URL`), vérifie `FX_SHA256` quand il est fourni, copie `server-data/` dans `/opt/fivem/server-data/` **et** dans `/opt/fivem/defaults/`, expose 30120/TCP-UDP et 40120/TCP |
+| `docker-compose.yml` | `name: gunfight` fige le préfixe des volumes du dev quel que soit le nom du dossier ; deux services : `fxserver` (sans `build` ni `image`, `env_file: .env`, volume `txdata`, healthcheck HTTP sur `30120/dynamic.json`, plafond mémoire `${FXSERVER_MEMORY_LIMIT:-4g}`) et `mariadb:11.4` épinglée par digest (volume `dbdata`, `docker/mariadb.cnf`, scripts de `docker/db/init/`, plafond mémoire `${MARIADB_MEMORY_LIMIT:-2g}`) ; le serveur attend que la base soit `healthy` |
+| `docker-compose.dev.yml` | ajoute `build: .` et le bind mount `./server-data` pour le développement local |
+| `docker-compose.prod.yml` | utilise `${IMAGE_REF}`, active l'amorçage des maps et renomme les volumes en `gunfight-prod-*` |
+| `docker/entrypoint.sh` | valide `LICENSE_KEY`, génère `server-data/secrets.cfg` à partir de `.env` (en retirant les `\r` de Windows) sous `umask 077`, remet le fichier en `chmod 600` à chaque démarrage, amorce `maps.json` si demandé, puis lance FXServer |
 | `server-data/server.cfg` | endpoints réseau, `exec secrets.cfg`, `sv_scriptHookAllowed 0`, ordre de démarrage des ressources, permissions admin |
 | `.env.example` | modèle de configuration, copié en `.env` au premier `start.bat` |
 
@@ -47,6 +99,27 @@ MySQL et les identifiants administrateurs.
 En mode moniteur, **aucun argument** ne doit être ajouté après `run.sh` :
 txAdmin plante (SIGSEGV) au démarrage. Le mode direct sert aux tests rapides et
 au job Docker de la CI (`TXADMIN=false`).
+
+## Durcissement de l'exploitation
+
+Le « lot 1 » du durcissement verrouille les réglages qui exposent la machine ou
+les secrets. Ces invariants sont vérifiés par la classe `InfraDocker` de
+`tests/test_depot.py` : les retirer fait échouer la CI.
+
+- **txAdmin n'écoute que sur la boucle locale** : le port est publié en
+  `127.0.0.1:40120:40120/tcp`, donc injoignable depuis le réseau, même sur un
+  VPS. L'accès distant passe par un tunnel SSH
+  (`ssh -L 40120:127.0.0.1:40120 utilisateur@IP_DU_VPS`) ou par un reverse
+  proxy TLS (Caddy, nginx).
+- **`secrets.cfg` reste privé** : le script tourne sous `umask 077` et le fichier
+  est remis en `chmod 600` à chaque démarrage. Une mise à jour ne rend donc pas
+  lisible un fichier créé en 644 par une ancienne version.
+- **Healthcheck fxserver** : `curl -fsS http://127.0.0.1:30120/dynamic.json`,
+  avec 120 s de `start_period` pour le démarrage à froid. En mode moniteur,
+  « unhealthy » est attendu tant que l'assistant txAdmin n'est pas terminé.
+- **Plafonds mémoire** : 4 Go pour `fxserver`, 2 Go pour `mariadb`,
+  surchargeables par `FXSERVER_MEMORY_LIMIT` / `MARIADB_MEMORY_LIMIT` dans
+  `.env` (voir `.env.example`).
 
 ## Ressources FiveM
 
@@ -138,23 +211,46 @@ utilisateur `gunfight`, réglages InnoDB/`utf8mb4` dans `docker/mariadb.cnf`,
 scripts de `docker/db/init/` exécutés une seule fois sur une base vide. La
 chaîne `mysql_connection_string` est déjà générée dans `secrets.cfg`.
 
+### Sauvegarde et restauration
+
+`scripts/sauvegarder.sh` utilise la surcouche prod et écrit dans
+`backups/<horodatage>/` trois archives : `base.sql.gz` (dump MariaDB),
+`txdata.tar.gz` (comptes et configuration txAdmin) et `maps.tar.gz` (données
+`gf_maps`). Il purge les dossiers de plus de 14 jours. La restauration se fait
+avec le serveur de jeu arrêté : import SQL dans `mariadb` (qui reste démarré),
+puis extraction des deux archives tar dans un conteneur avec le volume
+correspondant monté. Ces étapes ne sont pas automatisées ; elles doivent être
+répétées sur une copie avant d'être utilisées en production.
+
 ## Intégration continue
 
 | Workflow | Déclencheur | Rôle |
 |---|---|---|
 | `.github/workflows/qualite.yml` | PR, envoi sur `main` | vérifications statiques + tests de cohérence (voir [`qualite.md`](qualite.md)) |
-| `.github/workflows/docker.yml` | PR, envoi sur `main`, tags `v*` | construit l'image, la publie sur GHCR (hors PR), puis teste un démarrage réel des ressources |
+| `.github/workflows/docker.yml` | PR, envoi sur `main`, tags `v*` | construit l'image, la publie sur GHCR (hors PR), puis teste un démarrage réel des ressources, **y compris sur les PR** |
 
-Les deux sont déclarés **bloquants** dans la protection de `main` : voir
-[`protection-branche.md`](protection-branche.md).
+Sur une pull request, le job `smoke` construit l'image localement (sans envoi au
+registre) et la démarre ; sur `main` et les tags, il télécharge l'image publiée.
+Le test utilise le secret dédié `CFX_LICENSE_KEY` : sans lui, il affiche une
+note et saute le démarrage sans échouer.
+
+Les trois checks (`Qualité du dépôt`, `Construire et publier l'image`,
+`Vérifier le démarrage des ressources`) sont déclarés **bloquants** dans la
+protection de `main` : voir [`protection-branche.md`](protection-branche.md).
+
+Les actions GitHub sont épinglées par SHA de commit et les images par digest
+(Dockerfile, MariaDB, images de base). `.github/dependabot.yml` propose chaque
+semaine les mises à jour des actions et des images ; MariaDB ≥ 11.5 est ignorée
+pour garder les changements de version manuels.
 
 ## Limites connues
 
 - La logique de jeu Lua n'a **pas encore** de tests unitaires : la couverture
   automatique porte sur la syntaxe, les manifestes, la configuration et le
   démarrage réel des ressources.
-- Le test de démarrage nécessite le secret `CFX_LICENSE_KEY` ; sans lui il est
-  ignoré (le job de construction d'image reste bloquant).
+- Le test de démarrage nécessite le secret `CFX_LICENSE_KEY` ; sans lui (PR de
+  fork ou de Dependabot), le job reste vert mais le démarrage n'est pas testé.
+  Les autres vérifications restent bloquantes.
 - Le serveur tourne avec `sv_scriptHookAllowed 0` : aucune ressource cliente
   non signée n'est chargée.
 - Un anti-triche dédié reste conseillé avant une ouverture au grand public.

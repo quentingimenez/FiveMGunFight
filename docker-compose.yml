@@ -1,13 +1,22 @@
 # =============================================================================
-#  Lancement : docker compose up -d --build   (ou double-clic sur start.bat)
-#  Arrêt     : docker compose down            (ou double-clic sur stop.bat)
-#  État     : double-clic sur status.bat
+#  Socle commun aux environnements. NE PAS LANCER SEUL.
+#
+#  Développement : docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#  Production    : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#  Arrêt         : docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+#
+#  start.bat / stop.bat / status.bat enveloppent déjà le fichier de dev.
 # =============================================================================
+# Fige le nom du projet Compose : les volumes restent gunfight_* quel que soit
+# le nom du dossier de checkout (sinon Compose les préfixe avec ce nom de dossier).
+name: gunfight
 services:
   fxserver:
-    build: .
     container_name: gunfight-fxserver
     restart: unless-stopped
+    # Plafond mémoire : protège la machine hôte d'une fuite mémoire du serveur.
+    # Surchargeable dans .env (FXSERVER_MEMORY_LIMIT), 4g par défaut.
+    mem_limit: ${FXSERVER_MEMORY_LIMIT:-4g}
     env_file: .env
     environment:
       # true (défaut) : FXServer démarre en "mode moniteur", c'est txAdmin qui
@@ -18,16 +27,28 @@ services:
       TXHOST_DATA_PATH: /opt/fivem/txData
       TXHOST_TXA_PORT: "40120"
       TXHOST_INTERFACE: 0.0.0.0
+      # Amorçage de maps.json dans un volume vide. Désactivé en dev (le dossier
+      # du dépôt est monté), activé par docker-compose.prod.yml.
+      GF_SEED_MAPS: "false"
     init: true
     stdin_open: true   # permet de taper des commandes avec console.bat
     tty: true
     ports:
       - "30120:30120/tcp"
       - "30120:30120/udp"
-      - "40120:40120/tcp"
+      # Panneau txAdmin : joignable uniquement depuis cette machine. Pour un accès
+      # distant, passer par un tunnel SSH ou un reverse proxy TLS (pas configuré ici).
+      - "127.0.0.1:40120:40120/tcp"
+    healthcheck:
+      # Le serveur répond en HTTP sur le port de jeu dès qu'il accepte des joueurs.
+      # En mode moniteur, tant que txAdmin n'a pas été configuré, le conteneur
+      # reste "unhealthy" : c'est attendu.
+      test: ["CMD", "curl", "-fsS", "--max-time", "3", "http://127.0.0.1:30120/dynamic.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     volumes:
-      # Tes scripts : modifie-les sur ton PC, ils sont pris en compte directement
-      - ./server-data:/opt/fivem/server-data
       # Données de txAdmin (comptes admin, configuration) conservées entre les redémarrages
       - txdata:/opt/fivem/txData
     depends_on:
@@ -42,9 +63,15 @@ services:
         max-file: "3"
 
   mariadb:
-    image: mariadb:11.4
+    # Digest figé : MariaDB 11.4 LTS, résolu le 2026-11-25. Dependabot propose
+    # les mises à jour ; les montées majeures (11.8) restent manuelles.
+    image: mariadb:11.4@sha256:a8992b5e5404d11e03c54a31d0c1bdea3fd116d283aa6d1a627551f29045309b
     container_name: gunfight-mariadb
     restart: unless-stopped
+    # Plafond mémoire : protège la machine hôte d'une fuite mémoire. 2g couvre le
+    # buffer pool InnoDB de 1G avec de la marge (voir docker/mariadb.cnf).
+    # Surchargeable dans .env (MARIADB_MEMORY_LIMIT).
+    mem_limit: ${MARIADB_MEMORY_LIMIT:-2g}
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
       MARIADB_DATABASE: ${MARIADB_DATABASE}

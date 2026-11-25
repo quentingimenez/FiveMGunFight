@@ -7,7 +7,7 @@ Empêcher tout envoi direct sur `main` et n'autoriser une fusion que si :
 1. la modification est arrivée par une **pull request** ;
 2. elle a été **relue et approuvée** par l'autre collaborateur ;
 3. la **CI est verte** (vérifications statiques, tests de cohérence,
-   construction de l'image) ;
+   construction de l'image, démarrage réel du serveur) ;
 4. toutes les **conversations de revue sont résolues**.
 
 ## Règles appliquées
@@ -20,11 +20,15 @@ Le contenu exact est dans [`.github/branch-protection.json`](../.github/branch-p
 | 1 approbation | l'auteur ne peut pas s'auto-approuver |
 | Revue `CODEOWNERS` obligatoire | `@WardenPro` ou `@Zhics` doit approuver |
 | Approbation invalidée après un nouvel envoi | une modification après revue doit être relue |
-| Status checks requis (stricts) | `Qualité du dépôt` et `Construire et publier l'image` doivent passer, sur la pointe de la branche |
+| Status checks requis (stricts) | `Qualité du dépôt`, `Construire et publier l'image` et `Vérifier le démarrage des ressources` doivent passer, sur la pointe de la branche |
 | Conversations résolues | aucun commentaire bloquant ne reste ouvert |
 | Force-push interdit | pas de réécriture d'historique sur `main` |
 | Suppression interdite | `main` ne peut pas être supprimée |
 | `enforce_admins: true` | le propriétaire est soumis aux mêmes règles |
+
+Le check **`Vérifier le démarrage des ressources`** est requis même quand le
+secret `CFX_LICENSE_KEY` manque (PR de fork ou Dependabot) : le job affiche
+alors une note et reste vert, ce qui rend le cas visible sans bloquer la PR.
 
 ## Contrainte de plan GitHub
 
@@ -69,9 +73,10 @@ La procédure ci-dessous s'applique aussitôt après le changement de plan.
    - `Require conversation resolution before merging` ;
    - `Require status checks to pass before merging` →
      `Require branches to be merged up to date` ;
-   - dans la liste des checks, sélectionner **`Qualité du dépôt`** et
-     **`Construire et publier l'image`** (ils n'apparaissent qu'après un premier
-     run de CI sur une pull request) ;
+   - dans la liste des checks, sélectionner **`Qualité du dépôt`**,
+     **`Construire et publier l'image`** et
+     **`Vérifier le démarrage des ressources`** (ils n'apparaissent qu'après un
+     premier run de CI sur une pull request) ;
    - `Do not allow bypassing the above settings` (équivalent de
      `enforce_admins`) ;
    - `Do not allow force pushes` et `Do not allow deletions` restent décochés au
@@ -99,7 +104,7 @@ gh api repos/WardenPro/FiveMGunFight/branches/main/protection
 ```
 
 Attendu : `required_pull_request_reviews` non nul,
-`required_status_checks.contexts` contenant les deux noms de jobs,
+`required_status_checks.contexts` contenant les trois noms de jobs,
 `allow_force_pushes.enabled: false`, `enforce_admins.enabled: true`.
 
 Test réel, sans risque pour `main` :

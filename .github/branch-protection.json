@@ -3,7 +3,8 @@
     "strict": true,
     "contexts": [
       "Qualité du dépôt",
-      "Construire et publier l'image"
+      "Construire et publier l'image",
+      "Vérifier le démarrage des ressources"
     ]
   },
   "enforce_admins": true,

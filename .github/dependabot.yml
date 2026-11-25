@@ -1,0 +1,49 @@
+# =============================================================================
+#  Mises à jour automatiques des dépendances.
+#
+#  Dependabot ouvre une pull request par semaine (lundi matin) et regroupe les
+#  mises à jour par écosystème. Une PR Dependabot n'a pas accès aux secrets
+#  Actions : le job de démarrage réel (« smoke ») y est donc ignoré avec une
+#  note, et la PR reste vérifiée par les contrôles statiques et la construction
+#  de l'image.
+#
+#  Les montées majeures restent manuelles : chaque PR est relue et testée, rien
+#  n'est fusionné automatiquement.
+# =============================================================================
+version: 2
+updates:
+  # Actions GitHub : les workflows les épinglent par SHA de commit. Dependabot
+  # met à jour le SHA et le commentaire de version de fin de ligne.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # Images de base : Dockerfile et fichiers docker-compose (tous à la racine).
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    groups:
+      images:
+        patterns:
+          - "*"
+    ignore:
+      # MariaDB 11.4 est la version LTS choisie : ignorer 11.5 et au-delà.
+      # Les correctifs de sécurité de la branche 11.4 continuent de passer par
+      # la mise à jour du digest.
+      - dependency-name: "mariadb"
+        versions:
+          - ">= 11.5"

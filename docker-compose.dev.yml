@@ -1,0 +1,14 @@
+# =============================================================================
+#  Développement : image construite localement, scripts du dépôt montés.
+#
+#  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+#  Les volumes gardent les noms du socle (gunfight_txdata, gunfight_dbdata) :
+#  une installation existante continue de fonctionner sans migration.
+# =============================================================================
+services:
+  fxserver:
+    build: .
+    volumes:
+      # Tes scripts : modifie-les sur ton PC, ils sont pris en compte directement
+      - ./server-data:/opt/fivem/server-data

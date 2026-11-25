@@ -5,3 +5,4 @@ server-data/txData/
 server-data/.replxx_history
 __pycache__/
 *.pyc
+backups/

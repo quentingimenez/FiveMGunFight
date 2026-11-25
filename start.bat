@@ -2,6 +2,8 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 title Serveur Gunfight
+rem Socle + surcouche de développement (image construite localement, scripts montés)
+set COMPOSE_FILE=docker-compose.yml;docker-compose.dev.yml
 
 where docker >nul 2>nul
 if errorlevel 1 (

@@ -68,17 +68,51 @@ bash scripts/verifier.sh                      # Lua, JSON, JS, shell, compose
 python -m unittest discover -s tests -v      # cohérence du dépôt
 ```
 
-Si tu touches aux scripts Lua, au `server.cfg` ou au `Dockerfile`, teste
-réellement le serveur :
+La classe `InfraDocker` de ces tests vérifie les garde-fous d'exploitation :
+txAdmin limité à `127.0.0.1`, healthcheck FXServer, plafonds mémoire des deux
+services, permissions de `secrets.cfg`, `FROM` et image MariaDB épinglés par
+digest, amorçage de `maps.json` dans l'entrypoint.
+
+Si tu touches aux scripts Lua, au `server.cfg`, au `Dockerfile` ou aux fichiers
+Compose, teste réellement le serveur :
 
 ```bash
-docker compose build
-docker compose up -d
-docker compose logs -f fxserver     # attendre « Started resource gf_… »
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f fxserver
+# attendre « Started resource gf_… »
 ```
 
 Puis en jeu : `/attack` ou `/redzone`, et une manche de test (`/startround` en
 admin). Vérifie la console pour les erreurs rouges.
+
+### Environnements Compose
+
+Le socle `docker-compose.yml` ne se lance **jamais seul** : il ne contient ni
+`build` ni `image` pour `fxserver`. Toutes les commandes manuelles de
+développement ajoutent la surcouche dev :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
+
+`start.bat`, `stop.bat` et `status.bat` le font déjà. **Ne mets pas `IMAGE_REF`
+en développement** : la surcouche dev construit l'image localement, alors que
+`IMAGE_REF` ne sert qu'à la surcouche prod pour télécharger l'image GHCR.
+
+Si tu touches au déploiement (`Dockerfile`, `docker/entrypoint.sh`, fichiers
+Compose, `.env.example`), vérifie la surcouche prod : `image: ${IMAGE_REF:?...}`,
+volume `maps`, volumes `gunfight-prod-*`, `GF_SEED_MAPS: "true"`. La validation
+locale se fait sans démarrer la production :
+
+```bash
+IMAGE_REF=exemple.invalid/gunfight:test \
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
+```
+
+Les classes `EnvironnementsCompose` et `ChaineCI` de `tests/test_depot.py`
+couvrent ces invariants : si ton changement les casse, corrige le changement,
+pas le test.
 
 ## 6. Ouvrir la pull request
 
@@ -127,7 +161,7 @@ Au-delà de ~400 lignes modifiées, découpe.
 | Syntaxe Lua, JSON, JS, shell, compose | `.github/workflows/qualite.yml` | oui |
 | Cohérence des manifestes, maps, config, docs | `.github/workflows/qualite.yml` | oui |
 | Construction de l'image Docker | `.github/workflows/docker.yml` | oui |
-| Démarrage réel du serveur (smoke test) | `.github/workflows/docker.yml` | sur `main` (nécessite le secret `CFX_LICENSE_KEY`) |
+| Démarrage réel du serveur (smoke test) | `.github/workflows/docker.yml` | oui, sur PR comme sur `main` ; sans secret `CFX_LICENSE_KEY`, le job est vert mais le démarrage est sauté |
 
 Une CI rouge se corrige par un nouveau commit sur la branche, jamais par un
 contournement. Si tu penses qu'un test est faux, ouvre une pull request qui
