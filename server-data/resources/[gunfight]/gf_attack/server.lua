@@ -258,14 +258,54 @@ end
 local function sendZoneAll() eachPlayer(sendZone) end
 
 -- Place un joueur selon la phase actuelle (arrivée en cours de partie, etc.)
+-- ---------------------------------------------------------------- Soins
+-- Bandages et kevlars : le nombre est tenu par le serveur, le client ne fait
+-- que jouer l'animation puis appliquer le soin que le serveur a autorisé.
+local Items = {}   -- [src] = { bandage = n, kevlar = n }
+local Using = {}   -- [src] = GetGameTimer() de fin de l'utilisation en cours
+
+local function sendItems(src)
+    TriggerClientEvent('gf_attack:items', src, Items[src])
+end
+
+local function resetItems(src)
+    Items[src] = { bandage = Config.StartBandages, kevlar = Config.StartKevlars }
+    Using[src] = nil
+    sendItems(src)
+end
+
+local function clearItems(src)
+    Items[src], Using[src] = nil, nil
+    if GetPlayerName(src) then TriggerClientEvent('gf_attack:items', src, nil) end
+end
+
+RegisterNetEvent('gf_attack:useItem', function(item)
+    local src = source
+    local def = type(item) == 'string' and Config.Items[item] or nil
+    if not def or not S.team[src] or not S.alive[src] then return end
+    if S.phase ~= 'place' and S.phase ~= 'live' then return end
+    local t = GetGameTimer()
+    if Using[src] and t < Using[src] then return end   -- une seule utilisation à la fois
+    local inv = Items[src]
+    if not inv or (inv[item] or 0) <= 0 then return end
+    inv[item] = inv[item] - 1
+    Using[src] = t + math.floor(def.duration * 1000)
+    TriggerClientEvent('gf_attack:applyItem', src, item)
+    sendItems(src)
+end)
+
+AddEventHandler('playerDropped', function() Items[source], Using[source] = nil, nil end)
+
 local function placeForPhase(src)
     if S.phase == 'select' then
         setAlive(src, true)
         spawnRole(src, { vehicle = true, freeze = true, protected = true })
         openLoadout(src)
+        resetItems(src)
     elseif S.phase == 'place' then
         setAlive(src, true)
         spawnRole(src, { vehicle = true, weapons = true, protected = true })
+        resetItems(src)
     elseif S.phase == 'live' then
         setAlive(src, false)
         toSpectator(src)
@@ -311,6 +351,7 @@ local function startSelect()
         setAlive(src, true)
         spawnRole(src, { vehicle = true, freeze = true, protected = true })
         openLoadout(src)
+        resetItems(src)   -- 2 bandages + 2 kevlars à chaque manche
         local role = roleOf(S.team[src])
         local roleText = role == 'attack' and ('Tu ATTAQUES : ' .. zone().name) or ('Tu DÉFENDS : ' .. zone().name)
         if S.swapped then
@@ -597,6 +638,7 @@ end)
 
 AddEventHandler('gf:modeLeft', function(src, mode)
     if mode ~= 'attack' or not S.team[src] then return end
+    clearItems(src)
     if S.round > 0 and not S.matchOver then
         local stats = S.stats[src]
         S.departed[#S.departed + 1] = {
@@ -629,6 +671,12 @@ AddEventHandler('gf:playerKilled', function(victim, killer, weapon, mode)
     if vs then vs.deaths = vs.deaths + 1 end
     if killer and S.team[killer] and S.team[killer] ~= S.team[victim] and S.stats[killer] then
         S.stats[killer].kills = S.stats[killer].kills + 1
+        -- Récompense : 1 kevlar par kill (dans la limite de Config.MaxKevlars)
+        local inv = Items[killer]
+        if inv and S.alive[killer] and inv.kevlar < Config.MaxKevlars then
+            inv.kevlar = math.min(Config.MaxKevlars, inv.kevlar + Config.KevlarPerKill)
+            sendItems(killer)
+        end
     end
     S.scoreboardDirty = true
 

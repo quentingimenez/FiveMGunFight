@@ -348,3 +348,139 @@ CreateThread(function()
         end
     end
 end)
+
+-- =============================================================================
+--  Soins : bandage (touche 3) et kevlar (touche 4)
+--  Le serveur tient le nombre d'objets ; le client joue l'animation (on peut
+--  marcher, pas tirer) puis applique le soin à la fin.
+-- =============================================================================
+local items = nil          -- { bandage = n, kevlar = n } ou nil hors du mode
+local using = nil          -- { item, endsAt, total } pendant une utilisation
+local gainedUntil = 0      -- affichage « +1 kevlar »
+local message = nil        -- { text, untilT } petit message d'information
+
+local function info(text)
+    message = { text = text, untilT = GetGameTimer() + 1800 }
+end
+
+RegisterNetEvent('gf_attack:items', function(inv)
+    if inv and items and (inv.kevlar or 0) > (items.kevlar or 0) and not using then
+        gainedUntil = GetGameTimer() + 2000
+    end
+    items = inv
+end)
+
+local function tryUse(item)
+    if not items or LocalPlayer.state.gf_mode ~= 'attack' or using then return end
+    local def = Config.Items[item]
+    local ped = PlayerPedId()
+    if IsEntityDead(ped) or not LocalPlayer.state.gf_alive then return end
+    if zone and zone.phase == 'select' then return end
+    if IsPedInAnyVehicle(ped, false) then return info('Descends du véhicule pour te soigner') end
+    if (items[item] or 0) <= 0 then return info(('Plus de %s'):format(def.label:lower())) end
+    if def.stat == 'health' and GetEntityHealth(ped) >= GetEntityMaxHealth(ped) then
+        return info('Vie déjà au maximum')
+    end
+    if def.stat == 'armour' and GetPedArmour(ped) >= 100 then
+        return info('Kevlar déjà au maximum')
+    end
+    TriggerServerEvent('gf_attack:useItem', item)
+end
+
+for item, def in pairs(Config.Items) do
+    RegisterCommand('+gf_' .. item, function() tryUse(item) end, false)
+    RegisterCommand('-gf_' .. item, function() end, false)
+    RegisterKeyMapping('+gf_' .. item, ('Gunfight : %s'):format(def.label:lower()), 'keyboard', def.key)
+end
+
+-- Le serveur a validé : animation puis soin
+RegisterNetEvent('gf_attack:applyItem', function(item)
+    local def = Config.Items[item]
+    if not def or using then return end
+    CreateThread(function()
+        local ped = PlayerPedId()
+        using = { item = item, endsAt = GetGameTimer() + def.duration * 1000, total = def.duration * 1000 }
+
+        RequestAnimDict(def.anim.dict)
+        local t = GetGameTimer() + 2000
+        while not HasAnimDictLoaded(def.anim.dict) and GetGameTimer() < t do Wait(0) end
+        -- 49 = haut du corps seulement + en boucle + on peut se déplacer
+        TaskPlayAnim(ped, def.anim.dict, def.anim.name, 8.0, -8.0, -1, 49, 0, false, false, false)
+
+        local ok = true
+        while using and GetGameTimer() < using.endsAt do
+            ped = PlayerPedId()
+            if IsEntityDead(ped) or IsPedInAnyVehicle(ped, false) then ok = false break end
+            DisablePlayerFiring(PlayerId(), true)
+            DisableControlAction(0, 24, true)   -- tirer
+            DisableControlAction(0, 25, true)   -- viser
+            DisableControlAction(0, 257, true)
+            DisableControlAction(0, 140, true)
+            DisableControlAction(0, 141, true)
+            DisableControlAction(0, 142, true)
+            Wait(0)
+        end
+
+        StopAnimTask(ped, def.anim.dict, def.anim.name, 2.0)
+        RemoveAnimDict(def.anim.dict)
+        if ok and using and not IsEntityDead(ped) then
+            if def.stat == 'health' then
+                SetEntityHealth(ped, math.min(GetEntityMaxHealth(ped), GetEntityHealth(ped) + def.amount))
+            else
+                SetPedArmour(ped, math.min(100, GetPedArmour(ped) + def.amount))
+            end
+        end
+        using = nil
+    end)
+end)
+
+AddEventHandler('gf_core:spawned', function() using = nil end)
+
+local function text(str, x, y, scale, r, g, b, align)
+    SetTextFont(4)
+    SetTextScale(scale, scale)
+    SetTextColour(r, g, b, 255)
+    SetTextOutline()
+    if align == 'right' then
+        SetTextRightJustify(true)
+        SetTextWrap(0.0, x)
+    else
+        SetTextCentre(true)
+    end
+    BeginTextCommandDisplayText('STRING')
+    AddTextComponentSubstringPlayerName(str)
+    EndTextCommandDisplayText(x, y)
+end
+
+-- Affichage : objets restants (bas droite), barre de progression, messages
+CreateThread(function()
+    while true do
+        if not items or LocalPlayer.state.gf_mode ~= 'attack' or not LocalPlayer.state.gf_alive then
+            Wait(300)
+        else
+            if not IsEntityDead(PlayerPedId()) then
+                local b, k = items.bandage or 0, items.kevlar or 0
+                text(('[%s] Bandage x%d'):format(Config.Items.bandage.key, b), 0.985, 0.86, 0.45,
+                    b > 0 and 255 or 130, b > 0 and 255 or 130, b > 0 and 255 or 130, 'right')
+                text(('[%s] Kevlar x%d'):format(Config.Items.kevlar.key, k), 0.985, 0.89, 0.45,
+                    k > 0 and 120 or 130, k > 0 and 190 or 130, 255, 'right')
+                if GetGameTimer() < gainedUntil then
+                    text('+1 kevlar', 0.985, 0.83, 0.45, 120, 220, 120, 'right')
+                end
+            end
+
+            if using then
+                local left = math.max(0, using.endsAt - GetGameTimer())
+                local p = 1.0 - left / using.total
+                DrawRect(0.5, 0.80, 0.16, 0.012, 0, 0, 0, 160)
+                DrawRect(0.5 - 0.08 + 0.08 * p, 0.80, 0.16 * p, 0.012, 120, 220, 120, 230)
+                text(('%s… %.1f s'):format(Config.Items[using.item].label, left / 1000), 0.5, 0.765, 0.42, 255, 255, 255)
+            end
+
+            if message and GetGameTimer() < message.untilT then
+                text(message.text, 0.5, 0.74, 0.45, 255, 200, 80)
+            end
+            Wait(0)
+        end
+    end
+end)
