@@ -35,6 +35,14 @@ et les rulesets. L'API répond :
 gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)
 ```
 
+Constat vérifié sur ce dépôt (25/11/2026) : `PUT /branches/main/protection` et
+`POST /rulesets` répondent tous deux `403` avec ce message. L'interface
+**Settings → Branches** affiche bien « Add branch ruleset » et « Add classic
+branch protection rule », mais l'enregistrement échoue de la même façon.
+Ce qui est déjà actif, en revanche : fusion en **squash** uniquement, branche
+supprimée après fusion, `CODEOWNERS`, modèle de pull request, hook local
+`pre-push` et la CI « Qualité » bloquante dès qu'une protection existe.
+
 Deux solutions, au choix :
 
 - **GitHub Pro** (~4 $/mois, dépôt conservé privé) — recommandé, aucun code
