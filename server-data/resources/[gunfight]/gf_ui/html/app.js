@@ -396,6 +396,63 @@ function renderItems(list) {
     });
 }
 
+// Armes : [{ key, name, label, clip, clipMax, active }], ou null pour masquer.
+// Image : html/img/weapons/<NOM_GTA>.png (ex. WEAPON_CARBINERIFLE.png) ;
+// tant qu'elle n'existe pas, une silhouette d'arme générique la remplace.
+const GUN_SVG = 'M2 9h17l2-2h7v3h-3l-1 2h-4l-2 6h-4l1-4H9l-1 3H5l1-3H2z';
+function weaponIcon(name) {
+    const box = el('div', 'w-img');
+    const img = new Image();
+    img.onerror = () => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 30 20');
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', GUN_SVG);
+        svg.appendChild(p);
+        box.replaceChildren(svg);
+    };
+    img.src = `img/weapons/${encodeURIComponent(name)}.png`;
+    box.appendChild(img);
+    return box;
+}
+
+let WEAPONS_SIG = '';
+function renderWeapons(list) {
+    const box = $('#weapons');
+    if (!Array.isArray(list) || list.length === 0) { box.classList.add('hidden'); WEAPONS_SIG = ''; return; }
+    box.classList.remove('hidden');
+    // On ne reconstruit les cercles (et les images) que si les armes ou l'arme en main changent
+    const sig = list.map(w => `${w.key}:${w.name}:${w.active}`).join('|');
+    if (sig !== WEAPONS_SIG) {
+        WEAPONS_SIG = sig;
+        box.replaceChildren();
+        // Petits cercles d'abord (à gauche), grand cercle de l'arme en main à droite
+        const ordered = list.filter(w => !w.active).concat(list.filter(w => w.active));
+        ordered.forEach(w => {
+            const c = el('div', 'w-circle' + (w.active ? ' active' : ''));
+            c.dataset.key = w.key;
+            c.appendChild(el('span', 'w-key', w.key));
+            c.appendChild(weaponIcon(w.name));
+            if (w.active) {
+                const ammo = el('div', 'w-ammo');
+                ammo.appendChild(el('span', 'w-clip'));
+                ammo.appendChild(el('span', 'w-inf', '/ ∞'));
+                c.appendChild(ammo);
+                c.appendChild(el('div', 'w-name', w.label));
+            }
+            box.appendChild(c);
+        });
+    }
+    const active = list.find(w => w.active);
+    const c = active && box.querySelector('.w-circle.active');
+    if (c) {
+        const clip = Math.max(0, active.clip | 0);
+        $('.w-clip', c).textContent = clip;
+        c.classList.toggle('low', active.clipMax > 0 && clip <= Math.ceil(active.clipMax * 0.25));
+        c.classList.toggle('empty', clip === 0);
+    }
+}
+
 // ------------------------------------------------------------------ Messages du jeu
 window.addEventListener('message', (event) => {
     const msg = event.data || {};
@@ -403,6 +460,7 @@ window.addEventListener('message', (event) => {
         case 'hud': renderHud(msg.data); break;
         case 'vitals': renderVitals(msg.data); break;
         case 'items': renderItems(msg.data); break;
+        case 'weapons': renderWeapons(msg.data); break;
         case 'killfeed': addKill(msg.data); break;
         case 'killfeed_clear': $('#killfeed').replaceChildren(); break;
         case 'loadout_open': openLoadout(msg.data || {}); break;

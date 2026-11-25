@@ -459,3 +459,85 @@ html, body {
 .results-tables tr.mine { background: #24618b; box-shadow: inset 3px 0 #6ed4ff; font-weight: 800; }
 .results-tables tr.best td:first-child { color: #ffdc75; }
 .results-tables .crown { color: #ffd357; font-size: 1.25em; }
+
+/* ------------------------------------------------------------------ Armes (bas à droite) */
+#weapons {
+    --w-accent: #a855f7;
+    position: absolute;
+    right: 40px;
+    bottom: 40px;
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    pointer-events: none;
+}
+.w-circle {
+    position: relative;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, .35);
+    background: radial-gradient(circle, rgba(12, 14, 20, .55), rgba(12, 14, 20, .8));
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .55);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 18px;
+    opacity: .85;
+}
+.w-circle.active {
+    width: 160px;
+    height: 160px;
+    border: 7px solid var(--w-accent);
+    box-shadow: 0 0 18px rgba(168, 85, 247, .45), 0 4px 18px rgba(0, 0, 0, .6);
+    margin-bottom: 0;
+    opacity: 1;
+}
+.w-key {
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #f4f6fa;
+    color: #0c0e14;
+    font-weight: 900;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .6);
+}
+.w-circle.active .w-key { top: 4px; left: 4px; background: var(--w-accent); color: #fff; }
+.w-img { width: 44px; height: 28px; display: flex; align-items: center; justify-content: center; }
+.w-circle.active .w-img { width: 92px; height: 44px; margin-bottom: 2px; }
+.w-img img, .w-img svg { max-width: 100%; max-height: 100%; object-fit: contain; }
+.w-img svg { fill: rgba(255, 255, 255, .9); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8)); }
+.w-ammo {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    color: #fff;
+    font-family: 'Bahnschrift', 'Oswald', 'Arial Narrow', sans-serif;
+    font-weight: 700;
+    text-shadow: 0 2px 5px rgba(0, 0, 0, .9);
+}
+.w-clip { font-size: 40px; line-height: .9; font-variant-numeric: tabular-nums; }
+.w-inf { font-size: 16px; color: rgba(255, 255, 255, .7); }
+.w-name {
+    margin-top: 3px;
+    max-width: 120px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .75);
+}
+.w-circle.low .w-clip { color: #ffb347; }
+.w-circle.empty .w-clip { color: #ff5a5f; animation: wblink .6s ease-in-out infinite alternate; }
+@keyframes wblink { from { opacity: 1; } to { opacity: .35; } }

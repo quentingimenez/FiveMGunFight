@@ -128,6 +128,12 @@ AddEventHandler('gf_ui:items', function(list)
     SendNUIMessage({ type = 'items', data = list })
 end)
 
+-- HUD des armes en bas à droite (envoyé par gf_core)
+-- list = { { key, name, label, clip, clipMax, active }, ... } ou nil pour masquer
+AddEventHandler('gf_ui:weapons', function(list)
+    SendNUIMessage({ type = 'weapons', data = list })
+end)
+
 -- ---------------------------------------------------------------- Minimap sans barres GTA
 -- Les barres vie (verte) / armure (bleue) de GTA sous la minimap font doublon avec
 -- notre HUD : le mode « 3 » du scaleform minimap les masque. GTA le réinitialise
