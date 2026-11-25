@@ -93,6 +93,30 @@ end
 loadMap(S.zoneIndex)
 
 local function zone() return currentMap end
+
+-- Même contour que celui utilisé par le client pour les limites de la zone.
+local function attackerInZone()
+    local points = zone().points
+    for src, team in pairs(S.team) do
+        if team == S.attackers and S.alive[src] then
+            local ped = GetPlayerPed(src)
+            if ped ~= 0 then
+                local pos = GetEntityCoords(ped)
+                local inside, j = false, #points
+                for i = 1, #points do
+                    local a, b = points[i], points[j]
+                    if (a.y > pos.y) ~= (b.y > pos.y)
+                        and pos.x < (b.x - a.x) * (pos.y - a.y) / (b.y - a.y) + a.x then
+                        inside = not inside
+                    end
+                    j = i
+                end
+                if inside then return true end
+            end
+        end
+    end
+    return false
+end
 local function defenders() return other(S.attackers) end
 local function roleOf(t) return t == S.attackers and 'attack' or 'defense' end
 
@@ -325,6 +349,8 @@ end
 local function startLive()
     S.phase = 'live'
     S.endsAt = now() + Config.RoundTime
+    S.clockUpdatedAt = now()
+    S.clockPaused = false
     eachPlayer(function(src)
         if S.alive[src] then core:SetProtected(src, false) end
     end)
@@ -418,6 +444,9 @@ local function sendHud()
     end
     local left, right = side('A'), side('B')
     local subtitle = ('%s  •  %s  •  Premier à %d'):format(zone().name, phaseLabel(), Config.WinRounds)
+    if S.phase == 'live' and S.clockPaused then
+        subtitle = subtitle .. '  •  Chrono en pause'
+    end
     if S.phase == 'waiting' then
         subtitle = ('%s  •  En attente : %d / %d joueurs'):format(zone().name, count('A') + count('B'), Config.PlayersToStart)
     end
@@ -561,6 +590,11 @@ CreateThread(function()
         elseif S.phase == 'place' then
             if t >= S.endsAt then startLive() end
         elseif S.phase == 'live' then
+            S.clockPaused = attackerInZone()
+            if S.clockPaused then
+                S.endsAt = S.endsAt + (t - S.clockUpdatedAt)
+            end
+            S.clockUpdatedAt = t
             if t >= S.endsAt then
                 if S.solo and count(S.attackers) > 0 then
                     endRound(S.attackers, 'Temps écoulé : manche de test terminée')
