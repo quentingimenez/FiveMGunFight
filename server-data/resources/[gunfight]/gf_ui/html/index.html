@@ -59,8 +59,24 @@
 
     <!-- Vie et kevlar (bas de l'écran, au centre) + objets de soin en dessous -->
     <div id="vitals" class="hidden">
-        <div class="vrow armour"><div class="vbar"><div class="fill"></div></div><span class="val"></span></div>
-        <div class="vrow health"><div class="vbar"><div class="fill"></div></div><span class="val"></span></div>
+        <div class="vrow health">
+            <span class="val"></span>
+            <div class="vcol">
+                <div class="vlabel">
+                    <svg class="vicon" viewBox="0 0 12 12"><path d="M4.5 0h3v4.5H12v3H7.5V12h-3V7.5H0v-3h4.5z"/></svg>VIE
+                </div>
+                <div class="vbar"><div class="fill"></div></div>
+            </div>
+        </div>
+        <div class="vrow armour">
+            <span class="val"></span>
+            <div class="vcol">
+                <div class="vlabel">
+                    <svg class="vicon" viewBox="0 0 12 14"><path d="M6 0l6 2.2v4.6c0 3.4-2.5 6.1-6 7.2C2.5 12.9 0 10.2 0 6.8V2.2z"/></svg>KEVLAR
+                </div>
+                <div class="vbar"><div class="fill"></div></div>
+            </div>
+        </div>
         <div id="items" class="hidden"></div>
     </div>
 

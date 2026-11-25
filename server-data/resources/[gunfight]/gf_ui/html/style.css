@@ -275,20 +275,51 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     pointer-events: none;
 }
-.vrow { display: flex; align-items: center; gap: 10px; }
+/* Une ligne = gros chiffre à gauche + (libellé au-dessus d'une barre en segments) */
+.vrow {
+    display: grid;
+    grid-template-columns: 70px 300px;
+    align-items: end;
+    column-gap: 10px;
+}
+.vrow .val {
+    text-align: right;
+    color: #fff;
+    font-family: 'Bahnschrift', 'Oswald', 'Arial Narrow', sans-serif;
+    font-weight: 700;
+    font-size: 44px;
+    line-height: .82;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .85), 0 0 1px rgba(0, 0, 0, .9);
+}
+.vrow.armour .val { font-size: 30px; }
+.vcol { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .7)); }
+.vlabel {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0 0 4px 4px;
+    color: rgba(255, 255, 255, .8);
+    font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+.vicon { width: 13px; height: 13px; fill: currentColor; }
+/* Barre penchée découpée en 10 segments (le masque découpe le fond et le remplissage) */
 .vbar {
     position: relative;
-    width: 300px;
-    height: 16px;
-    background: rgba(12, 14, 20, 0.7);
-    border-radius: 4px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
+    height: 13px;
+    background: rgba(255, 255, 255, .16);
+    transform: skewX(-20deg);
+    -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 3px), transparent calc(10% - 3px) 10%);
+    mask-image: repeating-linear-gradient(90deg, #000 0 calc(10% - 3px), transparent calc(10% - 3px) 10%);
 }
-.vrow.armour .vbar { height: 12px; }
+.vrow.armour .vbar { height: 9px; }
 .vbar .fill {
     position: absolute;
     left: 0;
@@ -298,26 +329,18 @@ html, body {
     transition: width .15s ease-out;
 }
 .vrow.health .fill { background: #f4f6fa; }
-.vrow.armour .fill { background: #3d8bff; }
+.vrow.armour .fill { background: linear-gradient(180deg, #6cb4ff, #2f7bff); }
+.vrow.health.low .val,
+.vrow.health.low .vlabel { color: #ff5a5f; }
 .vrow.health.low .fill { background: #ff5a5f; }
-.vrow .val {
-    width: 38px;
-    font-size: 17px;
-    font-weight: 900;
-    font-variant-numeric: tabular-nums;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, .9);
-}
-.vrow.health .val { color: #f4f6fa; }
-.vrow.armour .val { color: #6aa8ff; font-size: 15px; }
-.vrow.health.low .val { color: #ff5a5f; }
-.vrow.hit .vbar { animation: vhit .25s ease-out; }
+.vrow.hit .vbar { animation: vhit .3s ease-out; }
 @keyframes vhit {
-    0%   { box-shadow: 0 0 0 2px rgba(255, 90, 95, .9); }
-    100% { box-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
+    0%   { background: rgba(255, 90, 95, .85); }
+    100% { background: rgba(255, 255, 255, .16); }
 }
 
 /* Objets de soin sous les barres */
-#items { display: flex; gap: 10px; margin-top: 4px; margin-right: 48px; }
+#items { display: flex; gap: 10px; margin-top: 8px; margin-left: 80px; }
 .item {
     display: flex;
     align-items: center;
@@ -340,7 +363,6 @@ html, body {
     justify-content: center;
 }
 .item .count { font-variant-numeric: tabular-nums; font-weight: 900; }
-.item.kevlar .count { color: #6aa8ff; }
 .item.empty { opacity: .45; }
 .item.gain { animation: gain .6s ease-out; }
 @keyframes gain {

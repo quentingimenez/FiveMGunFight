@@ -355,7 +355,7 @@ function setRow(sel, value) {
     const row = $(sel);
     const v = Math.max(0, Math.min(100, Math.round(value)));
     $('.fill', row).style.width = v + '%';
-    $('.val', row).textContent = v;   // valeur écrite à droite de la barre
+    $('.val', row).textContent = v;   // gros chiffre à gauche de la barre
     return v;
 }
 
