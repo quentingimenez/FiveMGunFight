@@ -57,6 +57,9 @@ Config.ValidateDeathHealth = true
 -- DOUBLÉ, TRIPLÉ, QUADRUPLÉ, QUINTUPLÉ... (remis à zéro si tu meurs)
 Config.MultiKillWindow = 6
 
+-- Collisions entre véhicules désactivées (pas de « pit » entre joueurs)
+Config.DisableVehicleCollisions = true
+
 -- Régénération naturelle de la vie (false = pas de régénération, plus "gunfight")
 Config.HealthRegen = false
 

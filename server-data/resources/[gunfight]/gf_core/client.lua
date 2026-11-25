@@ -307,6 +307,21 @@ CreateThread(function()
         end
         HudWeaponWheelIgnoreSelection()
 
+        -- Pas de collision entre véhicules (évite les « pits » entre joueurs).
+        -- Les joueurs à pied restent percutables.
+        if Config.DisableVehicleCollisions then
+            local veh = GetVehiclePedIsIn(ped, false)
+            if veh ~= 0 then
+                local pos = GetEntityCoords(veh)
+                for _, other in ipairs(GetGamePool('CVehicle')) do
+                    if other ~= veh and #(GetEntityCoords(other) - pos) < 80.0 then
+                        SetEntityNoCollisionEntity(veh, other, true)
+                        SetEntityNoCollisionEntity(other, veh, true)
+                    end
+                end
+            end
+        end
+
         -- Pas de tir ni de coups de poing quand on est protégé (lobby, préparation, spectateur)
         if protected or spectator or LocalPlayer.state.gf_mode == 'lobby' then
             DisablePlayerFiring(pid, true)

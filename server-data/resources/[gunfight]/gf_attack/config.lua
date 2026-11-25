@@ -28,7 +28,11 @@ Config.MatchEndDelay = 15      -- pause après la fin d'un match (secondes)
 Config.SwapSidesEveryRound = true
 
 Config.Vehicle = 'sultan'          -- voiture des attaquants en début de manche (nom de modèle GTA)
-Config.VehicleSpacing = 5.0        -- écart (m) entre les voitures d'une même équipe
+-- Formation d'apparition (voir spawnPos dans server.lua)
+Config.VehicleColumns = 3          -- voitures côte à côte par rangée
+Config.VehicleSideSpacing = 3.3    -- écart (m) entre deux voitures côte à côte (une voiture ≈ 2 m de large)
+Config.VehicleRowSpacing = 6.5     -- écart (m) entre deux rangées (une voiture ≈ 4,5 m de long)
+Config.FootSpacing = 1.6           -- écart (m) entre les joueurs à pied (défenseurs)
 
 Config.AttackSpawnDistance = 70.0  -- (zones de secours) distance des attaquants au-delà du bord
 Config.OutOfZoneDamage = 8         -- dégâts / seconde pour un défenseur hors de la zone (combat)

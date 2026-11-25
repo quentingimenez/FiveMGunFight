@@ -143,17 +143,36 @@ end
 
 -- Position d'apparition : les voitures sont rangées en rangées de 4 derrière
 -- le point de départ de l'équipe, toutes tournées vers la zone.
-local function spawnPos(src)
+-- Position d'apparition de l'équipe, en formation, tournée vers la zone.
+--  - en voiture : rangées de Config.VehicleColumns voitures côte à côte,
+--    serrées mais sans se chevaucher, les rangées suivantes derrière ;
+--  - à pied : un groupe compact (1 joueur au centre, puis des anneaux de 6,
+--    12, 18... joueurs autour), chacun à sa place.
+local function spawnPos(src, inVehicle)
     local z = zone()
     local sp = roleOf(S.team[src]) == 'defense' and z.defenseSpawn or z.attackSpawn
     local h = math.rad(headingTo(sp.x, sp.y, z.center.x, z.center.y))
     local fx, fy = -math.sin(h), math.cos(h)   -- vers l'avant (la zone)
     local rx, ry = math.cos(h), math.sin(h)    -- vers le côté
-
     local i = slotOf(src) - 1
-    local col, row = i % 4, math.floor(i / 4)
-    local side = (col - 1.5) * Config.VehicleSpacing
-    local back = row * Config.VehicleSpacing * 1.6
+    local side, back = 0.0, 0.0
+
+    if inVehicle then
+        local cols = Config.VehicleColumns
+        local col, row = i % cols, math.floor(i / cols)
+        side = (col - (cols - 1) / 2) * Config.VehicleSideSpacing
+        back = row * Config.VehicleRowSpacing
+    elseif i > 0 then
+        local ring, idx, ringSize = 1, i - 1, 6
+        while idx >= ringSize do
+            idx, ring = idx - ringSize, ring + 1
+            ringSize = 6 * ring
+        end
+        local a = idx / ringSize * 2 * math.pi
+        side = math.cos(a) * ring * Config.FootSpacing
+        back = math.sin(a) * ring * Config.FootSpacing
+    end
+
     local x = sp.x + rx * side - fx * back
     local y = sp.y + ry * side - fy * back
     return x, y, sp.z, math.deg(h) % 360.0
@@ -161,7 +180,8 @@ end
 
 -- opts : vehicle (bool), freeze, protected, weapons (bool : armes choisies)
 local function spawnRole(src, opts)
-    local x, y, z, h = spawnPos(src)
+    local inVehicle = opts.vehicle and roleOf(S.team[src]) == 'attack'
+    local x, y, z, h = spawnPos(src, inVehicle)
     local weapons = nil
     if opts.weapons then
         weapons = core:BuildWeaponList(core:ResolveSelection(src, S.choice[src]))
@@ -169,7 +189,7 @@ local function spawnRole(src, opts)
     core:Spawn(src, {
         x = x, y = y, z = z, heading = h,
         -- Seuls les attaquants ont une voiture : les défenseurs apparaissent à pied dans la zone
-        vehicle = (opts.vehicle and roleOf(S.team[src]) == 'attack') and Config.Vehicle or nil,
+        vehicle = inVehicle and Config.Vehicle or nil,
         weapons = weapons, armour = weapons and core:GetSelectionSettings().armour or nil,
         freeze = opts.freeze, protected = opts.protected,
     })
