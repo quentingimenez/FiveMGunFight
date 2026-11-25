@@ -282,6 +282,9 @@ local function buildState(src)
         serverName = Config.ServerName,
         build = buildSha(),
         online = #GetPlayers(),
+        -- Le client bloque la sélection et le lancement pendant ce délai : il
+        -- doit connaître le cooldown du serveur pour ne pas se le faire refuser.
+        modeCooldownMs = (Config.Party.modeCooldown or 1) * 1000,
         limits = {
             partyMax = Config.Party.maxSize,
             nameMin = Config.Character.nameMin,
@@ -1194,9 +1197,9 @@ RegisterNetEvent('gf_lobby:selectMode', function(payload)
     local src = source
     local modeId = type(payload) == 'table' and payload.mode or payload
     if type(modeId) ~= 'string' then return end
-    -- Annulation de la recherche serveur : le client ne peut pas envoyer
-    -- `{cancel=true}` via `play` (le relais client ne garde que `mode`), mais
-    -- `selectMode` accepte une charge utile table et relaie `cancel`.
+    -- Annulation de la recherche serveur : le client envoie une table
+    -- `{ mode = ..., cancel = true }` via `selectMode`. Le relais transmet la
+    -- table telle quelle ; `cancelQueue` vérifie ensuite les droits du chef.
     if type(payload) == 'table' and payload.cancel == true then
         cancelQueue(src)
         return

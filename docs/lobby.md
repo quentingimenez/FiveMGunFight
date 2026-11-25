@@ -142,9 +142,10 @@ Le personnage existe : le lobby s'affiche directement, sans écran de création.
    - **Choix documenté** : une seule recherche serveur active à la fois ; un
      nouveau `play` sur une recherche en cours est un simple rappel d'état, pas
      une seconde file.
-   - Le chef annule avec `selectMode {mode='attack', cancel=true}` (le relais
-     client `play` ne transmet pas `cancel`). La file est vidée et l'état NUI
-     restauré. Le client ne ferme jamais la NUI pendant l'attente.
+   - Le chef annule avec `selectMode {mode='attack', cancel=true}` : ce
+     callback transmet la table telle quelle au serveur, contrairement à
+     `play` qui ne garde que `mode`. La file est vidée et l'état NUI restauré.
+     Le client ne ferme jamais la NUI pendant l'attente.
    - À `size >= Config.Matchmaking.attackMin` (20, configurable), un thread
      serveur fige la file et appelle `exports.gf_core:SetMode(member, 'attack')`
      pour **tous** les membres. `gf_attack.Config.PlayersToStart = 20` empêche le
@@ -237,6 +238,7 @@ Enveloppe unique : `{type = "...", data = {...}}`.
 {
   serverName = "GUNFIGHT",
   online = 3,
+  modeCooldownMs = 1000,  -- délai minimal entre deux sélections/lancements
   limits = { partyMax = 4, nameMin = 3, nameMax = 20, skins = 5 },
   me = {
     id = 12,
