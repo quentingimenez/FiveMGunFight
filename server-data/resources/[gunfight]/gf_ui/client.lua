@@ -128,6 +128,25 @@ AddEventHandler('gf_ui:items', function(list)
     SendNUIMessage({ type = 'items', data = list })
 end)
 
+-- ---------------------------------------------------------------- Minimap sans barres GTA
+-- Les barres vie (verte) / armure (bleue) de GTA sous la minimap font doublon avec
+-- notre HUD : le mode « 3 » du scaleform minimap les masque. GTA le réinitialise
+-- parfois (respawn, changement de taille), d'où l'envoi à chaque image.
+CreateThread(function()
+    local minimap = RequestScaleformMovie('minimap')
+    while not HasScaleformMovieLoaded(minimap) do Wait(0) end
+    -- bascule grande carte / petite carte pour forcer le scaleform à se réinitialiser
+    SetRadarBigmapEnabled(true, false)
+    Wait(0)
+    SetRadarBigmapEnabled(false, false)
+    while true do
+        BeginScaleformMovieMethod(minimap, 'SETUP_HEALTH_ARMOUR')
+        ScaleformMovieMethodAddParamInt(3)
+        EndScaleformMovieMethod()
+        Wait(0)
+    end
+end)
+
 -- ---------------------------------------------------------------- Vie et kevlar
 -- Barres en bas au centre, dans les modes de jeu (pas au lobby).
 -- Vie d'un joueur GTA : 100 = mort, 200 = pleine -> affichée de 0 à 100.
