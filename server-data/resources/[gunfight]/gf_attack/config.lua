@@ -19,11 +19,11 @@
 Config = {}
 
 Config.MinPlayers = 2          -- joueurs nécessaires pour lancer automatiquement
-Config.WinRounds = 5           -- manches à gagner pour remporter le match
+Config.WinRounds = 2           -- manches à gagner pour remporter le match
 Config.SelectTime = 10         -- secondes pour choisir ses armes (gelé dans la voiture)
 Config.PlacementTime = 15      -- secondes de placement (zone fermée aux attaquants)
 Config.RoundTime = 180         -- durée max du combat (secondes)
-Config.EndDelay = 8            -- pause entre deux manches (secondes)
+Config.EndDelay = 6            -- pause entre deux manches : « Manche gagnée / perdue » (secondes)
 Config.MatchEndDelay = 15      -- pause après la fin d'un match (secondes)
 Config.SwapSidesEveryRound = true
 

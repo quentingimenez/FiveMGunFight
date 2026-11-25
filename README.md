@@ -15,7 +15,9 @@ Deux modes de jeu :
      Pas de réapparition : **la dernière équipe en vie gagne**. Un joueur mort regarde ses
      **alliés** (clic gauche / clic droit pour changer). Temps écoulé = victoire de la défense.
 
-  Les rôles s'inversent à chaque manche, premier à 5 manches gagne le match.
+  À la fin de chaque manche, chacun voit **MANCHE GAGNÉE** ou **MANCHE PERDUE** pendant quelques
+  secondes, puis les camps s'inversent (annonce **CHANGEMENT DE CAMP**). La première équipe à
+  **2 manches gagnées** remporte le match (**VICTOIRE** / **DÉFAITE**).
 - **Redzone** (`/redzone`) : chacun pour soi. Une seule partie à la fois (10 min).
   On apparaît **à pied** près de la zone, on va au **point véhicule** (marqueur bleu) et on
   appuie sur **E** pour monter dans sa voiture, on roule jusqu'à la zone rouge, on appuie sur

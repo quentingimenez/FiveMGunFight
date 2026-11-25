@@ -267,9 +267,14 @@ local function startSelect()
         spawnRole(src, { vehicle = true, freeze = true, protected = true })
         openLoadout(src)
         local role = roleOf(S.team[src])
-        announce(src, ('Manche %d'):format(S.round),
-            role == 'attack' and ('Tu ATTAQUES : ' .. zone().name) or ('Tu DÉFENDS : ' .. zone().name), 4000)
+        local roleText = role == 'attack' and ('Tu ATTAQUES : ' .. zone().name) or ('Tu DÉFENDS : ' .. zone().name)
+        if S.swapped then
+            announce(src, 'CHANGEMENT DE CAMP', ('Manche %d  ·  %s'):format(S.round, roleText), 4500)
+        else
+            announce(src, ('Manche %d'):format(S.round), roleText, 4000)
+        end
     end)
+    S.swapped = false
     if S.solo then
         announceAll(('Manche %d (test)'):format(S.round), 'Une équipe est vide : la manche se termine au chrono', 5000)
     end
@@ -315,15 +320,23 @@ local function endRound(winner, reason)
 
     eachPlayer(function(src) core:SetProtected(src, true) end)
 
-    local label = Config.Teams[winner].label
-    if S.score[winner] >= Config.WinRounds then
+    -- Message personnel : gagné ou perdu, selon l'équipe du joueur
+    local matchOver = S.score[winner] >= Config.WinRounds
+    if matchOver then
         S.matchOver = true
         S.endsAt = now() + Config.MatchEndDelay
-        announceAll(('%s remporte le match !'):format(label),
-            ('Score final %d - %d'):format(S.score.A, S.score.B), 8000)
-    else
-        announceAll(('%s gagne la manche'):format(label), reason, 5000)
     end
+    local scoreText = ('%s %d - %d %s'):format(Config.Teams.A.label, S.score.A, S.score.B, Config.Teams.B.label)
+    eachPlayer(function(src)
+        local won = S.team[src] == winner
+        if matchOver then
+            announce(src, won and 'VICTOIRE' or 'DÉFAITE', 'Score final : ' .. scoreText,
+                Config.MatchEndDelay * 1000 - 1000)
+        else
+            announce(src, won and 'MANCHE GAGNÉE' or 'MANCHE PERDUE', reason .. '  ·  ' .. scoreText,
+                Config.EndDelay * 1000 - 1000)
+        end
+    end)
     sendZoneAll()
     S.scoreboardDirty = true
 end
@@ -348,6 +361,7 @@ local function nextRound()
         for src in pairs(S.stats) do S.stats[src] = { kills = 0, deaths = 0 } end
     elseif Config.SwapSidesEveryRound then
         S.attackers = other(S.attackers)
+        S.swapped = true   -- annoncé au début de la manche suivante
     end
 
     if canStart() then startSelect() else goWaiting() end
