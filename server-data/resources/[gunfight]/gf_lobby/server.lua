@@ -27,6 +27,16 @@ local function log(message)
     print(('[gf_lobby] %s'):format(tostring(message)))
 end
 
+-- Version du build déployé : la convar gf_build_sha est posée par
+-- docker/entrypoint.sh depuis l'argument BUILD_SHA de l'image Docker (sha court
+-- du commit construit). Hors conteneur, elle est absente et on affiche « dev ».
+-- La valeur est filtrée : elle finit dans l'interface du lobby.
+local function buildSha()
+    local sha = tostring(GetConvar('gf_build_sha', '') or ''):gsub('%s+', '')
+    if not sha:match('^[%w._-]+$') then return 'dev' end
+    return sha
+end
+
 local function playerName(src)
     return GetPlayerName(src) or ('Joueur %d'):format(src)
 end
@@ -270,6 +280,7 @@ local function buildState(src)
 
     return {
         serverName = Config.ServerName,
+        build = buildSha(),
         online = #GetPlayers(),
         limits = {
             partyMax = Config.Party.maxSize,

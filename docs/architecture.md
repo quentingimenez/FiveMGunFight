@@ -33,12 +33,12 @@ démarrer une pile ambiguë.
 | Fichier | Rôle |
 |---|---|
 | `docker-compose.yml` | socle commun : services `fxserver` et `mariadb`, réseau, healthchecks, plafonds mémoire, volumes `txdata` et `dbdata` (noms `gunfight_txdata` / `gunfight_dbdata`), variables communes |
-| `docker-compose.dev.yml` | surcouche développement : `build: .` et bind mount `./server-data:/opt/fivem/server-data` ; garde les volumes du socle, donc une installation existante continue de fonctionner |
+| `docker-compose.dev.yml` | surcouche développement : build local (contexte `.`, argument `BUILD_SHA` avec repli `dev`) et bind mount `./server-data:/opt/fivem/server-data` ; garde les volumes du socle, donc une installation existante continue de fonctionner |
 | `docker-compose.prod.yml` | surcouche production : `image: ${IMAGE_REF:?...}`, `GF_SEED_MAPS: "true"`, volume `maps` monté sur `resources/[gunfight]/gf_maps/data`, volumes renommés `gunfight-prod-*`, aucun bind mount de `server-data/` |
 
 | Élément | Développement (socle + dev) | Production (socle + prod) |
 |---|---|---|
-| Image de `fxserver` | construite localement (`build: .`) | téléchargée depuis GHCR (`IMAGE_REF`) |
+| Image de `fxserver` | construite localement (`build:`, argument `BUILD_SHA`) | téléchargée depuis GHCR (`IMAGE_REF`) |
 | `server-data/` | bind mount du dépôt | fourni par l'image, aucun bind mount |
 | Maps | `server-data/resources/[gunfight]/gf_maps/data/` du dépôt | volume `maps` monté sur ce même chemin |
 | `GF_SEED_MAPS` | `"false"` (les maps du dépôt sont déjà là) | `"true"` (amorce `maps.json` si le volume n'en a pas) |
@@ -51,6 +51,29 @@ Les volumes de production portent des noms distincts : un `up` lancé avec le
 mauvais fichier ne peut pas écrire dans la base ou les maps de l'autre
 environnement. `start.bat` / `stop.bat` / `status.bat` utilisent toujours
 `docker-compose.yml` + `docker-compose.dev.yml`.
+
+## Version du build affichée par le lobby
+
+Le badge du lobby (`BUILD <sha>`) ne code plus aucune version : il affiche le
+sha court du commit **réellement construit**, et suit donc l'image déployée.
+
+| Maillon | Fichier | Rôle |
+|---|---|---|
+| Calcul | `.github/workflows/docker.yml` | étape « Calculer le sha du build » dans les jobs `image` et `smoke` : `cut -c1-7` de `github.sha` |
+| Construction | `Dockerfile` | `ARG BUILD_SHA=dev` puis `ENV GF_BUILD_SHA=${BUILD_SHA}` |
+| Publication | `docker/entrypoint.sh` | nettoie la valeur et écrit `set gf_build_sha "<sha>"` dans `server-data/secrets.cfg` (repli `dev`) |
+| Lecture | `gf_lobby/server.lua` | `GetConvar('gf_build_sha')` → `state.build` |
+| Affichage | `gf_lobby/html/js/app.js` | `applyBuild(next.build)` met le badge à jour |
+
+Le passage par la convar est volontaire : en production, `server-data` peut être
+monté depuis un volume (Unraid) ou figé dans l'image, donc un fichier du dépôt
+n'a aucune chance d'être à jour. La convar est posée par l'image qui tourne : le
+badge ne peut pas annoncer plus récent qu'elle. Hors CI (build local, FXServer
+lancé à la main) la valeur est `dev`.
+
+En développement, le sha local se transmet au build via l'environnement :
+`BUILD_SHA=$(git rev-parse --short HEAD) docker compose -f docker-compose.yml
+-f docker-compose.dev.yml build`.
 
 ## Amorçage de `maps.json`
 

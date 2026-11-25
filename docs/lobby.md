@@ -50,7 +50,10 @@ Le lobby n'est pas un monde ouvert :
 - marque `GUNFIGHT` + mention `LOBBY` ;
 - navigation : `LOBBY` actif, `ARMES` et `PERSONNAGE` verrouillés avec libellé
   `BIENTÔT` (emplacements réservés) ;
-- état serveur : nombre de joueurs en ligne et pastille de connexion.
+- état serveur : nombre de joueurs en ligne et pastille de connexion ;
+- badge `BUILD <sha>` : sha court du commit de l'image qui tourne (convar
+  `gf_build_sha`, voir [`architecture.md`](architecture.md#version-du-build-affichée-par-le-lobby)),
+  `dev` hors conteneur.
 
 ### Colonne gauche — profil
 

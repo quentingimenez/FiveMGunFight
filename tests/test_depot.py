@@ -304,11 +304,20 @@ class EnvironnementsCompose(unittest.TestCase):
 
     def test_dev_construit_l_image_et_monte_les_scripts(self) -> None:
         bloc = self.bloc(self.DEV, "fxserver")
-        self.assertRegex(bloc, r"(?m)^\s+build:\s*\.\s*$", "build local absent")
+        self.assertRegex(
+            bloc,
+            r"(?m)^\s+build:\s*(\.\s*$|\n\s+context:\s*\.\s*$)",
+            "build local absent",
+        )
         self.assertIn(
             "./server-data:/opt/fivem/server-data",
             bloc,
             "les scripts du dépôt ne sont pas montés en dev",
+        )
+        self.assertRegex(
+            bloc,
+            r"(?m)^\s+BUILD_SHA:\s*\$\{BUILD_SHA:-dev\}\s*$",
+            "le dev doit transmettre le sha du build (valeur de repli « dev »)",
         )
 
     def test_dev_garde_les_volumes_du_socle(self) -> None:

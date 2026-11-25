@@ -3,7 +3,9 @@
 (function () {
   'use strict';
 
-  var BUILD = '7259e64';
+  // Remplacé par le sha du commit envoyé par le serveur (gf_build_sha, posé par
+  // l'entrypoint depuis l'argument BUILD_SHA de l'image). « dev » hors conteneur.
+  var BUILD = 'dev';
   document.documentElement.setAttribute('data-build', BUILD);
 
   var ICONS = {
@@ -217,10 +219,17 @@
     }, 2000);
   }
 
+  function applyBuild(value) {
+    if (typeof value !== 'string' || !value) return;
+    BUILD = value;
+    document.documentElement.setAttribute('data-build', BUILD);
+    buildBadge();
+  }
+
   function markSynced() {
     syncDone = true;
     stopSyncWatch();
-    buildBadge('HOTFIX', 'ok');
+    buildBadge('OK', 'ok');
   }
 
   function renderProfile() {
@@ -303,6 +312,7 @@
       return;
     }
     state = next;
+    applyBuild(next.build);
     markSynced();
     revealApp();
     renderStatus();
