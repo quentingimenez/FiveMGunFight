@@ -55,7 +55,7 @@ Config.OutOfZoneDamage = 8         -- dégâts / seconde pour un défenseur hors
 Config.StartBandages = 2
 Config.StartKevlars = 2
 Config.KevlarPerKill = 1
-Config.MaxKevlars = 5              -- kevlars qu'on peut porter au maximum
+Config.MaxKevlars = 2              -- kevlars qu'on peut porter au maximum (un kill à 2 n'en rapporte pas)
 
 Config.Items = {
     bandage = {

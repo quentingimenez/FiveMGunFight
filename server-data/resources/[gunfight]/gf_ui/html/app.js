@@ -351,32 +351,49 @@ $('.lo-ok').onclick = () => {
 // ------------------------------------------------------------------ Vie et kevlar
 const VITALS = { health: null, armour: null };
 
-function setBar(sel, value, showValue) {
-    const bar = $(sel);
+function setRow(sel, value) {
+    const row = $(sel);
     const v = Math.max(0, Math.min(100, Math.round(value)));
-    $('.fill', bar).style.width = v + '%';
-    if (showValue) $('.val', bar).textContent = v;
+    $('.fill', row).style.width = v + '%';
+    $('.val', row).textContent = v;   // valeur écrite à droite de la barre
     return v;
 }
 
-function flash(sel) {
-    const bar = $(sel);
-    bar.classList.remove('hit');
-    void bar.offsetWidth;
-    bar.classList.add('hit');
+function flash(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
 }
 
 function renderVitals(d) {
     const box = $('#vitals');
     if (!d) { box.classList.add('hidden'); VITALS.health = VITALS.armour = null; return; }
     box.classList.remove('hidden');
-    const h = setBar('#vitals .health', d.health, true);
-    const a = setBar('#vitals .armour', d.armour, false);
+    const h = setRow('#vitals .health', d.health);
+    const a = setRow('#vitals .armour', d.armour);
     $('#vitals .health').classList.toggle('low', h <= 25);
-    if (VITALS.health !== null && h < VITALS.health) flash('#vitals .health');
-    if (VITALS.armour !== null && a < VITALS.armour) flash('#vitals .armour');
+    if (VITALS.health !== null && h < VITALS.health) flash($('#vitals .health'), 'hit');
+    if (VITALS.armour !== null && a < VITALS.armour) flash($('#vitals .armour'), 'hit');
     VITALS.health = h;
     VITALS.armour = a;
+}
+
+// Objets de soin : [{ id, key, label, count }], ou null pour masquer
+const ITEM_COUNTS = {};
+function renderItems(list) {
+    const box = $('#items');
+    if (!Array.isArray(list) || list.length === 0) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    box.replaceChildren();
+    list.forEach(it => {
+        const chip = el('div', `item ${it.id}` + (it.count > 0 ? '' : ' empty'));
+        chip.appendChild(el('span', 'key', it.key));
+        chip.appendChild(el('span', null, it.label));
+        chip.appendChild(el('span', 'count', `x${it.count}`));
+        box.appendChild(chip);
+        if (ITEM_COUNTS[it.id] !== undefined && it.count > ITEM_COUNTS[it.id]) flash(chip, 'gain');
+        ITEM_COUNTS[it.id] = it.count;
+    });
 }
 
 // ------------------------------------------------------------------ Messages du jeu
@@ -385,6 +402,7 @@ window.addEventListener('message', (event) => {
     switch (msg.type) {
         case 'hud': renderHud(msg.data); break;
         case 'vitals': renderVitals(msg.data); break;
+        case 'items': renderItems(msg.data); break;
         case 'killfeed': addKill(msg.data); break;
         case 'killfeed_clear': $('#killfeed').replaceChildren(); break;
         case 'loadout_open': openLoadout(msg.data || {}); break;

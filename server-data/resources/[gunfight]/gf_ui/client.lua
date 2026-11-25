@@ -122,6 +122,12 @@ RegisterNetEvent('gf_ui:match_results', function(data)
 end)
 
 
+-- Objets de soin affichés sous les barres (envoyés par le mode de jeu, ex. gf_attack)
+-- list = { { id, key, label, count }, ... } ou nil pour masquer
+AddEventHandler('gf_ui:items', function(list)
+    SendNUIMessage({ type = 'items', data = list })
+end)
+
 -- ---------------------------------------------------------------- Vie et kevlar
 -- Barres en bas au centre, dans les modes de jeu (pas au lobby).
 -- Vie d'un joueur GTA : 100 = mort, 200 = pleine -> affichée de 0 à 100.

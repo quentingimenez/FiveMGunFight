@@ -269,24 +269,26 @@ html, body {
 /* ------------------------------------------------------------------ Vie et kevlar */
 #vitals {
     position: absolute;
-    bottom: 22px;
+    bottom: 64px;
     left: 50%;
     transform: translateX(-50%);
-    width: 300px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    align-items: center;
+    gap: 6px;
     pointer-events: none;
 }
+.vrow { display: flex; align-items: center; gap: 10px; }
 .vbar {
     position: relative;
-    height: 18px;
+    width: 300px;
+    height: 16px;
     background: rgba(12, 14, 20, 0.7);
     border-radius: 4px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
 }
-.vbar.armour { height: 10px; }
+.vrow.armour .vbar { height: 12px; }
 .vbar .fill {
     position: absolute;
     left: 0;
@@ -295,25 +297,55 @@ html, body {
     width: 100%;
     transition: width .15s ease-out;
 }
-.vbar.health .fill { background: #f4f6fa; }
-.vbar.armour .fill { background: #3d8bff; }
-.vbar.health.low .fill { background: #ff5a5f; }
-.vbar .val {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 13px;
+.vrow.health .fill { background: #f4f6fa; }
+.vrow.armour .fill { background: #3d8bff; }
+.vrow.health.low .fill { background: #ff5a5f; }
+.vrow .val {
+    width: 38px;
+    font-size: 17px;
     font-weight: 900;
     font-variant-numeric: tabular-nums;
-    color: #0c0e14;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, .9);
 }
-.vbar.armour .val { display: none; }
-.vbar.health.low .val { color: #fff; }
-.vbar.hit { animation: vhit .25s ease-out; }
+.vrow.health .val { color: #f4f6fa; }
+.vrow.armour .val { color: #6aa8ff; font-size: 15px; }
+.vrow.health.low .val { color: #ff5a5f; }
+.vrow.hit .vbar { animation: vhit .25s ease-out; }
 @keyframes vhit {
     0%   { box-shadow: 0 0 0 2px rgba(255, 90, 95, .9); }
     100% { box-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
+}
+
+/* Objets de soin sous les barres */
+#items { display: flex; gap: 10px; margin-top: 4px; margin-right: 48px; }
+.item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(12, 14, 20, 0.75);
+    border-radius: 6px;
+    padding: 4px 10px 4px 4px;
+    font-size: 13px;
+    font-weight: 700;
+}
+.item .key {
+    min-width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: #f4f6fa;
+    color: #0c0e14;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.item .count { font-variant-numeric: tabular-nums; font-weight: 900; }
+.item.kevlar .count { color: #6aa8ff; }
+.item.empty { opacity: .45; }
+.item.gain { animation: gain .6s ease-out; }
+@keyframes gain {
+    0%   { transform: scale(1.25); box-shadow: 0 0 0 2px rgba(106, 168, 255, .9); }
+    100% { transform: scale(1); box-shadow: none; }
 }
 
 /* ------------------------------------------------------------------ Annonces */

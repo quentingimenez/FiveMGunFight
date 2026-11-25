@@ -356,18 +356,26 @@ end)
 -- =============================================================================
 local items = nil          -- { bandage = n, kevlar = n } ou nil hors du mode
 local using = nil          -- { item, endsAt, total } pendant une utilisation
-local gainedUntil = 0      -- affichage « +1 kevlar »
 local message = nil        -- { text, untilT } petit message d'information
 
 local function info(text)
     message = { text = text, untilT = GetGameTimer() + 1800 }
 end
 
-RegisterNetEvent('gf_attack:items', function(inv)
-    if inv and items and (inv.kevlar or 0) > (items.kevlar or 0) and not using then
-        gainedUntil = GetGameTimer() + 2000
+-- Envoie les quantités à l'interface (affichées sous les barres de vie / kevlar)
+local function pushItems()
+    if not items then return TriggerEvent('gf_ui:items', nil) end
+    local list = {}
+    for _, id in ipairs({ 'bandage', 'kevlar' }) do
+        local def = Config.Items[id]
+        list[#list + 1] = { id = id, key = def.key, label = def.label, count = items[id] or 0 }
     end
+    TriggerEvent('gf_ui:items', list)
+end
+
+RegisterNetEvent('gf_attack:items', function(inv)
     items = inv
+    pushItems()
 end)
 
 local function tryUse(item)
@@ -452,23 +460,13 @@ local function text(str, x, y, scale, r, g, b, align)
     EndTextCommandDisplayText(x, y)
 end
 
--- Affichage : objets restants (bas droite), barre de progression, messages
+-- Affichage : barre de progression du soin et petits messages
+-- (les quantités sont affichées par gf_ui, sous les barres de vie / kevlar)
 CreateThread(function()
     while true do
         if not items or LocalPlayer.state.gf_mode ~= 'attack' or not LocalPlayer.state.gf_alive then
             Wait(300)
         else
-            if not IsEntityDead(PlayerPedId()) then
-                local b, k = items.bandage or 0, items.kevlar or 0
-                text(('[%s] Bandage x%d'):format(Config.Items.bandage.key, b), 0.985, 0.86, 0.45,
-                    b > 0 and 255 or 130, b > 0 and 255 or 130, b > 0 and 255 or 130, 'right')
-                text(('[%s] Kevlar x%d'):format(Config.Items.kevlar.key, k), 0.985, 0.89, 0.45,
-                    k > 0 and 120 or 130, k > 0 and 190 or 130, 255, 'right')
-                if GetGameTimer() < gainedUntil then
-                    text('+1 kevlar', 0.985, 0.83, 0.45, 120, 220, 120, 'right')
-                end
-            end
-
             if using then
                 local left = math.max(0, using.endsAt - GetGameTimer())
                 local p = 1.0 - left / using.total
