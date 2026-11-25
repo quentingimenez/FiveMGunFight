@@ -27,6 +27,16 @@ local function log(message)
     print(('[gf_lobby] %s'):format(tostring(message)))
 end
 
+-- Version du build déployé : la convar gf_build_sha est posée par
+-- docker/entrypoint.sh depuis l'argument BUILD_SHA de l'image Docker (sha court
+-- du commit construit). Hors conteneur, elle est absente et on affiche « dev ».
+-- La valeur est filtrée : elle finit dans l'interface du lobby.
+local function buildSha()
+    local sha = tostring(GetConvar('gf_build_sha', '') or ''):gsub('%s+', '')
+    if not sha:match('^[%w._-]+$') then return 'dev' end
+    return sha
+end
+
 local function playerName(src)
     return GetPlayerName(src) or ('Joueur %d'):format(src)
 end
@@ -270,7 +280,11 @@ local function buildState(src)
 
     return {
         serverName = Config.ServerName,
+        build = buildSha(),
         online = #GetPlayers(),
+        -- Le client bloque la sélection et le lancement pendant ce délai : il
+        -- doit connaître le cooldown du serveur pour ne pas se le faire refuser.
+        modeCooldownMs = (Config.Party.modeCooldown or 1) * 1000,
         limits = {
             partyMax = Config.Party.maxSize,
             nameMin = Config.Character.nameMin,
@@ -1183,9 +1197,9 @@ RegisterNetEvent('gf_lobby:selectMode', function(payload)
     local src = source
     local modeId = type(payload) == 'table' and payload.mode or payload
     if type(modeId) ~= 'string' then return end
-    -- Annulation de la recherche serveur : le client ne peut pas envoyer
-    -- `{cancel=true}` via `play` (le relais client ne garde que `mode`), mais
-    -- `selectMode` accepte une charge utile table et relaie `cancel`.
+    -- Annulation de la recherche serveur : le client envoie une table
+    -- `{ mode = ..., cancel = true }` via `selectMode`. Le relais transmet la
+    -- table telle quelle ; `cancelQueue` vérifie ensuite les droits du chef.
     if type(payload) == 'table' and payload.cancel == true then
         cancelQueue(src)
         return

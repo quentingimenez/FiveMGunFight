@@ -46,6 +46,10 @@ invitations, barre de modes et bouton **Jouer**. Les onglets **Armes** et
 de l'interface, du protocole NUI et des règles d'escouade est dans
 [docs/lobby.md](docs/lobby.md).
 
+Les **accès** (ports, journaux, console, admin, base de données) et le
+**déroulé de débogage/test** sont rassemblés dans
+[docs/debug-test.md](docs/debug-test.md).
+
 ---
 
 ## 1. Ce qu'il te faut (une seule fois)
@@ -60,8 +64,9 @@ de l'interface, du protocole NUI et des règles d'escouade est dans
 
 > **Plus de 48 joueurs ?** La clé gratuite est limitée à 48 places. Pour 64 joueurs ou plus,
 > il faut un abonnement *Element Club* Cfx.re (via https://portal.cfx.re) lié à ton compte.
-> Le nombre de places est aussi plafonné par ce que couvre ton abonnement : si FiveM refuse
-> le `300` demandé, baisse `MAX_PLAYERS` dans le fichier `.env` à la valeur autorisée.
+> Le nombre de places est aussi plafonné par ce que couvre ton abonnement : le défaut du dépôt
+> est `MAX_PLAYERS=48`. Si FiveM refuse la valeur demandée, baisse `MAX_PLAYERS` dans le fichier
+> `.env` à la valeur autorisée.
 > Une clé peut être **révoquée à tout moment** si elle circule : ne la mets jamais dans un dépôt,
 > une capture d'écran ou un message.
 
@@ -535,7 +540,7 @@ La procédure complète, y compris la bascule réelle en production, est dans
 |---|---|
 | `ERREUR : LICENSE_KEY est vide` | remplis `LICENSE_KEY` dans `.env` |
 | `Docker n'est pas démarré` | lance Docker Desktop, attends l'icône verte |
-| Erreur de licence / « too many slots » | `MAX_PLAYERS` dépasse la limite de ta clé (48 sans Element Club) |
+| Erreur de licence / « too many slots » | `MAX_PLAYERS` dépasse la limite de ta clé (défaut du dépôt : 48, sans Element Club) : baisse la valeur dans `.env` |
 | `Could not authenticate server license key` | clé invalide, révoquée ou mal copiée (`\r` : réenregistre `.env` en UTF-8 sans retour chariot) |
 | Ressource `sessionmanager` / `hardcap` introuvable | n'existe plus dans les versions récentes de FXServer : les lignes ont été retirées de `server.cfg`, ne pas les remettre |
 | `docker compose up` échoue : « service fxserver has neither an image nor a build context » | le socle seul ne démarre pas : ajoute `-f docker-compose.dev.yml` (local) ou `-f docker-compose.prod.yml` (VPS) ; `start.bat` le fait déjà |

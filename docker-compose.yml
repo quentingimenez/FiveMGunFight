@@ -48,7 +48,7 @@ services:
     environment:
       # --- Configuration non secrète (valeurs lues dans .env par Compose) ---
       SERVER_NAME: ${SERVER_NAME:-Gunfight}
-      MAX_PLAYERS: ${MAX_PLAYERS:-300}
+      MAX_PLAYERS: ${MAX_PLAYERS:-48}
       ADMIN_IDENTIFIERS: ${ADMIN_IDENTIFIERS:-}
       MARIADB_DATABASE: ${MARIADB_DATABASE:-gunfight}
       MARIADB_USER: ${MARIADB_USER:-gunfight}

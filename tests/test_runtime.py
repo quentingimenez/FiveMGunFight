@@ -24,6 +24,7 @@ ENTRYPOINT = RACINE / "docker" / "entrypoint.sh"
 GITIGNORE = RACINE / ".gitignore"
 DOCKERIGNORE = RACINE / ".dockerignore"
 SECRETS_EXEMPLE = RACINE / "docker" / "secrets.exemple" / "README.md"
+ENV_EXEMPLE = RACINE / ".env.example"
 
 
 def lire(chemin: Path) -> str:
@@ -140,6 +141,28 @@ class SecretsHorsEnvironnement(unittest.TestCase):
             "GF_SEED_MAPS",
         ):
             self.assertIn(cle, fxserver)
+
+    def test_defaut_max_players_48_dans_compose_et_entrypoint(self) -> None:
+        # Au-delà de 48 places, la clé gratuite Cfx.re est refusée par FiveM.
+        fxserver = environnement(bloc_service(lire(COMPOSE), "fxserver"))
+        self.assertEqual(fxserver.get("MAX_PLAYERS"), "${MAX_PLAYERS:-48}")
+        texte = lire(ENTRYPOINT)
+        self.assertIn('MAX_PLAYERS="$(propre "${MAX_PLAYERS:-48}")"', texte)
+
+    def test_env_exemple_demande_48_joueurs_par_defaut(self) -> None:
+        # Le modèle recopié par start.bat doit rester sous la limite gratuite :
+        # un 300 ici reproduirait l'erreur « more slots than allowed ».
+        self.assertIn("MAX_PLAYERS=48", lire(ENV_EXEMPLE).splitlines())
+
+    def test_entrypoint_avertit_si_max_players_invalide_ou_superieur_a_48(self) -> None:
+        texte = lire(ENTRYPOINT)
+        self.assertIn('case "$MAX_PLAYERS" in', texte)
+        self.assertIn("n'est pas un entier", texte)
+        # Une valeur non numérique ne doit pas finir dans sv_maxclients :
+        # on retombe sur le défaut au lieu d'écrire une convar invalide.
+        self.assertIn("c'est le nombre de places par défaut (48) qui s'applique.", texte)
+        self.assertIn("dépasse les 48 places de la clé gratuite", texte)
+        self.assertIn("https://portal.cfx.re/subscriptions", texte)
 
     def test_dev_transmet_les_secrets_explicitement(self) -> None:
         texte = lire(COMPOSE_DEV)
@@ -338,6 +361,70 @@ class DocumentationSecrets(unittest.TestCase):
         self.assertIn("chmod 600", texte)
         self.assertIn("SECRETS_DIR", texte)
         self.assertIn("CRLF", texte)
+
+
+class VersionDuBuild(unittest.TestCase):
+    """Le badge du lobby affiche le sha du commit construit par la CI.
+
+    Chaîne : .github/workflows/docker.yml (sha court) -> argument BUILD_SHA ->
+    variable GF_BUILD_SHA de l'image -> convar gf_build_sha dans secrets.cfg ->
+    `build` de l'état du lobby -> interface. Chaque maillon est vérifié : si un
+    seul saute, le badge affiche une version qui n'est plus celle du code.
+    """
+
+    NUI = RACINE / "server-data" / "resources" / "[gunfight]" / "gf_lobby" / "html"
+    SERVEUR = RACINE / "server-data" / "resources" / "[gunfight]" / "gf_lobby" / "server.lua"
+    WORKFLOW = RACINE / ".github" / "workflows" / "docker.yml"
+    CALCUL = (
+        "echo \"BUILD_SHA=$(printf '%s' '${{ github.sha }}' | cut -c1-7)\""
+        ' >> "$GITHUB_ENV"'
+    )
+
+    def test_dockerfile_declare_et_exporte_l_argument(self) -> None:
+        texte = lire(DOCKERFILE)
+        self.assertRegex(texte, r"(?m)^ARG BUILD_SHA=dev$", "argument BUILD_SHA absent")
+        self.assertIn("ENV GF_BUILD_SHA=${BUILD_SHA}", texte, "GF_BUILD_SHA non exportée")
+        self.assertLess(
+            texte.index("ARG BUILD_SHA"),
+            texte.index("GF_BUILD_SHA"),
+            "l'argument doit précéder son export",
+        )
+
+    def test_entrypoint_publie_la_convar(self) -> None:
+        texte = lire(ENTRYPOINT)
+        self.assertIn("${GF_BUILD_SHA:-}", texte, "l'entrypoint ignore GF_BUILD_SHA")
+        self.assertIn(
+            'echo "set gf_build_sha \\"$BUILD_SHA\\""', texte, "convar gf_build_sha non écrite"
+        )
+        # La valeur vient d'un argument de build : elle est nettoyée avant
+        # d'atterrir dans secrets.cfg, qui est lu par le serveur.
+        self.assertIn("tr -cd '0-9a-fA-F'", texte, "le sha n'est pas nettoyé")
+        self.assertIn("BUILD_SHA=dev", texte, "repli « dev » absent")
+
+    def test_serveur_lit_la_convar(self) -> None:
+        texte = lire(self.SERVEUR)
+        self.assertIn("GetConvar('gf_build_sha'", texte, "la convar n'est pas lue")
+        self.assertIn("build = buildSha(),", texte, "le sha n'entre pas dans l'état du lobby")
+
+    def test_interface_naffiche_plus_de_sha_en_dur(self) -> None:
+        for nom in ("index.html", "js/app.js"):
+            texte = lire(self.NUI / nom)
+            with self.subTest(fichier=nom):
+                self.assertNotIn("7259e64", texte, "ancien sha toujours en dur")
+                self.assertNotIn("b8b4a5c", texte, "ancien sha toujours en dur")
+        app = lire(self.NUI / "js" / "app.js")
+        self.assertIn("var BUILD = 'dev';", app, "repli « dev » absent de l'interface")
+        self.assertIn("applyBuild(next.build)", app, "le sha reçu n'est pas appliqué au badge")
+
+    def test_workflow_transmet_le_sha_aux_deux_builds(self) -> None:
+        texte = lire(self.WORKFLOW)
+        self.assertEqual(
+            texte.count(self.CALCUL), 2, "le sha doit être calculé dans les deux jobs"
+        )
+        self.assertIn("BUILD_SHA=${{ env.BUILD_SHA }}", texte, "job image sans BUILD_SHA")
+        self.assertIn(
+            '--build-arg "BUILD_SHA=$BUILD_SHA"', texte, "job smoke sans BUILD_SHA"
+        )
 
 
 if __name__ == "__main__":

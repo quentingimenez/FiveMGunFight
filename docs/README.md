@@ -12,6 +12,7 @@ décrivent le fonctionnement interne et l'exploitation.
 | [`lobby.md`](lobby.md) | tu travailles sur le lobby, l'escouade ou la création de personnage |
 | [`must-have.md`](must-have.md) | tu veux connaître les fonctionnalités prévues et l'ordre dans lequel les construire |
 | [`qualite.md`](qualite.md) | tu modifies du code et tu veux savoir ce que la CI vérifie |
+| [`debug-test.md`](debug-test.md) | tu veux les accès (ports, logs, console, admin) et les scénarios de test local |
 | [`protection-branche.md`](protection-branche.md) | tu dois configurer ou vérifier les règles de la branche `main` |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | tu ouvres ta première pull request |
 | [`../SECURITY.md`](../SECURITY.md) | tu manipules des secrets, ou tu constates une fuite |

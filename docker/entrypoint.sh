@@ -47,12 +47,37 @@ DB_PASS="$(secret db_password "${MARIADB_PASSWORD:-}")"
 unset LICENSE_KEY STEAM_WEB_API_KEY MARIADB_PASSWORD
 
 SERVER_NAME="$(propre "${SERVER_NAME:-Gunfight}")"
-MAX_PLAYERS="$(propre "${MAX_PLAYERS:-300}")"
+MAX_PLAYERS="$(propre "${MAX_PLAYERS:-48}")"
+# La clé gratuite Cfx.re plafonne à 48 places : au-delà, FiveM refuse toute
+# connexion avec « This server uses more slots than allowed by the current
+# subscription ». On avertit sans bloquer : le choix d'un abonnement reste à
+# l'exploitant. Le case garde le test arithmétique POSIX sûr (sh, pas bash).
+case "$MAX_PLAYERS" in
+  ''|*[!0-9]*)
+    echo " AVERTISSEMENT : MAX_PLAYERS='$MAX_PLAYERS' n'est pas un entier :"
+    echo " c'est le nombre de places par défaut (48) qui s'applique."
+    MAX_PLAYERS=48
+    ;;
+  *)
+    if [ "$MAX_PLAYERS" -gt 48 ]; then
+      echo " AVERTISSEMENT : MAX_PLAYERS=$MAX_PLAYERS dépasse les 48 places de la clé gratuite."
+      echo " FiveM refusera les connexions au-delà de 48 places."
+      echo " Baisse MAX_PLAYERS à 48 dans .env, ou prends un abonnement Element Club"
+      echo " Cfx.re : https://portal.cfx.re/subscriptions"
+    fi
+    ;;
+esac
 ADMIN_IDENTIFIERS="$(propre "${ADMIN_IDENTIFIERS:-}")"
 DB_HOST="$(propre "${DB_HOST:-mariadb}")"
 DB_NAME="$(propre "${MARIADB_DATABASE:-gunfight}")"
 DB_USER="$(propre "${MARIADB_USER:-gunfight}")"
 TXADMIN="$(propre "${TXADMIN:-true}")"
+
+# Version du build, injectée à la construction de l'image (Dockerfile, argument
+# BUILD_SHA). On ne garde que des caractères de sha : une valeur inattendue ne
+# doit pas pouvoir casser server.cfg ni y injecter une commande.
+BUILD_SHA="$(printf '%s' "${GF_BUILD_SHA:-}" | tr -cd '0-9a-fA-F' | cut -c1-40)"
+[ -n "$BUILD_SHA" ] || BUILD_SHA=dev
 
 if [ -z "$CLE_LICENCE" ] || [ "$CLE_LICENCE" = "change_moi" ]; then
   echo "=================================================================="
@@ -89,6 +114,7 @@ esac
   echo "sv_licenseKey \"$CLE_LICENCE\""
   echo "sv_maxclients $MAX_PLAYERS"
   echo "sv_hostname \"$SERVER_NAME\""
+  echo "set gf_build_sha \"$BUILD_SHA\""
   echo "set mysql_connection_string \"mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_NAME?charset=utf8mb4\""
   if [ -n "$CLE_STEAM" ]; then
     echo "set steam_webApiKey \"$CLE_STEAM\""
@@ -130,6 +156,7 @@ if [ "${GF_SEED_MAPS:-false}" = "true" ] && [ ! -f "$MAPS_DATA/maps.json" ]; the
 fi
 
 echo "secrets.cfg généré (joueurs max : $MAX_PLAYERS)"
+echo "Build            : $BUILD_SHA"
 echo "Version FXServer : $(cat "$SERVER/FX_VERSION.txt" 2>/dev/null)"
 echo "Connexion en jeu : touche F8 puis  connect localhost"
 

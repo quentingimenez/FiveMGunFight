@@ -9,6 +9,14 @@
 # les mises à jour de digest ; on ne change pas de distribution sans test.
 FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e
 
+# Version du build : sha court du commit, injecté par la CI au moment de la
+# construction (.github/workflows/docker.yml, étape « Calculer le sha du
+# build »). L'entrypoint la recopie dans secrets.cfg sous forme de convar
+# (gf_build_sha) : le lobby affiche ainsi le commit réellement déployé, même
+# quand server-data est monté en volume. Hors CI la valeur reste « dev ».
+ARG BUILD_SHA=dev
+ENV GF_BUILD_SHA=${BUILD_SHA}
+
 # Quelle version de FXServer télécharger :
 #   FX_CHANNEL = recommended (stable, conseillé) | latest
 #   FX_URL     = lien direct vers un fx.tar.xz précis (prioritaire si rempli)
