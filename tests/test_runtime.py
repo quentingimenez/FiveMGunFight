@@ -24,6 +24,7 @@ ENTRYPOINT = RACINE / "docker" / "entrypoint.sh"
 GITIGNORE = RACINE / ".gitignore"
 DOCKERIGNORE = RACINE / ".dockerignore"
 SECRETS_EXEMPLE = RACINE / "docker" / "secrets.exemple" / "README.md"
+ENV_EXEMPLE = RACINE / ".env.example"
 
 
 def lire(chemin: Path) -> str:
@@ -140,6 +141,28 @@ class SecretsHorsEnvironnement(unittest.TestCase):
             "GF_SEED_MAPS",
         ):
             self.assertIn(cle, fxserver)
+
+    def test_defaut_max_players_48_dans_compose_et_entrypoint(self) -> None:
+        # Au-delà de 48 places, la clé gratuite Cfx.re est refusée par FiveM.
+        fxserver = environnement(bloc_service(lire(COMPOSE), "fxserver"))
+        self.assertEqual(fxserver.get("MAX_PLAYERS"), "${MAX_PLAYERS:-48}")
+        texte = lire(ENTRYPOINT)
+        self.assertIn('MAX_PLAYERS="$(propre "${MAX_PLAYERS:-48}")"', texte)
+
+    def test_env_exemple_demande_48_joueurs_par_defaut(self) -> None:
+        # Le modèle recopié par start.bat doit rester sous la limite gratuite :
+        # un 300 ici reproduirait l'erreur « more slots than allowed ».
+        self.assertIn("MAX_PLAYERS=48", lire(ENV_EXEMPLE).splitlines())
+
+    def test_entrypoint_avertit_si_max_players_invalide_ou_superieur_a_48(self) -> None:
+        texte = lire(ENTRYPOINT)
+        self.assertIn('case "$MAX_PLAYERS" in', texte)
+        self.assertIn("n'est pas un entier", texte)
+        # Une valeur non numérique ne doit pas finir dans sv_maxclients :
+        # on retombe sur le défaut au lieu d'écrire une convar invalide.
+        self.assertIn("c'est le nombre de places par défaut (48) qui s'applique.", texte)
+        self.assertIn("dépasse les 48 places de la clé gratuite", texte)
+        self.assertIn("https://portal.cfx.re/subscriptions", texte)
 
     def test_dev_transmet_les_secrets_explicitement(self) -> None:
         texte = lire(COMPOSE_DEV)

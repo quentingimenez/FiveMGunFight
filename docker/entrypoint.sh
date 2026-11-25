@@ -47,7 +47,26 @@ DB_PASS="$(secret db_password "${MARIADB_PASSWORD:-}")"
 unset LICENSE_KEY STEAM_WEB_API_KEY MARIADB_PASSWORD
 
 SERVER_NAME="$(propre "${SERVER_NAME:-Gunfight}")"
-MAX_PLAYERS="$(propre "${MAX_PLAYERS:-300}")"
+MAX_PLAYERS="$(propre "${MAX_PLAYERS:-48}")"
+# La clé gratuite Cfx.re plafonne à 48 places : au-delà, FiveM refuse toute
+# connexion avec « This server uses more slots than allowed by the current
+# subscription ». On avertit sans bloquer : le choix d'un abonnement reste à
+# l'exploitant. Le case garde le test arithmétique POSIX sûr (sh, pas bash).
+case "$MAX_PLAYERS" in
+  ''|*[!0-9]*)
+    echo " AVERTISSEMENT : MAX_PLAYERS='$MAX_PLAYERS' n'est pas un entier :"
+    echo " c'est le nombre de places par défaut (48) qui s'applique."
+    MAX_PLAYERS=48
+    ;;
+  *)
+    if [ "$MAX_PLAYERS" -gt 48 ]; then
+      echo " AVERTISSEMENT : MAX_PLAYERS=$MAX_PLAYERS dépasse les 48 places de la clé gratuite."
+      echo " FiveM refusera les connexions au-delà de 48 places."
+      echo " Baisse MAX_PLAYERS à 48 dans .env, ou prends un abonnement Element Club"
+      echo " Cfx.re : https://portal.cfx.re/subscriptions"
+    fi
+    ;;
+esac
 ADMIN_IDENTIFIERS="$(propre "${ADMIN_IDENTIFIERS:-}")"
 DB_HOST="$(propre "${DB_HOST:-mariadb}")"
 DB_NAME="$(propre "${MARIADB_DATABASE:-gunfight}")"
