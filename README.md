@@ -5,11 +5,13 @@ Deux modes de jeu :
 
 - **Attaque de zone** (`/attack`) : 2 équipes. L'une attaque une zone (en rouge), l'autre la défend.
   Chaque manche se déroule en 3 temps :
-  1. **Choix des armes (10 s)** : tout le monde apparaît **dans sa voiture**, gelé, et choisit
+  1. **Choix des armes (10 s)** : les attaquants apparaissent **dans leur voiture**, les
+     défenseurs **à pied** dans la zone ; tout le monde est gelé et choisit
      **2 armes** parmi celles qu'il possède (plus tard : armes customisées gagnées dans des caisses).
   2. **Placement (15 s)** : on peut rouler ; les défenseurs se placent, la zone est **fermée aux
      attaquants**.
-  3. **Combat** : la zone s'ouvre. Les voitures restent, on peut en descendre et y remonter.
+  3. **Combat** : la zone s'ouvre. Les voitures des attaquants restent, on peut en descendre
+     et y remonter.
      Pas de réapparition : **la dernière équipe en vie gagne**. Un joueur mort regarde ses
      **alliés** (clic gauche / clic droit pour changer). Temps écoulé = victoire de la défense.
 
