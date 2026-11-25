@@ -301,7 +301,10 @@ RegisterNetEvent('gf_core:ready', function()
     -- vrai spawn (souvent le fond du menu reste affiché).
     if current == 'lobby' then
         if Spawning[src] then
-            print(('[gf_core] ready %s : spawn lobby déjà en cours'):format(src))
+            print(('[gf_core] ready %s : spawn lobby manqué, renvoi dans 3.2 s'):format(src))
+            SetTimeout(3200, function()
+                if Modes[src] == 'lobby' and not Spawning[src] then spawnLobby(src) end
+            end)
             return
         end
         print(('[gf_core] ready %s : nouveau spawn lobby'):format(src))
