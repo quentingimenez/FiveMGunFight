@@ -2,6 +2,7 @@
 .git
 server-data/secrets.cfg
 server-data/cache/
+server-data/resources/*/gf_lobby/data/characters.json
 *.bat
 README.md
 server-data/.replxx_history

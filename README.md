@@ -19,6 +19,13 @@ Sur tous les modes : chiffre de dégâts + son à chaque touche, son de kill, me
 
 Les maps (redzones et zones d'attaque) se créent **en jeu** avec l'éditeur `/editor`.
 
+À sa première connexion, le joueur crée son personnage puis arrive dans un **lobby
+statique** : caméra fixe, personnage visible, escouade de 4 joueurs maximum avec
+invitations, barre de modes et bouton **Jouer**. Les onglets **Armes** et
+**Personnage** sont déjà présents mais réservés aux prochaines versions. Le détail
+de l'interface, du protocole NUI et des règles d'escouade est dans
+[docs/lobby.md](docs/lobby.md).
+
 ---
 
 ## 1. Ce qu'il te faut (une seule fois)
@@ -51,6 +58,8 @@ Les maps (redzones et zones d'attaque) se créent **en jeu** avec l'éditeur `/e
    ```
    connect localhost
    ```
+5. À la première connexion, crée ton personnage (nom, genre, apparence) : tu arrives
+   ensuite dans le lobby. Les connexions suivantes ouvrent directement le lobby.
 
 Pour connaître l'état du serveur à tout moment : double-clic sur **`status.bat`**
 (conteneurs, santé de la base, dernières lignes de journal).
@@ -84,6 +93,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | `/attack` | tous | rejoindre l'Attaque de zone |
 | `/redzone` | tous | rejoindre la Redzone |
 | `/pos` | tous | affiche ta position (pour créer de nouvelles zones) |
+| `/lobbyui` | tous | réaffiche l'interface du lobby si elle a disparu |
 | touche **Z** (maintenue) | tous | classement |
 | `/startround` | admin | force le lancement d'une manche (marche même seul pour tester) |
 | `/endmatch` | admin | arrête le match, scores à zéro |
@@ -93,6 +103,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | `/nextmap` | admin | relance une partie Redzone sur la map suivante |
 | `/setmode [id] [lobby\|attack\|redzone]` | admin | déplace un joueur |
 | `/editor` ou `/maps` | admin | éditeur et liste des maps (voir ci-dessous) |
+| `/resetchar [id]` | admin | efface le personnage d'un joueur pour retester la création |
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
 
@@ -139,6 +150,7 @@ Les autres réglages sont dans les fichiers `config.lua` :
 | Fichier | Contenu |
 |---|---|
 | `server-data/resources/[gunfight]/gf_core/config.lua` | lobby, armes, gilet, régénération, délai des multi-kills |
+| `server-data/resources/[gunfight]/gf_lobby/config.lua` | scène et caméra du lobby, taille d'escouade, catalogue des modes, apparence |
 | `server-data/resources/[gunfight]/gf_attack/config.lua` | durées, manches gagnantes, couleurs d'équipes, zones de secours |
 | `server-data/resources/[gunfight]/gf_redzone/config.lua` | durée de partie, véhicule, délai de réapparition, zones de secours |
 
@@ -168,7 +180,7 @@ scripts/verifier.sh     contrôles statiques (Lua, JSON, JS, shell, compose)
 scripts/sauvegarder.sh  sauvegarde de la production (base, txdata, maps)
 scripts/proteger-branche.sh  applique la protection de main (plan GitHub Pro requis)
 tests/                  tests automatiques du dépôt (unittest)
-docs/                   architecture, qualité, protection de branche
+docs/                   architecture, lobby, qualité, protection de branche
 .githooks/pre-push      refuse un envoi direct sur main
 CONTRIBUTING.md         branches, commits, pull requests, revue
 SECURITY.md             signalement de faille, gestion des secrets
@@ -177,6 +189,7 @@ server-data/
   resources/[cfx-default]/   ressources officielles Cfx.re (spawn, events)
   resources/[gunfight]/
     gf_core     modes, apparition, armes, morts, anti-tir sur coéquipier
+    gf_lobby    création de personnage, caméra fixe, escouade, invitations, choix du mode
     gf_attack   mode Attaque de zone
     gf_redzone  mode Redzone
     gf_maps     éditeur de maps en jeu (/editor) + sauvegarde data/maps.json
@@ -291,7 +304,7 @@ ressources`** :
 - sur `main` et les tags, l'image est publiée sur GitHub Container Registry
   (`ghcr.io/<compte>/fivemgunfight`), puis le job télécharge et démarre cette image.
 
-Le test vérifie que le serveur scanne bien ses ressources et que les cinq
+Le test vérifie que le serveur scanne bien ses ressources et que les six
 ressources de jeu `gf_*` démarrent réellement. Il utilise le secret dédié
 **`CFX_LICENSE_KEY`** (une clé de test, distincte de celle du serveur de production) :
 
@@ -451,6 +464,9 @@ production.
 | Impossible de se connecter | vérifie dans les journaux qu'il n'y a pas d'erreur rouge ; essaie `connect 127.0.0.1` |
 | Le port 30120 est déjà utilisé | un autre serveur FiveM tourne sur la machine : arrête-le |
 | Le mode ne démarre pas | il faut 2 joueurs (un par équipe) ou `/startround` en admin |
+| L'interface du lobby ne s'affiche pas | tape `/lobbyui` ; vérifie que `gf_lobby` est démarrée et que `data/characters.json` est accessible |
+| Le personnage n'apparaît pas / est invisible | attends la fin du fondu de connexion ; vérifie que `gf_core` et `gf_lobby` sont démarrées dans cet ordre |
+| Je veux recommencer la création de personnage | un admin lance `/resetchar [id]` ; le joueur retourne à l'écran de création |
 | `fxserver` reste `unhealthy` | normal en mode moniteur tant que txAdmin n'est pas configuré : termine l'assistant du panneau, le healthcheck passe ensuite au vert |
 | Comptes txAdmin, base ou maps vides en production | vérifie `docker volume ls` : la prod utilise `gunfight-prod-*`, pas `gunfight_txdata`/`gunfight_dbdata` ; un `up` avec la surcouche dev ne voit pas les données de prod |
 | `denied` ou `manifest unknown` au `pull` | l'image GHCR est privée : reconnecte-toi avec un token `read:packages` (`docker login ghcr.io`) |
@@ -460,12 +476,13 @@ production.
 
 - **Vote de map** : en fin de partie, vote entre 9 maps tirées parmi les maps **cochées**
   (Redzone et Attaque de zone). La case à cocher de `/maps` sert déjà à choisir les maps votables.
-- **Menu de lobby permanent** (style Fortnite) : choix du mode, groupe d'amis / invitations,
-  lancement de partie. Les commandes `/attack`, `/redzone`, `/lobby` seront remplacées par ce
-  menu, qui passera par `exports.gf_core:SetMode` (déjà prévu pour ça). Un groupe d'amis
-  devra être placé dans la même équipe en Attaque de zone.
-
-
+- **Escouade persistante** : le lobby regroupe déjà jusqu'à 4 joueurs et lance le mode pour
+  tous, mais l'escouade est dissoute au lancement. La prochaine étape est de la conserver
+  entre les parties et de placer ses membres dans la même équipe en Attaque de zone.
+- **Personnalisation** : les onglets Armes et Personnage du lobby sont des placeholders.
+  L'onglet Personnage remplacera la génération actuelle (nom, genre, carnation, style) par
+  un vrai éditeur de vêtements et de visage ; l'onglet Armes ajoutera les finitions et
+  accessoires. Les points d'extension sont décrits dans [docs/lobby.md](docs/lobby.md).
 - `gf_stats` : statistiques permanentes (kills, victoires) dans MariaDB avec **oxmysql**
   — la base est déjà prête dans `docker-compose.yml`, la chaîne de connexion
   (`mysql_connection_string`) est déjà générée par `docker/entrypoint.sh`.

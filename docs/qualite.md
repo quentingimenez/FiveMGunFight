@@ -39,7 +39,7 @@ rouge.
 |---|---|---|
 | Syntaxe Lua | `luac -p` | erreur de syntaxe, `end` manquant, chaîne non fermée — la ressource refuserait de démarrer |
 | JSON valide | Python (`json.load`) | virgule en trop dans `maps.json`, fichier tronqué |
-| Syntaxe JavaScript | `node --check` | erreur dans `gf_ui/html/app.js` qui casse toute l'interface NUI |
+| Syntaxe JavaScript | `node --check` | erreur dans `gf_ui/html/app.js` ou `gf_lobby/html/js/*.js` qui casse toute l'interface NUI |
 | Scripts shell | `sh -n` / `bash -n` + `shellcheck -S error` | `entrypoint.sh` cassé : le conteneur ne démarre plus du tout |
 | Compose | `docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q` et idem avec `docker-compose.prod.yml` | YAML invalide, référence de volume inexistante, variable mal écrite, surcouche qui ne se combine plus au socle |
 
@@ -53,13 +53,13 @@ succès silencieux. En CI, tous les outils sont installés : rien n'est ignoré.
 | Classe | Vérifie |
 |---|---|
 | `ManifestesFiveM` | chaque dossier de ressource a un `fxmanifest.lua`, avec `fx_version` et le jeu déclaré ; chaque fichier cité (scripts, `ui_page`, `files`) existe réellement |
-| `ConfigurationServeur` | les cinq ressources `gf_*` sont démarrées dans `server.cfg` ; `sessionmanager`/`hardcap` n'y reviennent pas ; `.env.example` contient toutes les clés attendues et aucun secret ; `.gitignore` et `.dockerignore` protègent `.env`, `secrets.cfg` et le cache |
+| `ConfigurationServeur` | les six ressources `gf_*` sont démarrées dans `server.cfg` ; `sessionmanager`/`hardcap` n'y reviennent pas ; `.env.example` contient toutes les clés attendues et aucun secret ; `.gitignore` et `.dockerignore` protègent `.env`, `secrets.cfg`, le cache et `gf_lobby/data/characters.json` |
 | `InfraDocker` | txAdmin limité à 127.0.0.1, healthcheck FXServer, plafonds mémoire des deux services, nom de projet Compose, `secrets.cfg` en 600, `FROM` Debian épinglé par digest, image MariaDB épinglée par digest, `GF_SEED_MAPS`/`MAPS_DEFAUT` dans l'entrypoint |
 | `EnvironnementsCompose` | les trois fichiers Compose existent ; le dev construit l'image et monte `./server-data` ; la prod utilise `${IMAGE_REF}`, le volume `maps` et les volumes `gunfight-prod-*` distincts ; le socle ne déclare ni `build` ni `image` pour `fxserver` |
 | `ChaineCI` | toutes les actions sont épinglées par SHA ; Dependabot suit les actions et les images et ignore MariaDB ≥ 11.5 ; le check de démarrage figure dans la protection de branche ; `docker.yml` déclenche le smoke sur les pull requests |
 | `MapsEnJeu` | structure de `maps.json` : noms, rayons positifs, polygones d'au moins trois sommets, points de départ présents, identifiants uniques |
-| `Documentation` | les documents (`README`, `CONTRIBUTING`, `SECURITY`, `docs/`, modèle de PR, `CODEOWNERS`) existent et ne sont pas vides ; le README cite chaque ressource ; chaque workflow déclare `on:` et `jobs:` |
-| `DepotGit` | aucun fichier secret n'est suivi par Git (`git ls-files`) |
+| `Documentation` | les documents (`README`, `CONTRIBUTING`, `SECURITY`, `docs/`, dont `docs/lobby.md`, modèle de PR, `CODEOWNERS`) existent et ne sont pas vides ; le README cite chaque ressource ; chaque workflow déclare `on:` et `jobs:` |
+| `DepotGit` | aucun fichier secret n'est suivi par Git (`git ls-files`), y compris `gf_lobby/data/characters.json` |
 
 Ces tests n'ont pas de dépendance réseau ni de conteneur : ils tournent en
 quelques secondes et peuvent être lancés avant chaque commit.

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Gunfight — Lobby</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/modes.css">
+  <link rel="stylesheet" href="css/squad.css">
+  <link rel="stylesheet" href="css/customization.css">
+  <link rel="stylesheet" href="css/creator.css">
+</head>
+<body class="booting">
+  <div id="scene-fx" aria-hidden="true">
+    <div class="fx-vignette"></div>
+    <div class="fx-glow"></div>
+    <div class="fx-grid"></div>
+    <div class="fx-scan"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div id="lobby-chrome" class="hidden">
+      <header id="topbar">
+        <div class="brand" id="brand">
+          <span class="brand-mark" id="brand-mark"></span>
+          <span class="brand-text">
+            <strong>GUNFIGHT</strong>
+            <small>LOBBY</small>
+          </span>
+        </div>
+        <nav id="main-nav" aria-label="Navigation principale"></nav>
+        <div id="topbar-status" aria-live="polite"></div>
+      </header>
+
+      <aside id="profile-panel" class="panel" aria-label="Profil"></aside>
+      <aside id="squad-panel" class="panel" aria-label="Escouade"></aside>
+
+      <div id="center-hint" aria-hidden="true"></div>
+
+      <section id="modes-bar" aria-label="Modes de jeu"></section>
+    </div>
+
+    <div id="creator-root" class="hidden" aria-label="Création de personnage"></div>
+
+    <div id="invite-root"></div>
+    <div id="toasts" aria-live="assertive"></div>
+
+    <div id="transition-overlay" class="hidden" aria-hidden="true">
+      <div class="transition-content">
+        <span class="transition-spinner" aria-hidden="true"></span>
+        <p class="eyebrow">Lancement</p>
+        <h2 id="transition-title">Attaque de zone</h2>
+        <p id="transition-subtitle" class="muted">Préparation de la partie…</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="boot">
+    <div class="boot-inner">
+      <div class="boot-mark" id="boot-mark"></div>
+      <p class="eyebrow">Gunfight</p>
+      <h1>Lobby</h1>
+      <p id="boot-status" class="muted">Connexion au serveur…</p>
+      <button id="boot-retry" class="btn ghost hidden" type="button">Réessayer</button>
+      <div class="boot-line" aria-hidden="true"><span></span></div>
+    </div>
+  </div>
+
+  <noscript>Cette interface nécessite JavaScript.</noscript>
+
+  <script src="js/nui.js" defer></script>
+  <script src="js/app.js" defer></script>
+  <script src="js/modes.js" defer></script>
+  <script src="js/squad.js" defer></script>
+  <script src="js/customization.js" defer></script>
+  <script src="js/creator.js" defer></script>
+</body>
+</html>

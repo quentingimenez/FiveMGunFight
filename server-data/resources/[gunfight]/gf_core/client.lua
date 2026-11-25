@@ -7,6 +7,8 @@
 local protected = false
 local spectator = false
 local spawning = false
+local hasSpawned = false
+local spawnSeq = 0       -- incrémenté à chaque ordre de spawn (ignorer les anciens)
 local modeVehicle = nil  -- véhicule donné par le mode (redzone)
 
 -- Supprime le véhicule de mode (touche F en redzone, changement de mode...)
@@ -125,62 +127,76 @@ end
 
 -- ---------------------------------------------------------------- Événements serveur
 RegisterNetEvent('gf_core:spawn', function(o)
+    spawnSeq = spawnSeq + 1
+    local seq = spawnSeq
     CreateThread(function()
         while spawning do Wait(50) end
+        -- Un spawn plus récent a été reçu pendant l'attente : le plus ancien
+        -- ne doit plus déplacer le joueur ni rejouer le fondu.
+        if seq ~= spawnSeq then return end
         spawning = true
 
-        DoScreenFadeOut(250)
-        local t = GetGameTimer() + 1000
-        while not IsScreenFadedOut() and GetGameTimer() < t do Wait(0) end
+        local ok, err = pcall(function()
+            DoScreenFadeOut(250)
+            local t = GetGameTimer() + 1000
+            while not IsScreenFadedOut() and GetGameTimer() < t do Wait(0) end
 
-        local model = joaat(Config.PlayerModel)
-        if GetEntityModel(PlayerPedId()) ~= model and loadModel(model) then
-            SetPlayerModel(PlayerId(), model)
-            SetPedDefaultComponentVariation(PlayerPedId())
-            SetModelAsNoLongerNeeded(model)
+            local model = joaat(Config.PlayerModel)
+            if GetEntityModel(PlayerPedId()) ~= model and loadModel(model) then
+                SetPlayerModel(PlayerId(), model)
+                SetPedDefaultComponentVariation(PlayerPedId())
+                SetModelAsNoLongerNeeded(model)
+            end
+
+            -- L'ancien véhicule est supprimé par le serveur ; on oublie la référence
+            if modeVehicle and DoesEntityExist(modeVehicle) then
+                SetEntityAsMissionEntity(modeVehicle, true, true)
+                DeleteVehicle(modeVehicle)
+            end
+            modeVehicle = nil
+
+            local x, y, z = o.x + 0.0, o.y + 0.0, o.z + 0.0
+            RequestCollisionAtCoord(x, y, z)
+            NetworkResurrectLocalPlayer(x, y, z, (o.heading or 0.0) + 0.0, true, true, false)
+
+            local ped = PlayerPedId()
+            ClearPedTasksImmediately(ped)
+            ClearPlayerWantedLevel(PlayerId())
+            SetEntityHealth(ped, GetEntityMaxHealth(ped))
+            SetCanAttackFriendly(ped, true, false)
+
+            if o.spectator then
+                SetEntityCoordsNoOffset(ped, x, y, z, false, false, false)
+            else
+                placeOnGround(ped, x, y, z)
+            end
+            SetEntityHeading(ped, (o.heading or 0.0) + 0.0)
+
+            setSpectator(o.spectator and true or false)
+            if not o.spectator then applyLoadout(ped, o.loadout) end
+            setProtected((o.protected or o.spectator) and true or false)
+            FreezeEntityPosition(ped, (o.freeze or o.spectator) and true or false)
+
+            if o.vehicle and not o.spectator then
+                local p = GetEntityCoords(ped)
+                giveVehicle(o.vehicle, p.x, p.y, p.z, (o.heading or 0.0) + 0.0)
+            end
+
+            -- Événement local pour les modes (ex. gf_redzone suit le véhicule)
+            TriggerEvent('gf_core:spawned', { vehicle = modeVehicle })
+        end)
+
+        if not ok then
+            print(('[gf_core] erreur de spawn : %s'):format(tostring(err)))
         end
 
-        -- L'ancien véhicule est supprimé par le serveur ; on oublie la référence
-        if modeVehicle and DoesEntityExist(modeVehicle) then
-            SetEntityAsMissionEntity(modeVehicle, true, true)
-            DeleteVehicle(modeVehicle)
-        end
-        modeVehicle = nil
-
-        local x, y, z = o.x + 0.0, o.y + 0.0, o.z + 0.0
-        RequestCollisionAtCoord(x, y, z)
-        NetworkResurrectLocalPlayer(x, y, z, (o.heading or 0.0) + 0.0, true, true, false)
-
-        local ped = PlayerPedId()
-        ClearPedTasksImmediately(ped)
-        ClearPlayerWantedLevel(PlayerId())
-        SetEntityHealth(ped, GetEntityMaxHealth(ped))
-        SetCanAttackFriendly(ped, true, false)
-
-        if o.spectator then
-            SetEntityCoordsNoOffset(ped, x, y, z, false, false, false)
-        else
-            placeOnGround(ped, x, y, z)
-        end
-        SetEntityHeading(ped, (o.heading or 0.0) + 0.0)
-
-        setSpectator(o.spectator and true or false)
-        if not o.spectator then applyLoadout(ped, o.loadout) end
-        setProtected((o.protected or o.spectator) and true or false)
-        FreezeEntityPosition(ped, (o.freeze or o.spectator) and true or false)
-
-        if o.vehicle and not o.spectator then
-            local p = GetEntityCoords(ped)
-            giveVehicle(o.vehicle, p.x, p.y, p.z, (o.heading or 0.0) + 0.0)
-        end
-
+        -- Même si le spawn échoue, ne jamais laisser l'écran de chargement
+        -- bloqué : le joueur doit au moins voir le jeu et pouvoir utiliser /lobbyui.
         ShutdownLoadingScreen()
         ShutdownLoadingScreenNui()
         DoScreenFadeIn(400)
         spawning = false
-
-        -- Événement local pour les modes (ex. gf_redzone suit le véhicule)
-        TriggerEvent('gf_core:spawned', { vehicle = modeVehicle })
+        hasSpawned = true
     end)
 end)
 
@@ -237,6 +253,23 @@ CreateThread(function()
     exports.spawnmanager:setAutoSpawn(false)
     TriggerServerEvent('gf_core:ready')
 
+    -- Filet de sécurité : si le serveur n'a pas envoyé (ou si le client a raté)
+    -- gf_core:spawn, l'écran de chargement resterait sinon indéfiniment.
+    SetTimeout(10000, function()
+        if not hasSpawned then
+            print('[gf_core] aucun spawn reçu après 10 s, libération de l’écran de chargement')
+            ShutdownLoadingScreen()
+            ShutdownLoadingScreenNui()
+            -- Pas de fondu ici si un spawn est en cours : son propre thread
+            -- gère DoScreenFadeIn et un double fondu laisserait l'écran noir.
+            if not spawning then DoScreenFadeIn(400) end
+            -- Demander au serveur de rejouer le spawn : libérer l'écran seul
+            -- laisserait le joueur sans personnage. Pas de demande si un
+            -- spawn est déjà en cours (il finira et posera hasSpawned).
+            if not spawning then TriggerServerEvent('gf_core:ready') end
+        end
+    end)
+
     TriggerEvent('chat:addSuggestion', '/lobby', 'Retourner au lobby')
     TriggerEvent('chat:addSuggestion', '/attack', 'Rejoindre le mode Attaque de zone')
     TriggerEvent('chat:addSuggestion', '/redzone', 'Rejoindre la Redzone')
@@ -250,3 +283,12 @@ RegisterCommand('pos', function()
     TriggerEvent('chat:addMessage', { color = { 120, 200, 255 }, args = { 'Position', text } })
     print(text)
 end, false)
+
+-- Arrêt de la ressource pendant un spawn : libérer l'écran, sinon le joueur
+-- reste sur le fond noir/chargement alors que gf_core ne répond plus.
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+    ShutdownLoadingScreen()
+    ShutdownLoadingScreenNui()
+    DoScreenFadeIn(400)
+end)

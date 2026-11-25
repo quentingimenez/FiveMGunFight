@@ -2,6 +2,7 @@
 server-data/secrets.cfg
 server-data/cache/
 server-data/txData/
+server-data/resources/*/gf_lobby/data/characters.json
 server-data/.replxx_history
 __pycache__/
 *.pyc

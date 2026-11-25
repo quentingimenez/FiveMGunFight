@@ -22,7 +22,7 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[1]
 RESSOURCES = RACINE / "server-data" / "resources"
-RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone")
+RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone", "gf_lobby")
 MAPS_JSON = RESSOURCES / "[gunfight]" / "gf_maps" / "data" / "maps.json"
 
 MOTS_SCRIPTS = (
@@ -403,6 +403,7 @@ class Documentation(unittest.TestCase):
         "SECURITY.md",
         "docs/README.md",
         "docs/architecture.md",
+        "docs/lobby.md",
         "docs/qualite.md",
         "docs/protection-branche.md",
         ".github/pull_request_template.md",
@@ -544,9 +545,13 @@ class DepotGit(unittest.TestCase):
         except subprocess.CalledProcessError:  # pragma: no cover - copie sans .git
             self.skipTest("dépôt Git illisible")
         suivis = set(sortie.splitlines())
-        for interdit in (".env", "server-data/secrets.cfg"):
+        for interdit in (
+            ".env",
+            "server-data/secrets.cfg",
+            "server-data/resources/[gunfight]/gf_lobby/data/characters.json",
+        ):
             with self.subTest(fichier=interdit):
-                self.assertNotIn(interdit, suivis, "fichier secret versionné")
+                self.assertNotIn(interdit, suivis, "fichier sensible versionné")
 
 
 if __name__ == "__main__":

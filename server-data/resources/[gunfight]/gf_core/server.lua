@@ -10,6 +10,8 @@
 -- =============================================================================
 
 local Modes = {}      -- [src] = 'lobby' | 'attack' | 'redzone'
+local Spawning = {}   -- [src] = true tant qu'un spawn vient d'être envoyé (anti doublon)
+local SpawnOpts = {}  -- [src] = dernier spawn envoyé (rejouable si le client l'a raté)
 local lastDeath = {}  -- [src] = GetGameTimer() de la dernière mort (anti doublon)
 local Multi = {}      -- [src] = { count, last } pour les multi-kills
 local Vehicles = {}   -- [src] = netId du véhicule de mode (redzone)
@@ -70,6 +72,15 @@ end
 local function spawn(src, opts)
     deleteVehicle(src) -- l'ancien véhicule disparaît à chaque réapparition
     Player(src).state:set('gf_protected', (opts.protected or opts.spectator) and true or false, true)
+    print(('[gf_core] spawn %s mode=%s'):format(src, tostring(Modes[src])))
+    -- Fenêtre courte : un ready qui arrive juste après le spawn en cours ne
+    -- doit pas renvoyer un second gf_core:spawn (le client n'a pas encore
+    -- pu conserver le premier).
+    Spawning[src] = true
+    SpawnOpts[src] = opts
+    SetTimeout(3000, function()
+        if Spawning[src] then Spawning[src] = nil end
+    end)
     TriggerClientEvent('gf_core:spawn', src, opts)
 end
 
@@ -146,7 +157,29 @@ end)
 -- Le client prévient quand il est prêt (fin du chargement)
 RegisterNetEvent('gf_core:ready', function()
     local src = source
-    if Modes[src] then return end
+    local current = Modes[src]
+
+    -- Le client peut avoir raté le premier gf_core:spawn (chargement NUI,
+    -- reconnexion, redémarrage). On renvoie le lobby seulement si aucun
+    -- spawn n'est déjà en cours : sinon on ajoute un doublon qui écrase le
+    -- vrai spawn (souvent le fond du menu reste affiché).
+    if current == 'lobby' then
+        if Spawning[src] then
+            print(('[gf_core] ready %s : spawn lobby déjà en cours'):format(src))
+            return
+        end
+        print(('[gf_core] ready %s : nouveau spawn lobby'):format(src))
+        spawnLobby(src)
+        return
+    elseif current then
+        -- Reconnexion en plein mode : rejouer le dernier spawn reçu par le
+        -- serveur, pour ne pas laisser le joueur sans personnage.
+        if not Spawning[src] and SpawnOpts[src] then
+            print(('[gf_core] ready %s : re-spawn mode %s'):format(src, current))
+            spawn(src, SpawnOpts[src])
+        end
+        return
+    end
 
     local ids = {}
     for _, id in ipairs(GetPlayerIdentifiers(src)) do
@@ -161,6 +194,8 @@ AddEventHandler('playerDropped', function()
     local src = source
     local old = Modes[src]
     Modes[src] = nil
+    Spawning[src] = nil
+    SpawnOpts[src] = nil
     lastDeath[src] = nil
     Multi[src] = nil
     deleteVehicle(src)
