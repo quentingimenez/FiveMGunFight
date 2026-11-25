@@ -149,7 +149,15 @@ docker/mariadb.cnf      réglages MariaDB (cache, connexions, encodage)
 docker/db/init/         scripts SQL exécutés au tout premier démarrage
 .env.example            modèle de configuration (.env = ta vraie config, secrète)
 start.bat / stop.bat / status.bat / console.bat
-.github/workflows/      intégration continue (image Docker + test de démarrage)
+.github/workflows/      intégration continue (qualité, image Docker, test de démarrage)
+.github/                modèle de pull request, CODEOWNERS, règles de branche
+scripts/verifier.sh     contrôles statiques (Lua, JSON, JS, shell, compose)
+scripts/proteger-branche.sh  applique la protection de main (plan GitHub Pro requis)
+tests/                  tests automatiques du dépôt (unittest)
+docs/                   architecture, qualité, protection de branche
+.githooks/pre-push      refuse un envoi direct sur main
+CONTRIBUTING.md         branches, commits, pull requests, revue
+SECURITY.md             signalement de faille, gestion des secrets
 server-data/
   server.cfg            configuration FiveM
   resources/[cfx-default]/   ressources officielles Cfx.re (spawn, events)
@@ -226,15 +234,27 @@ passe forts et n'ouvre le port 40120 que si tu en as besoin.
 
 ## 10. Intégration continue (GitHub Actions)
 
-Le dépôt contient un workflow (`.github/workflows/docker.yml`) qui, à chaque envoi sur
-`main` :
+Le dépôt contient deux workflows, déclenchés à chaque **pull request** vers `main` et à
+chaque envoi sur `main` :
 
-1. construit l'image Docker ;
-2. démarre la pile complète avec une clé de licence fournie par le secret
-   **`CFX_LICENSE_KEY`** (avec `TXADMIN=false`, pour tester le serveur de jeu directement) ;
-3. vérifie que les 12 ressources sont trouvées (`Found 12 resources`) et que les cinq
-   ressources de jeu démarrent ;
-4. envoie l'image sur GitHub Container Registry (`ghcr.io/<compte>/fivem-gunfight`).
+| Workflow | Fichier | Rôle |
+|---|---|---|
+| **Qualité** | `.github/workflows/qualite.yml` | tests du dépôt + contrôles statiques |
+| **Image Docker** | `.github/workflows/docker.yml` | construit l'image et vérifie que le serveur démarre |
+
+**Qualité** installe Lua 5.4, Node et shellcheck, puis lance :
+
+1. `bash scripts/verifier.sh` : syntaxe Lua (`luac -p`), JSON valide, JavaScript
+   (`node --check`), scripts shell (`sh -n`/`bash -n` + `shellcheck -S error`) et
+   `docker compose config` ;
+2. `python3 -m unittest discover -s tests -v` : les tests de `tests/` (manifestes,
+   configuration du serveur, maps, documentation, absence de secrets suivis).
+
+**Image Docker** construit l'image, démarre la pile complète avec une clé de licence
+fournie par le secret **`CFX_LICENSE_KEY`** (avec `TXADMIN=false`, pour tester le serveur
+de jeu directement), vérifie que les 12 ressources sont trouvées (`Found 12 resources`) et
+que les cinq ressources de jeu démarrent, puis envoie l'image sur GitHub Container
+Registry (`ghcr.io/<compte>/fivem-gunfight`).
 
 Le test de démarrage est ignoré si le secret n'est pas configuré. Pour l'ajouter :
 
@@ -245,7 +265,41 @@ gh secret set CFX_LICENSE_KEY
 Le vrai serveur de jeu, lui, tourne avec la clé de ton fichier `.env` : celle du secret
 sert uniquement au test automatique.
 
-## 11. Mettre le serveur en ligne (VPS)
+### Ces contrôles bloquent-ils le merge ?
+
+Oui, **dès que la protection de `main` est active** : les deux vérifications
+(« Qualité du dépôt » et « Construire et publier l'image ») sont déclarées comme *checks
+obligatoires*, avec une approbation et la résolution des conversations. Tant que le dépôt
+reste privé sur le plan gratuit de GitHub, la protection n'est pas disponible : c'est le
+seul point à activer, voir [docs/protection-branche.md](docs/protection-branche.md).
+
+## 11. Contribuer au code
+
+Le dépôt n'accepte plus de modifications directes sur `main` : tout passe par une
+**branche** et une **pull request** relue par au moins une personne.
+
+1. Crée ta branche depuis `main` : `git switch -c feat/ma-fonctionnalite`.
+2. Fais tes modifications, puis lance les contrôles en local :
+   ```
+   bash scripts/verifier.sh
+   python -m unittest discover -s tests -v
+   ```
+3. Commit avec un message conventionnel (`feat: …`, `fix: …`, `docs: …`).
+4. Envoie la branche et ouvre la pull request : `gh pr create --fill`.
+5. La CI doit être verte, une revue est approuvée, puis la PR est fusionnée en
+   *squash* et la branche supprimée.
+
+Un hook fourni refuse un envoi direct sur `main` :
+
+```
+git config core.hooksPath .githooks
+```
+
+Pour contourner volontairement ce hook en cas d'urgence : `GF_ALLOW_MAIN=1 git push`.
+
+Détails complets : [CONTRIBUTING.md](CONTRIBUTING.md) et [docs/](docs/README.md).
+
+## 12. Mettre le serveur en ligne (VPS)
 
 1. Loue un VPS Linux (Ubuntu/Debian) avec disque NVMe. Ordre de grandeur :
    **4 vCPU / 8 Go** pour une trentaine de joueurs simultanés, **8 vCPU / 16 Go**
@@ -263,7 +317,7 @@ sert uniquement au test automatique.
 
 Mettre à jour FXServer : `docker compose build --no-cache` puis `docker compose up -d`.
 
-## 12. Problèmes fréquents
+## 13. Problèmes fréquents
 
 | Symptôme | Solution |
 |---|---|

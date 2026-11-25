@@ -1,0 +1,42 @@
+name: Qualité
+
+# Vérifications rapides (moins de deux minutes) exécutées sur chaque pull
+# request et sur chaque envoi sur main. Ce job est déclaré « bloquant » dans la
+# protection de la branche main : une pull request ne peut pas être fusionnée
+# tant qu'il est rouge.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualite:
+    name: Qualité du dépôt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Installer Lua et shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.4 shellcheck
+
+      - name: Vérifications statiques (Lua, JSON, JS, shell, compose)
+        run: bash scripts/verifier.sh
+
+      - name: Tests de cohérence du dépôt
+        run: python3 -m unittest discover -s tests -v

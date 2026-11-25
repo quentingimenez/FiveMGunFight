@@ -1,7 +1,7 @@
 name: Docker
 
 # Construit l'image à chaque envoi, la publie sur GitHub Container Registry,
-# puis vérifie qu'elle démarre réellement avec les 11 ressources du serveur.
+# puis vérifie qu'elle démarre réellement avec les 12 ressources du serveur.
 on:
   push:
     branches: [main]
@@ -23,7 +23,7 @@ jobs:
     name: Construire et publier l'image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: docker/setup-buildx-action@v3
 

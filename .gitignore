@@ -3,3 +3,5 @@ server-data/secrets.cfg
 server-data/cache/
 server-data/txData/
 server-data/.replxx_history
+__pycache__/
+*.pyc

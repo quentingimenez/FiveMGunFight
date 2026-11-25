@@ -1,0 +1,36 @@
+#!/bin/sh
+# =============================================================================
+#  Hook pre-push : refuse les envois directs sur main (et master).
+#
+#  Installation (une fois par clone) :
+#      git config core.hooksPath .githooks
+#
+#  Contournement volontaire, dépannage uniquement :
+#      GF_ALLOW_MAIN=1 git push
+#
+#  Ce hook est un filet local : la règle de référence est la protection de
+#  branche côté GitHub (voir docs/protection-branche.md).
+# =============================================================================
+
+statut=0
+
+while read -r _local_ref _local_sha distant_ref _distant_sha; do
+  case "$distant_ref" in
+    refs/heads/main|refs/heads/master)
+      branche="${distant_ref#refs/heads/}"
+      if [ "${GF_ALLOW_MAIN:-0}" = "1" ]; then
+        echo "pre-push : envoi direct sur $branche autorisé (GF_ALLOW_MAIN=1)." >&2
+      else
+        echo "pre-push : envoi direct sur $branche refusé." >&2
+        echo "  Toute modification passe par une pull request :" >&2
+        echo "    git switch -c feat/mon-sujet" >&2
+        echo "    git commit -m \"feat(scope): sujet\"" >&2
+        echo "    git push -u origin feat/mon-sujet" >&2
+        echo "  Dépannage exceptionnel : GF_ALLOW_MAIN=1 git push" >&2
+        statut=1
+      fi
+      ;;
+  esac
+done
+
+exit "$statut"

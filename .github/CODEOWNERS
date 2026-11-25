@@ -1,0 +1,16 @@
+# Fichiers dont la revue est obligatoire avant fusion.
+# La règle n'est appliquée par GitHub que si la protection de branche est active
+# (voir docs/protection-branche.md) : sans elle, ce fichier reste informatif.
+#
+# Propriétaires : WardenPro (propriétaire) et Zhics (collaborateur).
+# Une approbation de l'un des deux suffit (required_approving_review_count = 1).
+
+*                       @WardenPro @Zhics
+
+# Changements à impact fort : au moins un des deux doit relire.
+/docker-compose.yml     @WardenPro @Zhics
+/Dockerfile             @WardenPro @Zhics
+/docker/                @WardenPro @Zhics
+/.github/               @WardenPro @Zhics
+/server-data/server.cfg @WardenPro @Zhics
+/server-data/resources/ @WardenPro @Zhics
