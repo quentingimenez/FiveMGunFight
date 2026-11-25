@@ -185,6 +185,17 @@ gh pr view --json number,state,mergeable,statusCheckRollup
   que la branche a été rebasée.
 - Une PR ne se laisse jamais « en attente » en fin de session : elle est menée
   jusqu'à la fusion ou explicitement signalée comme bloquée (§ 7).
+- **Surveillance systématique** : toute PR ouverte par l'agent est surveillée
+  et fusionnée par l'agent lui-même (§ 4.8), sans que l'utilisateur ait à le
+  redemander. L'accord donné pour l'envoi (§ 4.5) vaut aussi pour la fusion
+  une fois la CI verte.
+- **Application Claude Code (desktop)** : juste après `gh pr create`, activer
+  le suivi automatique de la PR (Auto-fix : CI rouge, conflits, commentaires).
+  Si l'application répond que le dépôt « could not be matched to this
+  session's folders », demander à l'utilisateur de cliquer sur **« Linked by
+  Claude »** dans la barre de PR de la session, puis réactiver le suivi. En
+  attendant, suivre la CI soi-même (`gh pr checks --watch`) : l'absence du
+  suivi automatique n'est jamais une raison de laisser la PR ouverte.
 
 ### 4.8 Fusion
 
@@ -263,7 +274,7 @@ répondre par des commits sur la même branche, puis fusionner une fois les
 
 ## 8. Contexte du dépôt
 
-- Dépôt : `WardenPro/FiveMGunFight` (privé), `gh` authentifié et autorisé.
+- Dépôt : `quentingimenez/FiveMGunFight` (privé), `gh` authentifié et autorisé.
 - CI : `.github/workflows/qualite.yml` (job `Qualité du dépôt`) et
   `.github/workflows/docker.yml` (jobs `Construire et publier l'image` et
   `Vérifier le démarrage des ressources`), tous déclenchés sur chaque pull
