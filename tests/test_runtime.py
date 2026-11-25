@@ -340,5 +340,69 @@ class DocumentationSecrets(unittest.TestCase):
         self.assertIn("CRLF", texte)
 
 
+class VersionDuBuild(unittest.TestCase):
+    """Le badge du lobby affiche le sha du commit construit par la CI.
+
+    Chaîne : .github/workflows/docker.yml (sha court) -> argument BUILD_SHA ->
+    variable GF_BUILD_SHA de l'image -> convar gf_build_sha dans secrets.cfg ->
+    `build` de l'état du lobby -> interface. Chaque maillon est vérifié : si un
+    seul saute, le badge affiche une version qui n'est plus celle du code.
+    """
+
+    NUI = RACINE / "server-data" / "resources" / "[gunfight]" / "gf_lobby" / "html"
+    SERVEUR = RACINE / "server-data" / "resources" / "[gunfight]" / "gf_lobby" / "server.lua"
+    WORKFLOW = RACINE / ".github" / "workflows" / "docker.yml"
+    CALCUL = (
+        "echo \"BUILD_SHA=$(printf '%s' '${{ github.sha }}' | cut -c1-7)\""
+        ' >> "$GITHUB_ENV"'
+    )
+
+    def test_dockerfile_declare_et_exporte_l_argument(self) -> None:
+        texte = lire(DOCKERFILE)
+        self.assertRegex(texte, r"(?m)^ARG BUILD_SHA=dev$", "argument BUILD_SHA absent")
+        self.assertIn("ENV GF_BUILD_SHA=${BUILD_SHA}", texte, "GF_BUILD_SHA non exportée")
+        self.assertLess(
+            texte.index("ARG BUILD_SHA"),
+            texte.index("GF_BUILD_SHA"),
+            "l'argument doit précéder son export",
+        )
+
+    def test_entrypoint_publie_la_convar(self) -> None:
+        texte = lire(ENTRYPOINT)
+        self.assertIn("${GF_BUILD_SHA:-}", texte, "l'entrypoint ignore GF_BUILD_SHA")
+        self.assertIn(
+            'echo "set gf_build_sha \\"$BUILD_SHA\\""', texte, "convar gf_build_sha non écrite"
+        )
+        # La valeur vient d'un argument de build : elle est nettoyée avant
+        # d'atterrir dans secrets.cfg, qui est lu par le serveur.
+        self.assertIn("tr -cd '0-9a-fA-F'", texte, "le sha n'est pas nettoyé")
+        self.assertIn("BUILD_SHA=dev", texte, "repli « dev » absent")
+
+    def test_serveur_lit_la_convar(self) -> None:
+        texte = lire(self.SERVEUR)
+        self.assertIn("GetConvar('gf_build_sha'", texte, "la convar n'est pas lue")
+        self.assertIn("build = buildSha(),", texte, "le sha n'entre pas dans l'état du lobby")
+
+    def test_interface_naffiche_plus_de_sha_en_dur(self) -> None:
+        for nom in ("index.html", "js/app.js"):
+            texte = lire(self.NUI / nom)
+            with self.subTest(fichier=nom):
+                self.assertNotIn("7259e64", texte, "ancien sha toujours en dur")
+                self.assertNotIn("b8b4a5c", texte, "ancien sha toujours en dur")
+        app = lire(self.NUI / "js" / "app.js")
+        self.assertIn("var BUILD = 'dev';", app, "repli « dev » absent de l'interface")
+        self.assertIn("applyBuild(next.build)", app, "le sha reçu n'est pas appliqué au badge")
+
+    def test_workflow_transmet_le_sha_aux_deux_builds(self) -> None:
+        texte = lire(self.WORKFLOW)
+        self.assertEqual(
+            texte.count(self.CALCUL), 2, "le sha doit être calculé dans les deux jobs"
+        )
+        self.assertIn("BUILD_SHA=${{ env.BUILD_SHA }}", texte, "job image sans BUILD_SHA")
+        self.assertIn(
+            '--build-arg "BUILD_SHA=$BUILD_SHA"', texte, "job smoke sans BUILD_SHA"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

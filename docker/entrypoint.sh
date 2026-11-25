@@ -54,6 +54,12 @@ DB_NAME="$(propre "${MARIADB_DATABASE:-gunfight}")"
 DB_USER="$(propre "${MARIADB_USER:-gunfight}")"
 TXADMIN="$(propre "${TXADMIN:-true}")"
 
+# Version du build, injectée à la construction de l'image (Dockerfile, argument
+# BUILD_SHA). On ne garde que des caractères de sha : une valeur inattendue ne
+# doit pas pouvoir casser server.cfg ni y injecter une commande.
+BUILD_SHA="$(printf '%s' "${GF_BUILD_SHA:-}" | tr -cd '0-9a-fA-F' | cut -c1-40)"
+[ -n "$BUILD_SHA" ] || BUILD_SHA=dev
+
 if [ -z "$CLE_LICENCE" ] || [ "$CLE_LICENCE" = "change_moi" ]; then
   echo "=================================================================="
   if [ -z "$CLE_LICENCE" ]; then
@@ -89,6 +95,7 @@ esac
   echo "sv_licenseKey \"$CLE_LICENCE\""
   echo "sv_maxclients $MAX_PLAYERS"
   echo "sv_hostname \"$SERVER_NAME\""
+  echo "set gf_build_sha \"$BUILD_SHA\""
   echo "set mysql_connection_string \"mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_NAME?charset=utf8mb4\""
   if [ -n "$CLE_STEAM" ]; then
     echo "set steam_webApiKey \"$CLE_STEAM\""
@@ -130,6 +137,7 @@ if [ "${GF_SEED_MAPS:-false}" = "true" ] && [ ! -f "$MAPS_DATA/maps.json" ]; the
 fi
 
 echo "secrets.cfg généré (joueurs max : $MAX_PLAYERS)"
+echo "Build            : $BUILD_SHA"
 echo "Version FXServer : $(cat "$SERVER/FX_VERSION.txt" 2>/dev/null)"
 echo "Connexion en jeu : touche F8 puis  connect localhost"
 

@@ -114,10 +114,14 @@ Pour le test statique du smoke, construire l'image avec les valeurs du fichier
 FX_URL="$(sed -n 's/^FX_URL=//p' .fxserver-version)"
 FX_SHA256="$(sed -n 's/^FX_SHA256=//p' .fxserver-version)"
 docker build --tag gunfight:local \
+  --build-arg "BUILD_SHA=$(git rev-parse --short HEAD)" \
   --build-arg "FX_URL=$FX_URL" --build-arg "FX_SHA256=$FX_SHA256" .
 docker run --rm -e LICENSE_KEY=change_moi gunfight:local
 echo $?   # doit afficher 1 et citer LICENSE_KEY
 ```
+
+Sans `BUILD_SHA`, l'image porte la version `dev` et le badge du lobby l'affiche
+telle quelle : c'est le repli attendu hors CI, pas un défaut.
 
 Prérequis pour ne rien ignorer : Lua 5.4 (`luac`), LuaRocks (`luacheck`),
 Node.js, Python 3, Docker Desktop démarré, `shellcheck`, `actionlint`,

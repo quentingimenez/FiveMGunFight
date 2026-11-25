@@ -45,6 +45,12 @@ jobs:
       - name: Récupérer le dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Sha court du commit construit : il entre dans l'image (argument
+      # BUILD_SHA, convar gf_build_sha) et devient la version affichée par le
+      # lobby. Le job smoke refait le même calcul pour son image locale.
+      - name: Calculer le sha du build
+        run: echo "BUILD_SHA=$(printf '%s' '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_ENV"
+
       # GHCR refuse une référence contenant des majuscules : on calcule une fois
       # pour toutes la version minuscule du nom du dépôt.
       - name: Calculer le nom d'image en minuscules
@@ -121,6 +127,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
+            BUILD_SHA=${{ env.BUILD_SHA }}
             FX_URL=${{ env.FX_URL }}
             FX_SHA256=${{ env.FX_SHA256 }}
           provenance: ${{ github.event_name == 'pull_request' && 'false' || 'mode=max' }}
@@ -160,6 +167,9 @@ jobs:
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Calculer le sha du build
+        run: echo "BUILD_SHA=$(printf '%s' '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_ENV"
 
       - name: Calculer le nom d'image en minuscules
         run: |
@@ -229,6 +239,7 @@ jobs:
           set -euo pipefail
           docker build \
             --tag "$IMAGE_LC:ci-${{ github.sha }}" \
+            --build-arg "BUILD_SHA=$BUILD_SHA" \
             --build-arg "FX_URL=$FX_URL" \
             --build-arg "FX_SHA256=$FX_SHA256" \
             .

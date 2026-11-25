@@ -15,7 +15,13 @@
 # =============================================================================
 services:
   fxserver:
-    build: .
+    build:
+      context: .
+      args:
+        # Sha court du commit local, sinon « dev » : la version affichée par le
+        # lobby suit le code monté, pas seulement l'image.
+        #   BUILD_SHA=$(git rev-parse --short HEAD) docker compose ... build
+        BUILD_SHA: ${BUILD_SHA:-dev}
     # Les fichiers du bind mount viennent de Windows : ils apparaissent
     # appartenir à root et les permissions POSIX ne sont pas fiables. On reste
     # root en développement pour ne pas bloquer l'édition des scripts ; l'image
