@@ -12,7 +12,8 @@ name: Docker
 # serveur de production : seule la vérification de démarrage l'utilise. Les pull
 # requests Dependabot (et celles venues d'un fork) n'ont pas accès aux secrets
 # Actions : le démarrage complet est alors sauté avec une note, mais le test
-# statique et la construction restent exécutés.
+# statique et la construction restent exécutés. Dans tous les autres cas, un
+# secret absent fait échouer le job.
 on:
   push:
     branches: [main]
@@ -42,7 +43,7 @@ jobs:
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Récupérer le dépôt
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Sha court du commit construit : il entre dans l'image (argument
       # BUILD_SHA, convar gf_build_sha) et devient la version affichée par le
@@ -93,11 +94,11 @@ jobs:
           echo "FXServer $FX_VERSION épinglé."
 
       - name: Configurer Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Connexion à GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -105,7 +106,7 @@ jobs:
 
       - name: Étiquettes de l'image
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.IMAGE_LC }}
           # L'étiquette ci-<sha long> est aussi utilisée par le job smoke.
@@ -118,7 +119,7 @@ jobs:
       # docker exporter de Buildx ne sait pas exporter d'attestations avec
       # --load : provenance et SBOM sont donc réservés aux images publiées.
       - name: Build et push
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
@@ -165,7 +166,7 @@ jobs:
       LOGS_SURS: "false"
     steps:
       - name: Récupérer le dépôt
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Calculer le sha du build
         run: echo "BUILD_SHA=$(printf '%s' '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_ENV"
@@ -211,15 +212,23 @@ jobs:
           echo "FXServer $FX_VERSION épinglé."
 
       # Le runner ne reçoit jamais la clé sur une PR de fork ou de Dependabot :
-      # on le constate ici. Le test statique reste obligatoire ; seul le
-      # démarrage complet est conditionné par la clé.
+      # seul ce cas saute le démarrage complet (le test statique reste
+      # obligatoire). Partout ailleurs (push, PR interne, planification), une clé
+      # absente fait échouer le job : le démarrage réel est un check bloquant.
       - name: Détecter la clé de licence CI
+        env:
+          ACTEUR: ${{ github.actor }}
+          DEPOT_PR: ${{ github.event.pull_request.head.repo.full_name }}
+          DEPOT: ${{ github.repository }}
         run: |
-          if [ -z "${CFX_LICENSE_KEY:-}" ]; then
-            echo "::notice::Le secret CFX_LICENSE_KEY n'est pas disponible (PR de fork, Dependabot ou secret non configuré) : démarrage complet ignoré, test statique sans licence exécuté."
+          if [ -n "${CFX_LICENSE_KEY:-}" ]; then
+            echo "disponible=true" >> "$GITHUB_ENV"
+          elif [ "$ACTEUR" = "dependabot[bot]" ] || { [ -n "$DEPOT_PR" ] && [ "$DEPOT_PR" != "$DEPOT" ]; }; then
+            echo "::notice::PR de fork ou de Dependabot : pas d'accès au secret CFX_LICENSE_KEY, démarrage complet ignoré, test statique sans licence exécuté."
             echo "disponible=false" >> "$GITHUB_ENV"
           else
-            echo "disponible=true" >> "$GITHUB_ENV"
+            echo "::error::Le secret CFX_LICENSE_KEY est absent : le démarrage réel est obligatoire hors PR de fork ou de Dependabot. Ajoute-le dans Settings > Secrets and variables > Actions."
+            exit 1
           fi
 
       # Même étiquette que celle publiée par le job image (metadata-action) :
@@ -237,7 +246,7 @@ jobs:
 
       - name: Connexion à GHCR (envoi, tag ou planification)
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -371,7 +380,7 @@ jobs:
 
       - name: Publier les journaux
         if: always() && env.LOGS_SURS == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: journaux-smoke
           path: |

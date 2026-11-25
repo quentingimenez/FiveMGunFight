@@ -48,6 +48,41 @@ RegisterNetEvent('gf_ui:kill', function(d)
     SendNUIMessage({ type = 'kill', data = d })
 end)
 
+-- ---------------------------------------------------------------- Choix des armes
+-- data = { title, weapons = { {id,label,category} }, selected = {id,id}, count, seconds }
+local loadoutFocus = false
+
+local function releaseLoadoutFocus()
+    if loadoutFocus then
+        loadoutFocus = false
+        SetNuiFocus(false, false)
+    end
+end
+
+RegisterNetEvent('gf_ui:loadout_open', function(d)
+    loadoutFocus = true
+    SetNuiFocus(true, true)
+    SetNuiFocusKeepInput(false)
+    SendNUIMessage({ type = 'loadout_open', data = d })
+end)
+
+RegisterNetEvent('gf_ui:loadout_close', function()
+    releaseLoadoutFocus()
+    SendNUIMessage({ type = 'loadout_close' })
+end)
+
+-- Chaque changement de sélection est envoyé au serveur (il valide)
+RegisterNUICallback('loadout', function(d, cb)
+    TriggerServerEvent('gf:loadoutChosen', d.ids)
+    cb({ ok = true })
+end)
+
+-- Bouton « Valider » : on rend la main au joueur, le choix reste enregistré
+RegisterNUICallback('loadout_done', function(_, cb)
+    releaseLoadoutFocus()
+    cb({ ok = true })
+end)
+
 -- Affiche le classement pendant X ms (fin de partie)
 RegisterNetEvent('gf_ui:scoreboard_show', function(ms)
     SendNUIMessage({ type = 'scoreboard_visible', visible = true })
@@ -80,3 +115,8 @@ RegisterCommand('-gf_scoreboard', function()
     SendNUIMessage({ type = 'scoreboard_visible', visible = false })
 end, false)
 RegisterKeyMapping('+gf_scoreboard', 'Gunfight : afficher le classement', 'keyboard', 'Z')
+
+-- Résultat du match, conservé à l'écran jusqu'au changement de mode.
+RegisterNetEvent('gf_ui:match_results', function(data)
+    SendNUIMessage({ type = 'match_results', data = data })
+end)

@@ -97,18 +97,74 @@ local function placeOnGround(ped, x, y, z)
     FreezeEntityPosition(ped, false)
 end
 
+-- Emplacements d'armes : slots[1] = arme sur la touche 1, slots[2] = touche 2...
+-- Remplis dans l'ordre où les armes ont été choisies (ou listées dans la config).
+local slots = {}
+
 local function applyLoadout(ped, name)
     RemoveAllPedWeapons(ped, true)
     SetPedArmour(ped, 0)
+    slots = {}
     local lo = name and Config.Loadouts[name]
     if not lo then return end
     for _, w in ipairs(lo.weapons) do
         GiveWeaponToPed(ped, joaat(w[1]), w[2], false, false)
+        slots[#slots + 1] = joaat(w[1])
     end
-    if lo.weapons[1] then
-        SetCurrentPedWeapon(ped, joaat(lo.weapons[1][1]), true)
-    end
+    if slots[1] then SetCurrentPedWeapon(ped, slots[1], true) end
     SetPedArmour(ped, lo.armour or 0)
+end
+
+-- Armes au choix : list = { { name, ammo, components = {}, tint }, ... }
+local function applyWeapons(ped, list, armour)
+    RemoveAllPedWeapons(ped, true)
+    slots = {}
+    for _, w in ipairs(list or {}) do
+        local hash = joaat(w.name)
+        GiveWeaponToPed(ped, hash, w.ammo or 250, false, false)
+        for _, comp in ipairs(w.components or {}) do
+            GiveWeaponComponentToPed(ped, hash, joaat(comp))
+        end
+        if w.tint then SetPedWeaponTintIndex(ped, hash, w.tint) end
+        slots[#slots + 1] = hash
+    end
+    if slots[1] then SetCurrentPedWeapon(ped, slots[1], true) end
+    SetPedArmour(ped, armour or 0)
+end
+
+-- Touches 1, 2... : sortir l'arme de l'emplacement correspondant
+local function selectSlot(i)
+    local ped = PlayerPedId()
+    local hash = slots[i]
+    if not hash or IsEntityDead(ped) or not HasPedGotWeapon(ped, hash, false) then return end
+    SetCurrentPedWeapon(ped, hash, true)
+end
+
+for i = 1, Config.WeaponSlots do
+    RegisterCommand('+gf_slot' .. i, function() selectSlot(i) end, false)
+    RegisterCommand('-gf_slot' .. i, function() end, false)
+    RegisterKeyMapping('+gf_slot' .. i, ('Gunfight : arme %d'):format(i), 'keyboard', tostring(i))
+end
+
+-- Contrôles GTA désactivés : roue des armes (TAB), molette, touches de
+-- catégories d'armes (1 à 9 de GTA) et changement d'arme en véhicule.
+local WEAPON_SWITCH_CONTROLS = {
+    37,                                     -- roue des armes (TAB)
+    12, 13, 14, 15, 16, 17,                 -- navigation / molette dans la roue
+    99, 100, 115, 116,                      -- arme suivante / précédente (véhicule)
+    157, 158, 159, 160, 161, 162, 163, 164, 165, -- touches 1 à 9 de GTA
+    261, 262,                               -- molette : arme suivante / précédente
+}
+
+-- Gèle / dégèle le joueur ET son véhicule s'il est dedans
+local function setFrozen(on)
+    local ped = PlayerPedId()
+    FreezeEntityPosition(ped, on)
+    local veh = GetVehiclePedIsIn(ped, false)
+    if veh ~= 0 then
+        FreezeEntityPosition(veh, on)
+        SetVehicleEngineOn(veh, true, true, false)
+    end
 end
 
 local function setProtected(on)
@@ -149,11 +205,14 @@ RegisterNetEvent('gf_core:spawn', function(o)
             end
 
             -- L'ancien véhicule est supprimé par le serveur ; on oublie la référence
-            if modeVehicle and DoesEntityExist(modeVehicle) then
-                SetEntityAsMissionEntity(modeVehicle, true, true)
-                DeleteVehicle(modeVehicle)
+            -- (sauf keepVehicle : il reste dans la manche)
+            if not o.keepVehicle then
+                if modeVehicle and DoesEntityExist(modeVehicle) then
+                    SetEntityAsMissionEntity(modeVehicle, true, true)
+                    DeleteVehicle(modeVehicle)
+                end
+                modeVehicle = nil
             end
-            modeVehicle = nil
 
             local x, y, z = o.x + 0.0, o.y + 0.0, o.z + 0.0
             RequestCollisionAtCoord(x, y, z)
@@ -173,17 +232,25 @@ RegisterNetEvent('gf_core:spawn', function(o)
             SetEntityHeading(ped, (o.heading or 0.0) + 0.0)
 
             setSpectator(o.spectator and true or false)
-            if not o.spectator then applyLoadout(ped, o.loadout) end
+            if not o.spectator then
+                if o.weapons then
+                    applyWeapons(ped, o.weapons, o.armour) -- armes au choix
+                else
+                    applyLoadout(ped, o.loadout)           -- équipement fixe
+                end
+            end
             setProtected((o.protected or o.spectator) and true or false)
             FreezeEntityPosition(ped, (o.freeze or o.spectator) and true or false)
 
             if o.vehicle and not o.spectator then
                 local p = GetEntityCoords(ped)
+                FreezeEntityPosition(ped, false) -- un personnage gelé ne monte pas en voiture
                 giveVehicle(o.vehicle, p.x, p.y, p.z, (o.heading or 0.0) + 0.0)
+                if o.freeze then setFrozen(true) end
             end
 
             -- Événement local pour les modes (ex. gf_redzone suit le véhicule)
-            TriggerEvent('gf_core:spawned', { vehicle = modeVehicle })
+            TriggerEvent('gf_core:spawned', { vehicle = modeVehicle, spectator = o.spectator and true or false })
         end)
 
         if not ok then
@@ -213,7 +280,11 @@ RegisterNetEvent('gf_core:modeChanged', function()
 end)
 
 RegisterNetEvent('gf_core:freeze', function(on)
-    FreezeEntityPosition(PlayerPedId(), on)
+    setFrozen(on)
+end)
+
+RegisterNetEvent('gf_core:giveWeapons', function(list, armour)
+    applyWeapons(PlayerPedId(), list, armour)
 end)
 
 -- ---------------------------------------------------------------- Boucle permanente
@@ -228,6 +299,27 @@ CreateThread(function()
 
         if not Config.HealthRegen then
             SetPlayerHealthRechargeMultiplier(pid, 0.0)
+        end
+
+        -- Pas de roue des armes : seulement les touches 1, 2... (voir selectSlot)
+        for _, control in ipairs(WEAPON_SWITCH_CONTROLS) do
+            DisableControlAction(0, control, true)
+        end
+        HudWeaponWheelIgnoreSelection()
+
+        -- Pas de collision entre véhicules (évite les « pits » entre joueurs).
+        -- Les joueurs à pied restent percutables.
+        if Config.DisableVehicleCollisions then
+            local veh = GetVehiclePedIsIn(ped, false)
+            if veh ~= 0 then
+                local pos = GetEntityCoords(veh)
+                for _, other in ipairs(GetGamePool('CVehicle')) do
+                    if other ~= veh and #(GetEntityCoords(other) - pos) < 80.0 then
+                        SetEntityNoCollisionEntity(veh, other, true)
+                        SetEntityNoCollisionEntity(other, veh, true)
+                    end
+                end
+            end
         end
 
         -- Pas de tir ni de coups de poing quand on est protégé (lobby, préparation, spectateur)

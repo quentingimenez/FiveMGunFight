@@ -3,16 +3,30 @@
 Serveur FiveM « standalone » (sans ESX/QBCore), qui tourne dans **Docker**.
 Deux modes de jeu :
 
-- **Attaque de zone** (`/attack`) : 2 équipes. L'une attaque une zone, l'autre la défend.
-  Pas de réapparition pendant la manche : **la dernière équipe en vie gagne**.
-  Si le temps est écoulé, la défense gagne. Les rôles s'inversent à chaque manche,
-  premier à 5 manches gagne le match.
+- **Attaque de zone** (`/attack`) : 2 équipes. L'une attaque une zone (en rouge), l'autre la défend.
+  Chaque manche se déroule en 3 temps :
+  1. **Choix des armes (10 s)** : les attaquants apparaissent **dans leur voiture**, garées
+     côte à côte en rangées de 3, les défenseurs **à pied**, en groupe serré dans la zone ;
+     tout le monde est gelé et choisit
+     **2 armes** parmi celles qu'il possède (plus tard : armes customisées gagnées dans des caisses).
+  2. **Placement (15 s)** : on peut rouler ; les défenseurs se placent, la zone est **fermée aux
+     attaquants**.
+  3. **Combat** : la zone s'ouvre. Les voitures des attaquants restent, on peut en descendre
+     et y remonter.
+     Pas de réapparition : **la dernière équipe en vie gagne**. Un joueur mort regarde ses
+     **alliés** (clic gauche / clic droit pour changer). Temps écoulé = victoire de la défense.
+
+  À la fin de chaque manche, chacun voit **MANCHE GAGNÉE** ou **MANCHE PERDUE** pendant quelques
+  secondes, puis les camps s'inversent (annonce **CHANGEMENT DE CAMP**). La première équipe à
+  **2 manches gagnées** remporte le match (**VICTOIRE** / **DÉFAITE**).
 - **Redzone** (`/redzone`) : chacun pour soi. Une seule partie à la fois (10 min).
   On apparaît **à pied** près de la zone, on va au **point véhicule** (marqueur bleu) et on
   appuie sur **E** pour monter dans sa voiture, on roule jusqu'à la zone rouge, on appuie sur
   **F** : la voiture disparaît et on se bat. On ne peut tirer et être touché **que dans la zone**.
   À la mort, retour au point d'apparition, à pied.
   À la fin de la partie : podium, puis nouvelle partie sur la map suivante.
+
+Les véhicules ne se percutent pas entre eux (pas de « pit »), seuls les piétons peuvent être renversés.
 
 Sur tous les modes : chiffre de dégâts + son à chaque touche, son de kill, messages
 **DOUBLÉ / TRIPLÉ / QUADRUPLÉ / QUINTUPLÉ…** et kill feed propre au mode (en haut à droite).
@@ -90,12 +104,13 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | Commande | Qui | Effet |
 |---|---|---|
 | `/lobby` | tous | retour au lobby |
-| `/attack` | tous | rejoindre l'Attaque de zone |
+| `/attack` | tous | ramène au lobby pour lancer la recherche d’Attaque de zone |
 | `/redzone` | tous | rejoindre la Redzone |
 | `/pos` | tous | affiche ta position (pour créer de nouvelles zones) |
 | `/lobbyui` | tous | réaffiche l'interface du lobby si elle a disparu |
 | touche **Z** (maintenue) | tous | classement |
-| `/startround` | admin | force le lancement d'une manche (marche même seul pour tester) |
+| touches **1** et **2** | tous | sortir l'arme choisie en 1re / 2e position (la roue des armes de GTA est désactivée) |
+| `/startround` | admin | force le lancement d’un match avec les joueurs déjà dans le mode (possible en solo) |
 | `/endmatch` | admin | arrête le match, scores à zéro |
 | `/nextzone` | admin | zone d'attaque suivante (hors match) |
 | `/setteam [id] [A\|B]` | admin | change l'équipe d'un joueur |
@@ -107,8 +122,12 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
 
-> **Tester seul** : `/attack` puis `/startround`. Comme l'autre équipe est vide,
-> la manche ne se termine qu'au chrono (mode test).
+> **Recherche** : un chef d’escouade la lance depuis le lobby (Attaque de zone puis JOUER) ; tous les joueurs du lobby qui ont un personnage y sont inscrits. Le match démarre à 20 joueurs et en prend 30 au plus (`Config.Matchmaking` de `gf_lobby`, voir [docs/lobby.md](docs/lobby.md)). Si un match est déjà en cours, la file attend sa fin. Les participants reviennent au lobby à la fin du match.
+
+Le combat commence avec 3 minutes au chrono. Il se met en pause tant qu’au moins un attaquant vivant se trouve dans la zone et reprend lorsque le dernier en sort. À zéro, la défense gagne la manche.
+
+> **Tester seul** : tape `/startround` en tant qu’admin. Comme l'autre équipe est vide,
+> la manche se termine au chrono et le point revient à ton équipe (mode test). En attaque, sors de la zone pour laisser le chrono défiler.
 
 ## 5. Créer des maps en jeu (`/editor`)
 
@@ -149,9 +168,9 @@ Les autres réglages sont dans les fichiers `config.lua` :
 
 | Fichier | Contenu |
 |---|---|
-| `server-data/resources/[gunfight]/gf_core/config.lua` | lobby, armes, gilet, régénération, délai des multi-kills |
+| `server-data/resources/[gunfight]/gf_core/config.lua` | lobby, catalogue d'armes et armes de départ (choix des 2 armes), gilet, régénération, délai des multi-kills |
 | `server-data/resources/[gunfight]/gf_lobby/config.lua` | scène et caméra du lobby, taille d'escouade, catalogue des modes, apparence |
-| `server-data/resources/[gunfight]/gf_attack/config.lua` | durées, manches gagnantes, couleurs d'équipes, zones de secours |
+| `server-data/resources/[gunfight]/gf_attack/config.lua` | durées (choix, placement, combat), voiture, manches gagnantes, couleurs d'équipes, opacité de la zone sur la carte, zones de secours |
 | `server-data/resources/[gunfight]/gf_redzone/config.lua` | durée de partie, véhicule, délai de réapparition, zones de secours |
 
 Le volume des sons de touche et de kill se règle en haut de
@@ -518,7 +537,7 @@ La procédure complète, y compris la bascule réelle en production, est dans
 | `mariadb` reste `unhealthy` | regarde `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs mariadb` ; si le disque est plein ou le volume corrompu, `down -v` puis relance (**efface les données**) |
 | Impossible de se connecter | vérifie dans les journaux qu'il n'y a pas d'erreur rouge ; essaie `connect 127.0.0.1` |
 | Le port 30120 est déjà utilisé | un autre serveur FiveM tourne sur la machine : arrête-le |
-| Le mode ne démarre pas | il faut 2 joueurs (un par équipe) ou `/startround` en admin |
+| Le mode ne démarre pas | il faut 20 joueurs dans la recherche du lobby ou `/startround` en admin |
 | L'interface du lobby ne s'affiche pas | tape `/lobbyui` ; vérifie que `gf_lobby` est démarrée et que `data/characters.json` est accessible |
 | Le personnage n'apparaît pas / est invisible | attends la fin du fondu de connexion ; vérifie que `gf_core` et `gf_lobby` sont démarrées dans cet ordre |
 | Je veux recommencer la création de personnage | un admin lance `/resetchar [id]` ; le joueur retourne à l'écran de création |

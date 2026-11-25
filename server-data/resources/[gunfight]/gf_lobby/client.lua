@@ -56,7 +56,6 @@ local camTargetFov = Config.Stage.camera.fov
 
 local lastAppearanceSeed = nil  -- seed du ped local pour éviter les reapplications
 local remoteAppearance = {}     -- [ped] = clé d'apparence déjà appliquée
-local lastCoreSpawnAt = 0       -- dernier gf_core:spawned / gf_core:spawn reçu
 local previewCharacter = nil    -- aperçu local, jamais sauvegardé
 local stateRetryActive = false  -- boucle de récupération de gf_lobby:state
 
@@ -796,7 +795,6 @@ RegisterNetEvent('gf_core:modeChanged', function(mode)
 end)
 
 RegisterNetEvent('gf_core:spawned', function()
-    lastCoreSpawnAt = now()
     if not inLobby or not state then return end
     -- Le spawn de gf_core peut se terminer après l'état : on réapplique après
     -- un court délai, une seule fois.

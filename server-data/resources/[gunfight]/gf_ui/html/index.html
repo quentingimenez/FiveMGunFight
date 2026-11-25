@@ -41,6 +41,22 @@
         <div class="m-sub"></div>
     </div>
 
+    <!-- Choix des armes (début de manche) -->
+    <div id="loadout" class="hidden">
+        <div class="lo-panel">
+            <div class="lo-head">
+                <div>
+                    <div class="lo-title">Choisis tes armes</div>
+                    <div class="lo-sub"></div>
+                </div>
+                <div class="lo-timer"></div>
+            </div>
+            <div class="lo-slots"></div>
+            <div class="lo-grid"></div>
+            <button class="lo-ok">Valider</button>
+        </div>
+    </div>
+
     <!-- Annonces au centre de l'écran -->
     <div id="announce" class="hidden">
         <div class="a-title"></div>
@@ -56,6 +72,14 @@
         </table>
         <div class="sb-empty">Rejoins un mode avec /attack ou /redzone</div>
     </div>
+
+    <section id="match-results" class="hidden">
+        <div class="results-panel">
+            <div class="results-title"></div>
+            <div class="results-score"></div>
+            <div class="results-tables"></div>
+        </div>
+    </section>
 
     <script src="app.js"></script>
 </body>

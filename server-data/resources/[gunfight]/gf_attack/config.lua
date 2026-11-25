@@ -5,20 +5,47 @@
 --  Pas de réapparition pendant une manche : la dernière équipe en vie gagne.
 --  Si le temps est écoulé, c'est la DÉFENSE qui gagne.
 --  Les rôles s'inversent à chaque manche. Premier à WinRounds manches = victoire.
+--
+--  Déroulement d'une manche :
+--   1. Choix des armes (SelectTime) : les attaquants apparaissent DANS LEUR
+--      VOITURE, les défenseurs À PIED dans la zone ; tout le monde est gelé
+--      et choisit 2 armes parmi celles qu'il possède.
+--   2. Placement (PlacementTime) : on peut rouler. Les défenseurs se placent,
+--      les attaquants ne peuvent PAS encore entrer dans la zone.
+--   3. Combat (RoundTime) : la zone est ouverte. Les voitures restent : on peut
+--      descendre et remonter. Un joueur mort regarde ses alliés (clic gauche /
+--      clic droit pour changer de joueur).
 -- =============================================================================
 Config = {}
 
-Config.MinPlayers = 20         -- joueurs nécessaires pour lancer automatiquement (file serveur gf_lobby)
-Config.WinRounds = 5           -- manches à gagner pour remporter le match
-Config.PrepTime = 15           -- secondes de préparation (joueurs gelés)
-Config.RoundTime = 180         -- durée max d'une manche (secondes)
-Config.EndDelay = 8            -- pause entre deux manches (secondes)
+-- La recherche de partie est dans gf_lobby (Config.Matchmaking) : elle fait
+-- entrer les joueurs quand attackMin joueurs attendent, au plus attackMax.
+-- Garder PlayersToStart = attackMin et MaxPlayers = attackMax.
+-- Un admin peut lancer de force avec /startround, quel que soit le nombre.
+Config.PlayersToStart = 20
+Config.MaxPlayers = 30
+Config.WinRounds = 2           -- manches à gagner pour remporter le match
+Config.SelectTime = 10         -- secondes pour choisir ses armes (gelé dans la voiture)
+Config.PlacementTime = 15      -- secondes de placement (zone fermée aux attaquants)
+Config.RoundTime = 180         -- chrono de combat en secondes, en pause si un attaquant vivant est dans la zone
+Config.EndDelay = 6            -- pause entre deux manches : « Manche gagnée / perdue » (secondes)
 Config.MatchEndDelay = 15      -- pause après la fin d'un match (secondes)
 Config.SwapSidesEveryRound = true
 
-Config.AttackSpawnDistance = 70.0  -- distance (m) des attaquants AU-DELÀ du bord de la zone
-Config.SpawnSpread = 8.0           -- dispersion aléatoire (m) autour du point d'apparition
-Config.OutOfZoneDamage = 8         -- dégâts / seconde pour un défenseur hors de la zone
+Config.Vehicle = 'sultan'          -- voiture des attaquants en début de manche (nom de modèle GTA)
+-- Formation d'apparition (voir spawnPos dans server.lua)
+Config.VehicleColumns = 3          -- voitures côte à côte par rangée
+Config.VehicleSideSpacing = 3.3    -- écart (m) entre deux voitures côte à côte (une voiture ≈ 2 m de large)
+Config.VehicleRowSpacing = 6.5     -- écart (m) entre deux rangées (une voiture ≈ 4,5 m de long)
+Config.FootSpacing = 1.6           -- écart (m) entre les joueurs à pied (défenseurs)
+
+Config.AttackSpawnDistance = 70.0  -- (zones de secours) distance des attaquants au-delà du bord
+Config.OutOfZoneDamage = 8         -- dégâts / seconde pour un défenseur hors de la zone (combat)
+
+-- Opacité du remplissage rouge de la zone sur la carte (0 à 255).
+-- 255 = rouge plein ; plus bas = on voit les rues à travers, mais les cercles
+-- qui composent le remplissage se devinent un peu là où ils se chevauchent.
+Config.MapFillAlpha = 210
 
 Config.Teams = {
     A = { label = 'Équipe Rouge', color = '#ff5a5f' },

@@ -187,6 +187,85 @@ html, body {
     100% { transform: scale(1);   opacity: 1; }
 }
 
+/* ------------------------------------------------------------------ Choix des armes */
+#loadout {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, .35), rgba(0, 0, 0, .7));
+}
+.lo-panel {
+    width: min(760px, 92vw);
+    max-height: 86vh;
+    overflow-y: auto;
+    background: var(--bg-strong);
+    border-radius: 14px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, .6);
+}
+.lo-head { display: flex; justify-content: space-between; align-items: center; }
+.lo-title { font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+.lo-sub { color: var(--muted); font-size: 13px; }
+.lo-timer { font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.lo-timer.low { color: var(--red); }
+
+.lo-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lo-slot {
+    border: 2px dashed rgba(255, 255, 255, .2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-weight: 700;
+    min-height: 52px;
+}
+.lo-slot small { display: block; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+.lo-slot.filled { border-style: solid; border-color: var(--red); background: rgba(255, 90, 95, .1); }
+
+.lo-grid { display: flex; flex-direction: column; gap: 10px; }
+.lo-cat { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.lo-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.lo-card {
+    font: inherit;
+    color: var(--text);
+    background: rgba(255, 255, 255, .06);
+    border: 2px solid transparent;
+    border-radius: 9px;
+    padding: 10px 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+}
+.lo-card:hover { background: rgba(255, 255, 255, .12); }
+.lo-card.on { border-color: var(--red); background: rgba(255, 90, 95, .18); }
+.lo-card .n {
+    display: inline-block;
+    margin-right: 6px;
+    min-width: 18px;
+    border-radius: 9px;
+    background: var(--red);
+    color: #0c0e14;
+    font-size: 11px;
+    text-align: center;
+}
+
+.lo-ok {
+    font: inherit;
+    align-self: flex-end;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    padding: 10px 26px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.lo-ok:disabled { opacity: .4; cursor: not-allowed; }
+.lo-ok.done { background: #3ddc84; color: #0c0e14; }
+
 /* ------------------------------------------------------------------ Annonces */
 #announce {
     position: absolute;
@@ -241,3 +320,38 @@ html, body {
 #scoreboard td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, .05); }
 #scoreboard td:first-child { border-left: 3px solid transparent; }
 #scoreboard .sb-empty { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+
+/* Résultats de fin de match */
+#match-results {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(6, 10, 18, .82);
+}
+#match-results.hidden { display: none; }
+.results-panel {
+    width: min(1200px, 94vw);
+    max-height: 94vh;
+    overflow: auto;
+    padding: 20px 24px;
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 14px;
+    background: #111a28;
+    box-shadow: 0 16px 60px #000a;
+}
+.results-title { text-align: center; color: #ff747b; font-size: 36px; font-weight: 900; letter-spacing: 3px; }
+.results-title.won { color: #70e7ad; }
+.results-score { text-align: center; margin: 3px 0 18px; color: #cbd5e1; }
+.results-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.results-tables table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: clamp(10px, 1.35vh, 15px); }
+.results-tables th { color: #a9b8ca; text-align: left; }
+.results-tables th, .results-tables td { padding: clamp(2px, .38vh, 5px) 7px; border-bottom: 1px solid #ffffff12; }
+.results-tables th:first-child { width: 52%; }
+.results-tables th:nth-child(2) { width: 28%; }
+.results-tables td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results-tables tr.mine { background: #24618b; box-shadow: inset 3px 0 #6ed4ff; font-weight: 800; }
+.results-tables tr.best td:first-child { color: #ffdc75; }
+.results-tables .crown { color: #ffd357; font-size: 1.25em; }
