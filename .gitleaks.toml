@@ -1,0 +1,15 @@
+# Configuration gitleaks du dépôt FiveMGunFight.
+#
+# Les règles par défaut de gitleaks restent actives : cette configuration ne
+# désactive aucun détecteur. L'unique allowlist ci-dessous couvre un faux
+# positif documentaire connu, la valeur d'exemple « change_moi », et reste
+# limitée aux fichiers qui la citent. Toute nouvelle exception doit être
+# justifiée de la même façon, pas élargie à tout le dépôt.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Valeur d'exemple change_moi (documentation et tests), jamais un secret réel"
+paths = ['''^(?:docs/.*|tests/.*|\.env\.example)$''']
+regexes = ['''change_moi''']

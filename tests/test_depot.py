@@ -445,6 +445,22 @@ class ChaineCI(unittest.TestCase):
     def workflows(self) -> list[Path]:
         return sorted(self.WORKFLOWS.glob("*.yml"))
 
+    def blocs_jobs(self, chemin: Path) -> dict[str, str]:
+        """Bloc texte de chaque job d'un workflow, indexé par son identifiant."""
+        texte = lire(chemin)
+        section = re.search(r"(?ms)^jobs:\s*\n(.*)", texte)
+        if section is None:
+            self.fail(f"section jobs absente de {chemin.name}")
+        noms = re.findall(r"(?m)^  ([a-z][\w-]*):\s*$", section.group(1))
+        self.assertTrue(noms, f"aucun job dans {chemin.name}")
+        blocs: dict[str, str] = {}
+        for nom in noms:
+            bloc = bloc_service(texte, nom)
+            if bloc is None:
+                self.fail(f"job {nom} illisible dans {chemin.name}")
+            blocs[nom] = bloc
+        return blocs
+
     def test_actions_epinglees_par_sha(self) -> None:
         motif = re.compile(
             r"""(?m)^\s*(?:-\s*)?uses:\s*["']?([^"'\s#]+)["']?\s*(?:#.*)?$"""
@@ -526,6 +542,125 @@ class ChaineCI(unittest.TestCase):
             "FXServer quitte quand son entrée standard est fermée : "
             "le conteneur smoke doit être lancé avec -i",
         )
+
+    def test_chaque_job_a_timeout_permissions_et_runner_recent(self) -> None:
+        for workflow in self.workflows():
+            for nom, bloc in self.blocs_jobs(workflow).items():
+                with self.subTest(workflow=workflow.name, job=nom):
+                    self.assertRegex(
+                        bloc,
+                        r"(?m)^    timeout-minutes:\s*\d+\s*$",
+                        "chaque job doit borner sa durée",
+                    )
+                    self.assertIn(
+                        "runs-on: ubuntu-24.04",
+                        bloc,
+                        "les jobs doivent tourner sur Ubuntu 24.04",
+                    )
+                    self.assertRegex(
+                        bloc,
+                        r"(?m)^    permissions:\s*$",
+                        "chaque job doit déclarer des permissions explicites",
+                    )
+                    self.assertNotIn("write-all", bloc, "permissions trop larges")
+
+    def test_qualite_execute_les_nouveaux_controles(self) -> None:
+        texte = lire(self.WORKFLOWS / "qualite.yml")
+        attendus = (
+            "name: Qualité du dépôt",
+            "luacheck server-data/resources",
+            "run: actionlint",
+            "run: hadolint --config .hadolint.yaml Dockerfile",
+            "run: gitleaks dir",
+            "run: ruff check tests/",
+            "run: bash scripts/verifier.sh",
+            "fetch-depth: 0",
+            "run: gitleaks git",
+        )
+        for attendu in attendus:
+            with self.subTest(controle=attendu):
+                self.assertIn(attendu, texte)
+        self.assertIn("  securite:", texte, "job securite séparé absent")
+
+    def test_fxserver_version_est_epingle(self) -> None:
+        chemin = RACINE / ".fxserver-version"
+        self.assertTrue(chemin.is_file(), ".fxserver-version manquant")
+        valeurs = cles_env(chemin)
+        for cle in ("FX_VERSION", "FX_URL", "FX_SHA256"):
+            with self.subTest(cle=cle):
+                self.assertIn(cle, valeurs, f"{cle} absent de .fxserver-version")
+                self.assertTrue(valeurs[cle], f"{cle} vide dans .fxserver-version")
+        self.assertRegex(valeurs["FX_VERSION"], r"^\d+$")
+        self.assertRegex(
+            valeurs["FX_URL"],
+            r"^https://runtime\.fivem\.net/artifacts/fivem/.+/fx\.tar\.xz$",
+        )
+        self.assertRegex(valeurs["FX_SHA256"], r"^[0-9a-f]{64}$")
+        # L'URL pointe bien vers la version déclarée.
+        self.assertIn(valeurs["FX_VERSION"], valeurs["FX_URL"])
+
+    def test_dependabot_suit_docker_compose(self) -> None:
+        texte = lire(self.DEPENDABOT)
+        self.assertRegex(
+            texte,
+            r"package-ecosystem:\s*[\"']?docker-compose[\"']?",
+            "écosystème docker-compose absent de dependabot.yml",
+        )
+        bloc = re.search(
+            r"(?ms)^\s*-\s*package-ecosystem:\s*[\"']?docker-compose[\"']?[^\n]*\n"
+            r"(.*?)(?=^\s*-\s*package-ecosystem:|\Z)",
+            texte,
+        )
+        if bloc is None:
+            self.fail("entrée docker-compose illisible")
+        self.assertIn("mariadb", bloc.group(1).lower())
+        self.assertRegex(bloc.group(1), r">=\s*11\.5")
+
+    def test_docker_a_concurrence_artefact_et_test_statique(self) -> None:
+        texte = lire(self.WORKFLOWS / "docker.yml")
+        attendus = (
+            "schedule:",
+            'cron: "17 3 * * 1"',
+            "group: image-${{ github.ref }}",
+            "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+            "provenance:",
+            "sbom:",
+            "load: ${{ github.event_name == 'pull_request' }}",
+            "aquasecurity/trivy-action@",
+            "severity: CRITICAL,HIGH",
+            "ignore-unfixed: true",
+            'exit-code: "1"',
+            "LICENSE_KEY=change_moi",
+            "smoke-static.log",
+            "retention-days: 7",
+            "if-no-files-found: ignore",
+            "docker rm -f smoke",
+            "docker rm -f smoke-static",
+        )
+        for attendu in attendus:
+            with self.subTest(attendu=attendu):
+                self.assertIn(attendu, texte)
+
+        bloc = bloc_service(texte, "smoke")
+        if bloc is None:
+            self.fail("job smoke absent de docker.yml")
+        # La construction locale sur PR ne doit dépendre ni d'un secret ni de
+        # la clé : le test statique tourne toujours.
+        etape = re.search(
+            r"(?ms)^      - name: Construire l'image localement.*?(?=^      - name:|\Z)",
+            bloc,
+        )
+        if etape is None:
+            self.fail("étape de construction locale absente du job smoke")
+        self.assertNotIn("disponible", etape.group(0))
+        self.assertIn("name: Collecter les journaux", bloc)
+        self.assertIn('grep -Fq -- "$CFX_LICENSE_KEY"', bloc)
+        self.assertIn("if: always()", bloc, "les journaux doivent être collectés en échec")
+
+    def test_nom_du_check_smoke_inchange(self) -> None:
+        texte = lire(self.WORKFLOWS / "docker.yml")
+        self.assertIn(f"name: {self.NOM_SMOKE}", texte)
+        self.assertIn(self.NOM_SMOKE, lire(self.PROTECTION))
 
 
 class DepotGit(unittest.TestCase):

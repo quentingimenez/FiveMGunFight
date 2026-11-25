@@ -9,12 +9,22 @@
 --    gf:playerKilled (victim, killer, weaponHash, mode)   killer peut être nil
 -- =============================================================================
 
-local Modes = {}      -- [src] = 'lobby' | 'attack' | 'redzone'
-local Spawning = {}   -- [src] = true tant qu'un spawn vient d'être envoyé (anti doublon)
-local SpawnOpts = {}  -- [src] = dernier spawn envoyé (rejouable si le client l'a raté)
-local lastDeath = {}  -- [src] = GetGameTimer() de la dernière mort (anti doublon)
-local Multi = {}      -- [src] = { count, last } pour les multi-kills
-local Vehicles = {}   -- [src] = netId du véhicule de mode (redzone)
+local Validation = _G.Validation
+local RateLimit = _G.RateLimit
+
+local Modes = {}        -- [src] = 'lobby' | 'attack' | 'redzone'
+local Spawning = {}     -- [src] = true tant qu'un spawn vient d'être envoyé (anti doublon)
+local SpawnOpts = {}    -- [src] = dernier spawn envoyé (rejouable si le client l'a raté)
+local lastDeath = {}    -- [src] = GetGameTimer() de la dernière mort (anti doublon)
+local Multi = {}        -- [src] = { count, last } pour les multi-kills
+local Vehicles = {}     -- [src] = netId du véhicule de mode (redzone)
+local lastDamager = {}  -- [victime] = { src = tireur, at, weapon } (dégât serveur autorisé)
+
+-- Rate-limits par joueur (voir rate_limit.lua et config.lua)
+local rateVehicle = {}
+local rateVehicleGone = {}
+local rateReady = {}
+local rateRefus = {}
 
 -- Supprime le véhicule de mode d'un joueur (s'il en a un)
 local function deleteVehicle(src)
@@ -27,15 +37,65 @@ local function deleteVehicle(src)
     end
 end
 
--- Le client signale le véhicule qu'il vient de recevoir
+-- Journalise un refus sans spam : au plus un message par joueur et par minute.
+local function journaliserRefus(src, evenement, raison)
+    local reglage = Config.RefusLogRateLimit
+    if not RateLimit.autoriser(rateRefus, src, reglage.max, reglage.window, GetGameTimer()) then
+        return
+    end
+    print(('[gf_core] %s refusé pour %s (id %d) : %s'):format(
+        evenement, GetPlayerName(src) or '?', src, raison
+    ))
+end
+
+local function autoriserRate(etat, src, reglage)
+    return RateLimit.autoriser(etat, src, reglage.max, reglage.window, GetGameTimer())
+end
+
+-- Dépendances natives injectées dans le module pur validation.lua.
+local function verifierVehicule(src, netId)
+    return Validation.verifierVehicule(netId, src, {
+        entityFromNetId = NetworkGetEntityFromNetworkId,
+        entityExists = DoesEntityExist,
+        entityType = GetEntityType,
+        entityOwner = NetworkGetEntityOwner,
+        entityCoords = GetEntityCoords,
+        playerCoords = function(joueur)
+            local ped = GetPlayerPed(joueur)
+            if not ped or ped == 0 then return nil end
+            return GetEntityCoords(ped)
+        end,
+        maxDistance = Config.VehicleBindDistance,
+    })
+end
+
+-- Le client signale le véhicule qu'il vient de recevoir. Il ne peut le faire
+-- que pour une entité qui lui appartient (propriétaire réseau), du bon type,
+-- proche de lui, et sans dépasser le rate-limit.
 RegisterNetEvent('gf_core:vehicle', function(netId)
     local src = source
-    if Vehicles[src] and Vehicles[src] ~= netId then deleteVehicle(src) end
-    Vehicles[src] = tonumber(netId)
+    if not autoriserRate(rateVehicle, src, Config.VehicleRateLimit) then
+        journaliserRefus(src, 'gf_core:vehicle', 'trop de requêtes')
+        return
+    end
+
+    local ok, raison, id = verifierVehicule(src, netId)
+    if not ok then
+        journaliserRefus(src, 'gf_core:vehicle', raison)
+        return
+    end
+
+    if Vehicles[src] and Vehicles[src] ~= id then deleteVehicle(src) end
+    Vehicles[src] = id
 end)
 
 RegisterNetEvent('gf_core:vehicleGone', function()
-    Vehicles[source] = nil
+    local src = source
+    if not autoriserRate(rateVehicleGone, src, Config.VehicleGoneRateLimit) then
+        journaliserRefus(src, 'gf_core:vehicleGone', 'trop de requêtes')
+        return
+    end
+    Vehicles[src] = nil
 end)
 
 -- ---------------------------------------------------------------- Utilitaires
@@ -157,6 +217,11 @@ end)
 -- Le client prévient quand il est prêt (fin du chargement)
 RegisterNetEvent('gf_core:ready', function()
     local src = source
+    if not autoriserRate(rateReady, src, Config.ReadyRateLimit) then
+        journaliserRefus(src, 'gf_core:ready', 'trop de requêtes')
+        return
+    end
+
     local current = Modes[src]
 
     -- Le client peut avoir raté le premier gf_core:spawn (chargement NUI,
@@ -197,21 +262,69 @@ AddEventHandler('playerDropped', function()
     Spawning[src] = nil
     SpawnOpts[src] = nil
     lastDeath[src] = nil
+    lastDamager[src] = nil
+    for victime, entree in pairs(lastDamager) do
+        if entree.src == src then lastDamager[victime] = nil end
+    end
     Multi[src] = nil
     deleteVehicle(src)
+    RateLimit.oublier(rateVehicle, src)
+    RateLimit.oublier(rateVehicleGone, src)
+    RateLimit.oublier(rateReady, src)
+    RateLimit.oublier(rateRefus, src)
     if old then TriggerEvent('gf:modeLeft', src, old) end
 end)
 
 -- ---------------------------------------------------------------- Morts / kills
-local function handleDeath(victim, killer, weapon)
+local function mortConfirmee(victime)
+    return Validation.mortConfirmee(victime, {
+        ped = GetPlayerPed,
+        health = GetEntityHealth,
+        -- Native serveur indisponible sur certaines versions : le pcall évite
+        -- une erreur et Validation retombe alors sur la santé.
+        dead = function(ped)
+            local ok, mort = pcall(IsEntityDead, ped)
+            return ok and mort == true
+        end,
+    })
+end
+
+local function handleDeath(victim, weapon)
     local now = GetGameTimer()
     if lastDeath[victim] and now - lastDeath[victim] < 1500 then return end
-    lastDeath[victim] = now
+
+    -- La preuve de dégât est consommée dès qu'une mort est signalée : elle ne
+    -- doit jamais servir deux fois, même si la validation suivante échoue.
+    local entree = lastDamager[victim]
+    lastDamager[victim] = nil
 
     local mode = Modes[victim]
     if not mode then return end
 
-    -- Validation du tueur
+    -- La victime doit être réellement morte côté serveur (configurable pour
+    -- les serveurs où GetEntityHealth ne reflète pas la mort au bon moment).
+    if Config.ValidateDeathHealth then
+        local morte, raison = mortConfirmee(victim)
+        if not morte then
+            journaliserRefus(victim, 'mort', raison)
+            return
+        end
+    end
+
+    lastDeath[victim] = now
+
+    -- Le tueur ne vient jamais du client : seulement du dernier dégât autorisé
+    -- vu par weaponDamageEvent, récent et dans le même mode.
+    local memeMode = entree ~= nil and entree.src ~= nil and Modes[entree.src] == mode
+    local killer, armeDegat = nil, nil
+    if entree then
+        killer, armeDegat = Validation.tueurCreditable(
+            entree, now, Config.KillCreditWindow * 1000, memeMode, victim
+        )
+    end
+    weapon = weapon or armeDegat
+
+    -- Validation supplémentaire du tueur (sécurité en profondeur)
     if killer then
         if killer == victim or Modes[killer] ~= mode or not GetPlayerName(killer) then
             killer = nil
@@ -260,15 +373,17 @@ local function handleDeath(victim, killer, weapon)
     end
 end
 
--- Ces événements sont envoyés par la ressource "baseevents" (côté client)
+-- Ces événements sont envoyés par la ressource "baseevents" (côté client).
+-- Le tueur fourni par le client est ignoré : il vient de weaponDamageEvent.
 RegisterNetEvent('baseevents:onPlayerKilled')
-AddEventHandler('baseevents:onPlayerKilled', function(killerId, data)
-    handleDeath(source, tonumber(killerId), data and data.weaponhash or nil)
+AddEventHandler('baseevents:onPlayerKilled', function(_, data)
+    local arme = type(data) == 'table' and data.weaponhash or nil
+    handleDeath(source, arme)
 end)
 
 RegisterNetEvent('baseevents:onPlayerDied')
 AddEventHandler('baseevents:onPlayerDied', function()
-    handleDeath(source, nil, nil)
+    handleDeath(source, nil)
 end)
 
 -- ---------------------------------------------------------------- Anti friendly-fire
@@ -312,8 +427,12 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
         end
     end
 
-    -- Marqueur de dégâts pour le tireur
+    -- Dégât autorisé : c'est la seule preuve que le serveur gardera pour
+    -- créditer un kill. `weaponType` est fourni par le serveur (data).
     if sender ~= victim then
+        lastDamager[victim] = { src = sender, at = GetGameTimer(), weapon = data.weaponType }
+
+        -- Marqueur de dégâts pour le tireur
         TriggerClientEvent('gf_ui:hit', sender, {
             damage = math.floor(tonumber(data.weaponDamage) or 0),
             fatal = data.willKill and true or false,

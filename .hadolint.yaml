@@ -1,0 +1,18 @@
+# Configuration hadolint du Dockerfile FiveMGunFight.
+#
+# Deux règles sont volontairement ignorées, avec leur justification :
+# - DL3008 : les paquets apt (ca-certificates, curl, xz-utils) ne sont pas
+#   épinglés par version. L'image de base est déjà épinglée par digest et ces
+#   utilitaires suivent les mises à jour de sécurité Debian ; figer leur version
+#   empêcherait ces correctifs et casserait le build à chaque retrait de paquet.
+#   Un épinglage par version pourra être étudié avec une image de base figée
+#   dans le temps, ce qui n'est pas le choix actuel.
+# - DL4006 : le RUN qui résout l'URL FXServer contient un pipe
+#   (curl ... | sed) sans `SHELL -o pipefail`. Le RUN active déjà `set -eux` et
+#   le résultat du pipe est contrôlé par `test -n "$url"` : un téléchargement
+#   vide arrête le build. L'archive est ensuite vérifiée par `sha256sum -c`
+#   puisque ce lot épingle FX_SHA256. Ajouter pipefail demanderait de modifier
+#   le Dockerfile, hors périmètre ; à traiter avec sa prochaine évolution.
+ignored:
+  - DL3008
+  - DL4006

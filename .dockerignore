@@ -1,4 +1,7 @@
 .env
+.env.*
+# Aucun secret ne doit entrer dans l'image, même par accident.
+secrets/
 .git
 server-data/secrets.cfg
 server-data/cache/

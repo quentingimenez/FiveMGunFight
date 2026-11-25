@@ -146,6 +146,7 @@ local function ensurePlayer(src)
         lastInvite = 0,
         lastMode = 0,
         lastPlayers = 0,
+        lastState = 0,
         lastCreate = 0,
     }
     Players[src] = player
@@ -612,11 +613,10 @@ local function launchParty(src, modeId)
         for _, member in ipairs(members) do
             local memberPlayer = Players[member]
             if memberPlayer and memberPlayer.inLobby and memberPlayer.partyId == partyId then
-                local already = false
                 local okMode, currentMode = pcall(function()
                     return exports.gf_core:GetMode(member)
                 end)
-                already = okMode and currentMode == mode.id
+                local already = okMode and currentMode == mode.id
                 local ok, result = false, false
                 if not already then
                     ok, result = pcall(function()
@@ -703,9 +703,13 @@ RegisterNetEvent('gf_lobby:requestState', function()
     local player = ensurePlayer(src)
     if not player then return end
 
+    local now = GetGameTimer()
+    if now - player.lastState < Config.RequestCooldownMs then return end
+    player.lastState = now
+
     -- Ne jamais anticiper la création de party sur un mode nil/indisponible :
     -- gf_core n'a pas encore décidé, on renvoie un état sans fermer la NUI.
-    local ok, mode = false, nil
+    local ok, mode
     if not player.inLobby then
         ok, mode = pcall(function() return exports.gf_core:GetMode(src) end)
         if ok and mode and mode ~= 'lobby' then
@@ -729,14 +733,11 @@ RegisterNetEvent('gf_lobby:requestPlayers', function()
     local party = findParty(src)
     if not player or not player.inLobby or not party then return end
 
-    -- Anti-spam : cadence journalisée, mais la liste est TOUJOURS envoyée pour ne
-    -- jamais laisser la modale sans réponse (timer NUI 5 s).
+    -- Anti-spam : une requête trop rapprochée est ignorée. La NUI demande la
+    -- liste à l'ouverture de la modale (timer 5 s), pas en boucle.
     local now = GetGameTimer()
-    if now - player.lastPlayers < 600 then
-        log(('requestPlayers %s : cadence < 600ms, réponse quand même'):format(src))
-    else
-        player.lastPlayers = now
-    end
+    if now - player.lastPlayers < Config.RequestCooldownMs then return end
+    player.lastPlayers = now
 
     local list = {}
     for _, rawId in ipairs(GetPlayers()) do

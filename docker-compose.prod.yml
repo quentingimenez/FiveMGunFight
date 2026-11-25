@@ -1,10 +1,17 @@
 # =============================================================================
 #  Production : image publiée sur GHCR, aucune dépendance au dépôt Git.
 #
-#  Dans .env, renseigne IMAGE_REF (ex. ghcr.io/compte/fivemgunfight:v1.2.3),
-#  puis :
+#  Dans .env, renseigne IMAGE_REF (digest immuable, ex.
+#  ghcr.io/compte/fivemgunfight@sha256:<64 hex>), puis :
 #    docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
 #    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+#  Secrets : aucun secret ne passe par l'environnement. Ils sont montés depuis
+#  ${SECRETS_DIR:-./secrets}/ dans /run/secrets (licence, mot de passe base,
+#  clé Steam) et MariaDB reçoit les siens par MARIADB_*_PASSWORD_FILE. Les
+#  fichiers doivent exister avant le `up`, en fin de ligne LF (pas CRLF), avec
+#  les droits 600 et un propriétaire root : liste des noms dans
+#  docker/secrets.exemple/README.md.
 #
 #  server-data vient de l'image ; seul gf_maps/data est un volume, pour que les
 #  maps créées avec l'éditeur survivent aux mises à jour.
@@ -16,8 +23,32 @@ services:
       # Volume maps vide au premier démarrage : on le remplit avec le maps.json
       # de l'image (voir docker/entrypoint.sh).
       GF_SEED_MAPS: "true"
+      # Neutralisation explicite : même si une variable de ce nom traînait dans
+      # l'exécution (surcouche de développement combinée par erreur), aucune
+      # valeur secrète ne doit entrer dans l'environnement de production.
+      # docker/entrypoint.sh lit les valeurs utiles dans /run/secrets.
+      LICENSE_KEY: ""
+      MARIADB_PASSWORD: ""
+      STEAM_WEB_API_KEY: ""
+    secrets:
+      # Montés dans /run/secrets/<nom> (cible par défaut de Compose).
+      - license_key
+      - db_password
+      - steam_web_api_key
     volumes:
       - maps:/opt/fivem/server-data/resources/[gunfight]/gf_maps/data
+
+  mariadb:
+    environment:
+      # La base lit ses mots de passe dans les fichiers secrets, jamais dans
+      # l'environnement. Les clés vides neutralisent un éventuel héritage.
+      MARIADB_ROOT_PASSWORD: ""
+      MARIADB_PASSWORD: ""
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MARIADB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_root_password
+      - db_password
 
 volumes:
   # Volumes distincts de ceux du dev : un `up` lancé avec le mauvais fichier ne
@@ -28,3 +59,16 @@ volumes:
     name: gunfight-prod-dbdata
   maps:
     name: gunfight-prod-maps
+
+secrets:
+  # Chaque entrée est un fichier local lu par Compose au démarrage. Le chemin
+  # est relatif au dossier du projet ; SECRETS_DIR permet de le sortir du dépôt
+  # (recommandé sur un VPS).
+  license_key:
+    file: ${SECRETS_DIR:-./secrets}/license_key
+  db_password:
+    file: ${SECRETS_DIR:-./secrets}/db_password
+  db_root_password:
+    file: ${SECRETS_DIR:-./secrets}/db_root_password
+  steam_web_api_key:
+    file: ${SECRETS_DIR:-./secrets}/steam_web_api_key

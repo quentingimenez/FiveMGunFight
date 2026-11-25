@@ -3,6 +3,7 @@ Config = {}
 Config.ServerName = 'GUNFIGHT'
 Config.DefaultMode = 'attack'
 Config.BucketBase = 1000
+Config.RequestCooldownMs = 500 -- cadence minimale des lectures NUI (state, joueurs)
 Config.CharacterStorage = 'data/characters.json'
 Config.PedModels = {
   male = 'mp_m_freemode_01',

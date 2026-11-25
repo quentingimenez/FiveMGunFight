@@ -3,9 +3,9 @@
 #
 #  Dependabot ouvre une pull request par semaine (lundi matin) et regroupe les
 #  mises à jour par écosystème. Une PR Dependabot n'a pas accès aux secrets
-#  Actions : le job de démarrage réel (« smoke ») y est donc ignoré avec une
-#  note, et la PR reste vérifiée par les contrôles statiques et la construction
-#  de l'image.
+#  Actions : le démarrage réel du job (« smoke ») y est donc ignoré avec une
+#  note, mais son test statique sans licence et la construction de l'image
+#  continuent de vérifier la PR.
 #
 #  Les montées majeures restent manuelles : chaque PR est relue et testée, rien
 #  n'est fusionné automatiquement.
@@ -44,6 +44,25 @@ updates:
       # MariaDB 11.4 est la version LTS choisie : ignorer 11.5 et au-delà.
       # Les correctifs de sécurité de la branche 11.4 continuent de passer par
       # la mise à jour du digest.
+      - dependency-name: "mariadb"
+        versions:
+          - ">= 11.5"
+
+  # Fichiers Compose : Dependabot les suit séparément des Dockerfiles. La même
+  # exclusion MariaDB s'applique pour ne pas proposer une version non LTS.
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    groups:
+      compose:
+        patterns:
+          - "*"
+    ignore:
       - dependency-name: "mariadb"
         versions:
           - ">= 11.5"

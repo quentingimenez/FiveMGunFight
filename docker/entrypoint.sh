@@ -1,44 +1,71 @@
 #!/bin/sh
 # =============================================================================
 #  Démarrage du conteneur :
-#  1. génère server-data/secrets.cfg à partir des variables du fichier .env
-#  2. lance FXServer (txAdmin est intégré à FXServer et démarre avec lui)
+#  1. lit les secrets (Docker secrets /run/secrets/<nom>, sinon variables
+#     d'environnement pour le développement)
+#  2. génère server-data/secrets.cfg
+#  3. lance FXServer (txAdmin est intégré à FXServer et démarre avec lui)
 # =============================================================================
 set -e
 
 # Les fichiers générés par ce script (secrets.cfg) contiennent la clé de licence,
 # le mot de passe MySQL et les identifiants admin : ils ne doivent être lisibles
-# que par leur propriétaire (root dans le conteneur).
+# que par leur propriétaire (l'utilisateur fivem du conteneur en production).
 umask 077
 
 DATA=/opt/fivem/server-data
 SERVER=/opt/fivem/server
+SECRETS=/run/secrets
 
-# Le fichier .env est écrit sous Windows : un "\r" en fin de valeur casserait la
-# clé de licence ou les mots de passe. On nettoie chaque variable lue.
-strip_cr() {
-  printf '%s' "$1" | tr -d '\r'
+# Les fichiers .env sont écrits sous Windows : un "\r" en fin de valeur casserait
+# la clé de licence ou les mots de passe. On nettoie les \r et les \n de chaque
+# valeur, qu'elle vienne d'un fichier secret ou de l'environnement.
+propre() {
+  printf '%s' "$1" | tr -d '\r\n'
 }
 
-LICENSE_KEY="$(strip_cr "${LICENSE_KEY:-}")"
-SERVER_NAME="$(strip_cr "${SERVER_NAME:-Gunfight}")"
-MAX_PLAYERS="$(strip_cr "${MAX_PLAYERS:-300}")"
-ADMIN_IDENTIFIERS="$(strip_cr "${ADMIN_IDENTIFIERS:-}")"
-STEAM_WEB_API_KEY="$(strip_cr "${STEAM_WEB_API_KEY:-}")"
-DB_HOST="$(strip_cr "${DB_HOST:-mariadb}")"
-DB_NAME="$(strip_cr "${MARIADB_DATABASE:-gunfight}")"
-DB_USER="$(strip_cr "${MARIADB_USER:-gunfight}")"
-DB_PASS="$(strip_cr "${MARIADB_PASSWORD:-}")"
-TXADMIN="$(strip_cr "${TXADMIN:-true}")"
-
-if [ -z "$LICENSE_KEY" ] || [ "$LICENSE_KEY" = "change_moi" ]; then
-  echo "=================================================================="
-  if [ -z "$LICENSE_KEY" ]; then
-    echo " ERREUR : LICENSE_KEY est vide dans le fichier .env"
+# Lit un secret dans /run/secrets/<nom> en priorité (production : fichiers
+# Compose montés en lecture seule), sinon dans la variable d'environnement de
+# repli (développement). La valeur n'est jamais affichée.
+secret() {
+  _secret_nom="$1"
+  _secret_repli="$2"
+  _secret_fichier="$SECRETS/$_secret_nom"
+  if [ -r "$_secret_fichier" ]; then
+    propre "$(cat "$_secret_fichier" 2>/dev/null || true)"
   else
-    echo " ERREUR : LICENSE_KEY vaut encore change_moi dans le fichier .env"
+    propre "$_secret_repli"
   fi
-  echo " Crée ta clé sur https://portal.cfx.re puis colle-la dans .env"
+}
+
+# Valeurs utiles conservées dans des variables locales : on retire ensuite les
+# variables d'environnement, pour qu'elles ne soient pas héritées par FXServer
+# ni visibles avec `docker exec ... env` (le jeu lit secrets.cfg, pas l'environnement).
+CLE_LICENCE="$(secret license_key "${LICENSE_KEY:-}")"
+CLE_STEAM="$(secret steam_web_api_key "${STEAM_WEB_API_KEY:-}")"
+DB_PASS="$(secret db_password "${MARIADB_PASSWORD:-}")"
+unset LICENSE_KEY STEAM_WEB_API_KEY MARIADB_PASSWORD
+
+SERVER_NAME="$(propre "${SERVER_NAME:-Gunfight}")"
+MAX_PLAYERS="$(propre "${MAX_PLAYERS:-300}")"
+ADMIN_IDENTIFIERS="$(propre "${ADMIN_IDENTIFIERS:-}")"
+DB_HOST="$(propre "${DB_HOST:-mariadb}")"
+DB_NAME="$(propre "${MARIADB_DATABASE:-gunfight}")"
+DB_USER="$(propre "${MARIADB_USER:-gunfight}")"
+TXADMIN="$(propre "${TXADMIN:-true}")"
+
+if [ -z "$CLE_LICENCE" ] || [ "$CLE_LICENCE" = "change_moi" ]; then
+  echo "=================================================================="
+  if [ -z "$CLE_LICENCE" ]; then
+    echo " ERREUR : LICENSE_KEY est vide."
+    echo " Production : monte le secret license_key (/run/secrets/license_key)."
+    echo " Développement : renseigne LICENSE_KEY dans .env."
+  else
+    echo " ERREUR : LICENSE_KEY vaut encore change_moi."
+    echo " Remplace-la dans .env (développement) ou dans le secret license_key"
+    echo " monté sous /run/secrets/license_key (production)."
+  fi
+  echo " Crée ta clé sur https://portal.cfx.re puis relance le conteneur."
   echo "=================================================================="
   exit 1
 fi
@@ -58,13 +85,13 @@ esac
 
 # --- Fichier généré automatiquement (ne pas modifier à la main) ---
 {
-  echo "# FICHIER GÉNÉRÉ AUTOMATIQUEMENT AU DÉMARRAGE - ne pas modifier, voir .env"
-  echo "sv_licenseKey \"$LICENSE_KEY\""
+  echo "# FICHIER GÉNÉRÉ AUTOMATIQUEMENT AU DÉMARRAGE - ne pas modifier, voir docker/entrypoint.sh"
+  echo "sv_licenseKey \"$CLE_LICENCE\""
   echo "sv_maxclients $MAX_PLAYERS"
   echo "sv_hostname \"$SERVER_NAME\""
   echo "set mysql_connection_string \"mysql://$DB_USER:$DB_PASS@$DB_HOST/$DB_NAME?charset=utf8mb4\""
-  if [ -n "$STEAM_WEB_API_KEY" ]; then
-    echo "set steam_webApiKey \"$STEAM_WEB_API_KEY\""
+  if [ -n "$CLE_STEAM" ]; then
+    echo "set steam_webApiKey \"$CLE_STEAM\""
   fi
   # Administrateurs : ADMIN_IDENTIFIERS=fivem:123456,license:abcdef...
   # Une entrée est ignorée si elle ne ressemble pas à un identifiant (type:valeur),

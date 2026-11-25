@@ -137,7 +137,74 @@ if [ "$echecs" -eq "$avant" ]; then
   fi
 fi
 
-# --- 5. docker compose ------------------------------------------------------
+# --- 5. Lua (luacheck) ------------------------------------------------------
+titre "Lua (luacheck)"
+if ! command -v luacheck >/dev/null 2>&1; then
+  ignore "luacheck absent (installe-le avec LuaRocks ; la CI le fournit)"
+else
+  if sortie="$(luacheck server-data/resources 2>&1)"; then
+    resume="$(printf '%s\n' "$sortie" | grep '^Total:' | tail -n 1)"
+    ok "${resume:-luacheck}"
+  else
+    echec "luacheck"
+    printf '%s\n' "$sortie" | details
+  fi
+fi
+
+# --- 6. Workflows GitHub Actions (actionlint) -------------------------------
+titre "Workflows GitHub Actions (actionlint)"
+if ! command -v actionlint >/dev/null 2>&1; then
+  ignore "actionlint absent (télécharge une release épinglée ; la CI le fournit)"
+else
+  if sortie="$(actionlint 2>&1)"; then
+    ok "workflows valides"
+  else
+    echec "actionlint"
+    printf '%s\n' "$sortie" | details
+  fi
+fi
+
+# --- 7. Dockerfile (hadolint) -----------------------------------------------
+titre "Dockerfile (hadolint)"
+if ! command -v hadolint >/dev/null 2>&1; then
+  ignore "hadolint absent (télécharge une release épinglée ; la CI le fournit)"
+else
+  # hadolint découvre .hadolint.yaml dans le répertoire courant.
+  if sortie="$(hadolint Dockerfile 2>&1)"; then
+    ok "Dockerfile valide"
+  else
+    echec "hadolint"
+    printf '%s\n' "$sortie" | details
+  fi
+fi
+
+# --- 8. Secrets dans l'arbre (gitleaks) -------------------------------------
+titre "Secrets dans l'arbre (gitleaks)"
+if ! command -v gitleaks >/dev/null 2>&1; then
+  ignore "gitleaks absent (télécharge une release épinglée ; la CI le fournit)"
+else
+  if sortie="$(gitleaks dir --no-banner --redact --config .gitleaks.toml . 2>&1)"; then
+    ok "aucun secret détecté"
+  else
+    echec "gitleaks"
+    printf '%s\n' "$sortie" | details
+  fi
+fi
+
+# --- 9. Style Python des tests (ruff) ---------------------------------------
+titre "Style Python des tests (ruff)"
+if ! command -v ruff >/dev/null 2>&1; then
+  ignore "ruff absent (télécharge une release épinglée ; la CI le fournit)"
+else
+  if sortie="$(ruff check tests/ 2>&1)"; then
+    ok "tests/ conformes"
+  else
+    echec "ruff"
+    printf '%s\n' "$sortie" | details
+  fi
+fi
+
+# --- 10. docker compose -----------------------------------------------------
 titre "docker compose config"
 if ! command -v docker >/dev/null 2>&1; then
   ignore "docker absent"

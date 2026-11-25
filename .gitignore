@@ -1,4 +1,9 @@
 .env
+.env.*
+!.env.example
+# Secrets de production (fichiers montés par docker-compose.prod.yml).
+# Le modèle documenté docker/secrets.exemple/ reste versionné.
+secrets/
 server-data/secrets.cfg
 server-data/cache/
 server-data/txData/
@@ -7,3 +12,8 @@ server-data/.replxx_history
 __pycache__/
 *.pyc
 backups/
+restauration/
+.tmp-ops-*/
+*.sql.gz
+*.tar.gz
+*.age

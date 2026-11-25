@@ -75,11 +75,11 @@ et que le fichier manque, il copie le modèle de l'image depuis
 
 | Fichier | Rôle |
 |---|---|
-| `Dockerfile` | Debian `bookworm-slim` épinglé par digest, télécharge FXServer du canal `recommended` (ou `FX_CHANNEL`/`FX_URL`), vérifie `FX_SHA256` quand il est fourni, copie `server-data/` dans `/opt/fivem/server-data/` **et** dans `/opt/fivem/defaults/`, expose 30120/TCP-UDP et 40120/TCP |
-| `docker-compose.yml` | `name: gunfight` fige le préfixe des volumes du dev quel que soit le nom du dossier ; deux services : `fxserver` (sans `build` ni `image`, `env_file: .env`, volume `txdata`, healthcheck HTTP sur `30120/dynamic.json`, plafond mémoire `${FXSERVER_MEMORY_LIMIT:-4g}`) et `mariadb:11.4` épinglée par digest (volume `dbdata`, `docker/mariadb.cnf`, scripts de `docker/db/init/`, plafond mémoire `${MARIADB_MEMORY_LIMIT:-2g}`) ; le serveur attend que la base soit `healthy` |
-| `docker-compose.dev.yml` | ajoute `build: .` et le bind mount `./server-data` pour le développement local |
-| `docker-compose.prod.yml` | utilise `${IMAGE_REF}`, active l'amorçage des maps et renomme les volumes en `gunfight-prod-*` |
-| `docker/entrypoint.sh` | valide `LICENSE_KEY`, génère `server-data/secrets.cfg` à partir de `.env` (en retirant les `\r` de Windows) sous `umask 077`, remet le fichier en `chmod 600` à chaque démarrage, amorce `maps.json` si demandé, puis lance FXServer |
+| `Dockerfile` | Debian `bookworm-slim` épinglé par digest, télécharge FXServer épinglé par `.fxserver-version` (la CI passe `FX_URL` et `FX_SHA256` ; le mode `FX_CHANNEL` reste un repli local), vérifie l'empreinte, copie `server-data/` dans `/opt/fivem/server-data/` **et** dans `/opt/fivem/defaults/`, expose 30120/TCP-UDP et 40120/TCP, puis s'exécute en utilisateur non-root `fivem` (uid 10001) |
+| `docker-compose.yml` | `name: gunfight` fige le préfixe des volumes du dev quel que soit le nom du dossier ; deux services : `fxserver` (sans `build` ni `image`, sans `env_file` : les secrets sont montés dans `/run/secrets`, `cap_drop: ALL`, `no-new-privileges`, volume `txdata`, healthcheck HTTP sur `30120/dynamic.json`, plafond mémoire `${FXSERVER_MEMORY_LIMIT:-4g}`) et `mariadb:11.4` épinglée par digest (volume `dbdata`, secrets `_FILE`, `docker/mariadb.cnf`, scripts de `docker/db/init/`, réseau interne `backend`, plafond mémoire `${MARIADB_MEMORY_LIMIT:-2g}`) ; le serveur attend que la base soit `healthy` |
+| `docker-compose.dev.yml` | ajoute `build: .`, le bind mount `./server-data` et conserve l'utilisateur root pour que le montage Windows reste inscriptible |
+| `docker-compose.prod.yml` | utilise `${IMAGE_REF}` par digest, monte les quatre secrets, active l'amorçage des maps et renomme les volumes en `gunfight-prod-*` |
+| `docker/entrypoint.sh` | lit les secrets dans `/run/secrets` (repli sur les variables en développement), valide `LICENSE_KEY`, génère `server-data/secrets.cfg` sous `umask 077`, remet le fichier en `chmod 600`, retire les variables secrètes de l'environnement, amorce `maps.json` si demandé, puis lance FXServer |
 | `server-data/server.cfg` | endpoints réseau, `exec secrets.cfg`, `sv_scriptHookAllowed 0`, ordre de démarrage des ressources, permissions admin |
 | `.env.example` | modèle de configuration, copié en `.env` au premier `start.bat` |
 
@@ -90,10 +90,10 @@ MySQL et les identifiants administrateurs.
 ## Démarrage du conteneur
 
 ```text
-.env ──> entrypoint.sh ──> server-data/secrets.cfg ──> FXServer
-                                    │
-        TXADMIN=true  (défaut)      └─> run.sh  (mode moniteur : txAdmin pilote le serveur)
-        TXADMIN=false               └─> run.sh +set onesync on +exec server.cfg  (démarrage direct, CI)
+/run/secrets/*  ──> entrypoint.sh ──> server-data/secrets.cfg ──> FXServer
+   (ou .env en dev)                         │
+        TXADMIN=true  (défaut)              └─> run.sh  (mode moniteur : txAdmin pilote le serveur)
+        TXADMIN=false                       └─> run.sh +set onesync on +exec server.cfg  (démarrage direct, CI)
 ```
 
 En mode moniteur, **aucun argument** ne doit être ajouté après `run.sh` :
@@ -120,6 +120,10 @@ les secrets. Ces invariants sont vérifiés par la classe `InfraDocker` de
 - **Plafonds mémoire** : 4 Go pour `fxserver`, 2 Go pour `mariadb`,
   surchargeables par `FXSERVER_MEMORY_LIMIT` / `MARIADB_MEMORY_LIMIT` dans
   `.env` (voir `.env.example`).
+- **Volumes historiques** : un volume `gunfight-prod-*` créé avant le passage
+  non-root appartient à `root` et FXServer ne peut plus y écrire. La migration
+  `chown -R 10001:10001` est décrite dans
+  [`docs/runbooks/mise-a-jour.md`](runbooks/mise-a-jour.md).
 
 ## Ressources FiveM
 

@@ -3,6 +3,7 @@
 #  - Debian minimal + FXServer (version Linux officielle de Cfx.re)
 #  - Les scripts (server-data) sont copiés dans l'image ET peuvent être
 #    remplacés par un dossier monté en développement (docker-compose.dev.yml)
+#  - Le conteneur tourne avec l'utilisateur non privilégié fivem (UID/GID 10001)
 # =============================================================================
 # Digest figé : Debian bookworm-slim, résolu le 2026-11-25. Dependabot propose
 # les mises à jour de digest ; on ne change pas de distribution sans test.
@@ -22,6 +23,12 @@ ARG FX_SHA256=""
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
  && rm -rf /var/lib/apt/lists/*
+
+# Utilisateur non privilégié du serveur. L'UID/GID est fixe pour que les volumes
+# nommés (txData, maps) gardent les mêmes droits d'un déploiement à l'autre.
+RUN groupadd --gid 10001 fivem \
+ && useradd --uid 10001 --gid 10001 --home-dir /opt/fivem \
+      --no-create-home --shell /usr/sbin/nologin fivem
 
 # Téléchargement, vérification et extraction de FXServer
 WORKDIR /opt/fivem/server
@@ -45,12 +52,27 @@ RUN set -eux; \
 
 # Script de démarrage
 COPY docker/entrypoint.sh /entrypoint.sh
-RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod 0755 /entrypoint.sh
 
 # Copie par défaut des scripts du serveur (utile sur un VPS sans montage)
 COPY server-data/ /opt/fivem/server-data/
 # Copie de référence : sert à amorcer maps.json dans un volume vide (production)
 COPY server-data/ /opt/fivem/defaults/
+
+# Droits de l'utilisateur fivem :
+#  - txData : volume nommé de txAdmin (comptes, configuration) ;
+#  - server-data : secrets.cfg est généré ici au démarrage, FXServer y écrit
+#    aussi cache/ et les journaux ;
+#  - le dossier data de gf_maps : point de montage du volume « maps » en prod.
+# Docker recopie le propriétaire de ces dossiers dans un volume nommé neuf.
+RUN mkdir -p /opt/fivem/txData \
+ && chown -R 10001:10001 /opt/fivem
+
+# HOME évite que FXServer ou txAdmin tentent d'écrire dans /root.
+ENV HOME=/opt/fivem
+
+# Tout ce qui suit (et le processus lancé au démarrage) tourne sans privilège.
+USER 10001:10001
 
 WORKDIR /opt/fivem/server-data
 

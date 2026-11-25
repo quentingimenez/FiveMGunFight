@@ -2,7 +2,9 @@
 
 Index des documents du dépôt. Le `README.md` à la racine reste le guide
 utilisateur (installation, commandes en jeu, dépannage) ; les documents ici
-décrivent le fonctionnement interne et le processus de développement.
+décrivent le fonctionnement interne et l'exploitation.
+
+## Architecture et développement
 
 | Document | À lire si… |
 |---|---|
@@ -14,7 +16,29 @@ décrivent le fonctionnement interne et le processus de développement.
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | tu ouvres ta première pull request |
 | [`../SECURITY.md`](../SECURITY.md) | tu manipules des secrets, ou tu constates une fuite |
 
+## Exploitation
+
+| Document | À lire si… |
+|---|---|
+| [`runbooks/incident.md`](runbooks/incident.md) | la production est indisponible ou dégradée |
+| [`runbooks/restauration.md`](runbooks/restauration.md) | tu dois restaurer une sauvegarde (RPO 24 h, RTO 1 h) |
+| [`runbooks/mise-a-jour.md`](runbooks/mise-a-jour.md) | tu déploies une nouvelle image par digest |
+| [`runbooks/rotation-secrets.md`](runbooks/rotation-secrets.md) | un secret doit être remplacé ou a fuité |
+
+Outils associés : `scripts/verifier-sante.sh` (santé), `scripts/deployer.sh`
+(déploiement et rollback), `scripts/sauvegarder.sh` (sauvegarde),
+`scripts/restaurer.sh` (vérification et extraction), et
+`docker-compose.staging.yml` (préproduction isolée).
+
+## Décisions
+
+| Document | Sujet |
+|---|---|
+| [`adr/0001-protection-branche.md`](adr/0001-protection-branche.md) | protection de `main`, option GitHub Pro vs dépôt public |
+| [`adr/0002-fxserver-epingle.md`](adr/0002-fxserver-epingle.md) | FXServer épinglé par URL et SHA256 |
+
 ## Règles en une ligne
 
-`main` est protégée : une branche, une pull request, une revue, une CI verte,
-puis fusion en squash. Aucun envoi direct sur `main`.
+Une branche, une pull request, une revue, une CI verte, puis fusion en squash.
+Aucun envoi direct sur `main`. La protection GitHub de `main` reste **à
+activer** : le dépôt privé est sur un plan gratuit (voir l'ADR 0001).

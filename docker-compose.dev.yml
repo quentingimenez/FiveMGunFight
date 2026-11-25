@@ -5,10 +5,34 @@
 #
 #  Les volumes gardent les noms du socle (gunfight_txdata, gunfight_dbdata) :
 #  une installation existante continue de fonctionner sans migration.
+#
+#  SECRETS EN CLAIR : ce fichier transmet LICENSE_KEY, MARIADB_PASSWORD,
+#  MARIADB_ROOT_PASSWORD et STEAM_WEB_API_KEY depuis .env. C'est volontaire sur
+#  un poste de développement (le serveur n'écoute que sur localhost) ; les
+#  valeurs restent visibles avec `docker inspect`. La production n'utilise
+#  jamais cette surcouche : elle monte des Docker secrets (voir
+#  docker-compose.prod.yml).
 # =============================================================================
 services:
   fxserver:
     build: .
+    # Les fichiers du bind mount viennent de Windows : ils apparaissent
+    # appartenir à root et les permissions POSIX ne sont pas fiables. On reste
+    # root en développement pour ne pas bloquer l'édition des scripts ; l'image
+    # et la production tournent, elles, avec l'utilisateur fivem (UID 10001).
+    user: "0:0"
     volumes:
       # Tes scripts : modifie-les sur ton PC, ils sont pris en compte directement
       - ./server-data:/opt/fivem/server-data
+    environment:
+      # Secrets explicites pour le développement (voir l'en-tête du fichier).
+      LICENSE_KEY: ${LICENSE_KEY:-}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-}
+      STEAM_WEB_API_KEY: ${STEAM_WEB_API_KEY:-}
+
+  mariadb:
+    environment:
+      # L'entrypoint MariaDB exige un mot de passe root (ou ALLOW_EMPTY_PASSWORD,
+      # qu'on ne veut pas) : on les transmet explicitement ici.
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-}

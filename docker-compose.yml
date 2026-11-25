@@ -6,6 +6,12 @@
 #  Arrêt         : docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 #
 #  start.bat / stop.bat / status.bat enveloppent déjà le fichier de dev.
+#
+#  Secrets : plus aucun `env_file` ici. Compose lit .env pour l'interpolation
+#  ${...}, mais seules les variables NON secrètes sont listées dans
+#  `environment:`. Les secrets viennent de Docker secrets (/run/secrets) en
+#  production et sont transmis explicitement par docker-compose.dev.yml en
+#  développement.
 # =============================================================================
 # Fige le nom du projet Compose : les volumes restent gunfight_* quel que soit
 # le nom du dossier de checkout (sinon Compose les préfixe avec ce nom de dossier).
@@ -17,8 +23,36 @@ services:
     # Plafond mémoire : protège la machine hôte d'une fuite mémoire du serveur.
     # Surchargeable dans .env (FXSERVER_MEMORY_LIMIT), 4g par défaut.
     mem_limit: ${FXSERVER_MEMORY_LIMIT:-4g}
-    env_file: .env
+
+    # --- Garde-fous du conteneur ---
+    # FXServer n'a besoin d'aucune capacité Linux supplémentaire. On retire
+    # toutes les capacités et on interdit toute élévation de privilèges (setuid).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Limite le nombre de processus/threads : une fuite ne doit pas saturer
+    # l'hôte.
+    pids_limit: 512
+    # Limite de descripteurs de fichiers : FXServer ouvre beaucoup de fichiers
+    # (ressources, cache) sans avoir besoin des valeurs élevées de l'hôte.
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 16384
+    # /tmp reste inscriptible sans persister entre deux redémarrages. 64 Mo
+    # suffisent : les artefacts FXServer vont dans server-data/cache.
+    tmpfs:
+      - "/tmp:size=64m"
+
     environment:
+      # --- Configuration non secrète (valeurs lues dans .env par Compose) ---
+      SERVER_NAME: ${SERVER_NAME:-Gunfight}
+      MAX_PLAYERS: ${MAX_PLAYERS:-300}
+      ADMIN_IDENTIFIERS: ${ADMIN_IDENTIFIERS:-}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-gunfight}
+      MARIADB_USER: ${MARIADB_USER:-gunfight}
+      DB_HOST: ${DB_HOST:-mariadb}
       # true (défaut) : FXServer démarre en "mode moniteur", c'est txAdmin qui
       # lance le serveur de jeu et qui fournit le panneau web (port 40120).
       # false : FXServer démarre directement avec server.cfg, sans txAdmin.
@@ -30,6 +64,7 @@ services:
       # Amorçage de maps.json dans un volume vide. Désactivé en dev (le dossier
       # du dépôt est monté), activé par docker-compose.prod.yml.
       GF_SEED_MAPS: "false"
+
     init: true
     stdin_open: true   # permet de taper des commandes avec console.bat
     tty: true
@@ -56,6 +91,11 @@ services:
         # n'attend pas seulement le conteneur : attend que la base accepte les connexions
         condition: service_healthy
     stop_grace_period: 30s
+    networks:
+      # frontend : réseau de sortie (licence Cfx.re, artefacts) et ports publiés.
+      # backend  : réseau interne, non routé vers Internet, partagé avec MariaDB.
+      - frontend
+      - backend
     logging:
       driver: json-file
       options:
@@ -72,11 +112,21 @@ services:
     # buffer pool InnoDB de 1G avec de la marge (voir docker/mariadb.cnf).
     # Surchargeable dans .env (MARIADB_MEMORY_LIMIT).
     mem_limit: ${MARIADB_MEMORY_LIMIT:-2g}
+
+    # --- Garde-fous du conteneur ---
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    # Pas de cap_drop: ALL ici : l'entrypoint officiel MariaDB utilise
+    # setuid/setgid/chown pour passer de root à l'utilisateur mysql. Retirer
+    # toutes les capacités casserait le démarrage.
+
     environment:
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
-      MARIADB_DATABASE: ${MARIADB_DATABASE}
-      MARIADB_USER: ${MARIADB_USER}
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+      # Aucun mot de passe ici : la production les fournit par fichiers
+      # (MARIADB_*_PASSWORD_FILE dans docker-compose.prod.yml) et le
+      # développement les transmet explicitement dans docker-compose.dev.yml.
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-gunfight}
+      MARIADB_USER: ${MARIADB_USER:-gunfight}
       # met à jour les tables système quand l'image MariaDB est mise à jour
       MARIADB_AUTO_UPGRADE: "1"
     volumes:
@@ -91,6 +141,9 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    networks:
+      # Uniquement le réseau interne : aucun accès Internet, aucun port publié.
+      - backend
     logging:
       driver: json-file
       options:
@@ -101,3 +154,11 @@ services:
 volumes:
   txdata:
   dbdata:
+
+networks:
+  # Réseau de sortie et d'entrée (ports publiés) du serveur de jeu.
+  frontend:
+  # Réseau interne : MariaDB et FXServer communiquent ici, sans route vers
+  # l'extérieur. `internal: true` supprime la passerelle par défaut.
+  backend:
+    internal: true

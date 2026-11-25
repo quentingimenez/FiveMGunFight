@@ -1,0 +1,144 @@
+# =============================================================================
+#  Préproduction : pile complète, autonome, isolée de la production.
+#
+#  Fichier volontairement complet (pas une surcouche de docker-compose.yml) :
+#  il se lance seul et ne peut pas hériter par erreur des volumes, des noms de
+#  conteneurs ou des ports de la production.
+#
+#  Usage (depuis la racine, avec les secrets de production dans ./secrets/) :
+#    export STAGING_IMAGE_REF=ghcr.io/...@sha256:...
+#    docker compose -f docker-compose.staging.yml pull
+#    docker compose -f docker-compose.staging.yml up -d --wait
+#    docker compose -f docker-compose.staging.yml down
+#
+#  STAGING_IMAGE_REF doit rester définie pour toutes les commandes Compose,
+#  y compris logs et down : Compose résout le modèle entier à chaque appel.
+#  Les secrets (licence, mots de passe base, clé Steam) sont les mêmes fichiers
+#  que la production, montés dans /run/secrets ; aucun mot de passe ne passe par
+#  l'environnement. Voir docker/secrets.exemple/README.md.
+#
+#  Ports : jeu 30121 (TCP/UDP), txAdmin 127.0.0.1:40121. La production garde
+#  30120 et 40120 : les deux piles peuvent tourner côte à côte.
+# =============================================================================
+name: gunfight-staging
+
+services:
+  fxserver:
+    image: ${STAGING_IMAGE_REF:?Definis STAGING_IMAGE_REF (digest @sha256:...) pour la preproduction}
+    container_name: gunfight-staging-fxserver
+    restart: unless-stopped
+    mem_limit: ${FXSERVER_MEMORY_LIMIT:-4g}
+    environment:
+      TXADMIN: ${TXADMIN:-true}
+      TXHOST_DATA_PATH: /opt/fivem/txData
+      TXHOST_TXA_PORT: "40120"
+      TXHOST_INTERFACE: 0.0.0.0
+      # Volume maps vide au premier démarrage : amorcé depuis l'image.
+      GF_SEED_MAPS: "true"
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-gunfight}
+      MARIADB_USER: ${MARIADB_USER:-gunfight}
+      # Neutralisation : les valeurs utiles viennent de /run/secrets, jamais de
+      # l'environnement (même logique que la production).
+      LICENSE_KEY: ""
+      MARIADB_PASSWORD: ""
+      STEAM_WEB_API_KEY: ""
+    secrets:
+      - license_key
+      - db_password
+      - steam_web_api_key
+    init: true
+    stdin_open: true
+    tty: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    ports:
+      - "30121:30120/tcp"
+      - "30121:30120/udp"
+      - "127.0.0.1:40121:40120/tcp"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--max-time", "3", "http://127.0.0.1:30120/dynamic.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    volumes:
+      - txdata:/opt/fivem/txData
+      - maps:/opt/fivem/server-data/resources/[gunfight]/gf_maps/data
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mariadb:
+    image: mariadb:11.4@sha256:a8992b5e5404d11e03c54a31d0c1bdea3fd116d283aa6d1a627551f29045309b
+    container_name: gunfight-staging-mariadb
+    restart: unless-stopped
+    mem_limit: ${MARIADB_MEMORY_LIMIT:-2g}
+    environment:
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-gunfight}
+      MARIADB_USER: ${MARIADB_USER:-gunfight}
+      # Mots de passe lus dans les fichiers secrets, jamais dans l'environnement.
+      MARIADB_ROOT_PASSWORD: ""
+      MARIADB_PASSWORD: ""
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MARIADB_PASSWORD_FILE: /run/secrets/db_password
+      MARIADB_AUTO_UPGRADE: "1"
+    secrets:
+      - db_root_password
+      - db_password
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./docker/mariadb.cnf:/etc/mysql/conf.d/zz-gunfight.cnf:ro
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  frontend:
+  backend:
+    internal: true
+
+volumes:
+  # Noms explicites : jamais partagés avec la production ni avec le dev.
+  txdata:
+    name: gunfight-staging-txdata
+  dbdata:
+    name: gunfight-staging-dbdata
+  maps:
+    name: gunfight-staging-maps
+
+secrets:
+  # Mêmes noms et mêmes chemins que la production : la préproduction vérifie
+  # exactement le mode de lecture des secrets de l'image.
+  license_key:
+    file: ${SECRETS_DIR:-./secrets}/license_key
+  db_password:
+    file: ${SECRETS_DIR:-./secrets}/db_password
+  db_root_password:
+    file: ${SECRETS_DIR:-./secrets}/db_root_password
+  steam_web_api_key:
+    file: ${SECRETS_DIR:-./secrets}/steam_web_api_key

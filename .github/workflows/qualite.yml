@@ -1,9 +1,9 @@
 name: Qualité
 
-# Vérifications rapides (moins de deux minutes) exécutées sur chaque pull
-# request et sur chaque envoi sur main. Ce job est déclaré « bloquant » dans la
-# protection de la branche main : une pull request ne peut pas être fusionnée
-# tant qu'il est rouge.
+# Contrôles statiques du dépôt : syntaxe, style, secrets, workflows et tests.
+# Les outils binaires sont épinglés par version ET par empreinte SHA256 : le
+# téléchargement est vérifié avant installation, comme les actions le sont par
+# leur SHA de commit.
 on:
   push:
     branches: [main]
@@ -18,25 +18,118 @@ concurrency:
   group: qualite-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ACTIONLINT_VERSION: "1.7.12"
+  ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+  HADOLINT_VERSION: "2.15.1"
+  HADOLINT_SHA256: "c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507"
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+  RUFF_VERSION: "0.17.6"
+  RUFF_SHA256: "94b33791f48cd54ab35ad673a443a5c001d3e6d87effeaba9899070b700d45f3"
+  LUACHECK_VERSION: "1.2.0-1"
+
 jobs:
   qualite:
     name: Qualité du dépôt
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Récupérer le dépôt
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - name: Configurer Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "20"
 
-      - name: Installer Lua et shellcheck
+      # Lua 5.4 sert à luac ; LuaRocks installe luacheck. gcc est nécessaire
+      # pour compiler LuaFileSystem, dépendance native de luacheck.
+      - name: Installer Lua, LuaRocks et shellcheck
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq lua5.4 shellcheck
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            lua5.4 luarocks gcc shellcheck
 
-      - name: Vérifications statiques (Lua, JSON, JS, shell, compose)
+      - name: Installer luacheck
+        run: sudo luarocks install luacheck "$LUACHECK_VERSION"
+
+      - name: Installer actionlint, hadolint, gitleaks et ruff
+        run: |
+          set -euo pipefail
+
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          sudo install -m 0755 "$RUNNER_TEMP/actionlint" /usr/local/bin/actionlint
+
+          curl -fsSL -o "$RUNNER_TEMP/hadolint" \
+            "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-x86_64"
+          echo "${HADOLINT_SHA256}  $RUNNER_TEMP/hadolint" | sha256sum -c -
+          sudo install -m 0755 "$RUNNER_TEMP/hadolint" /usr/local/bin/hadolint
+
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          sudo install -m 0755 "$RUNNER_TEMP/gitleaks" /usr/local/bin/gitleaks
+
+          curl -fsSL -o "$RUNNER_TEMP/ruff.tar.gz" \
+            "https://github.com/astral-sh/ruff/releases/download/${RUFF_VERSION}/ruff-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${RUFF_SHA256}  $RUNNER_TEMP/ruff.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/ruff.tar.gz" -C "$RUNNER_TEMP"
+          sudo install -m 0755 "$RUNNER_TEMP/ruff-x86_64-unknown-linux-gnu/ruff" /usr/local/bin/ruff
+
+      - name: Vérifier le Lua (luacheck)
+        run: |
+          luacheck --version
+          luacheck server-data/resources
+
+      - name: Vérifier les workflows (actionlint)
+        run: actionlint
+
+      - name: Vérifier le Dockerfile (hadolint)
+        run: hadolint --config .hadolint.yaml Dockerfile
+
+      - name: Chercher des secrets dans l'arbre (gitleaks)
+        run: gitleaks dir --no-banner --redact --config .gitleaks.toml .
+
+      - name: Vérifier le style Python (ruff)
+        run: ruff check tests/
+
+      # Le script local reste la référence : il refait ces contrôles quand les
+      # outils sont présents et valide aussi le JSON, Node, le shell et Compose.
+      - name: Contrôles locaux et fichiers Compose
         run: bash scripts/verifier.sh
 
       - name: Tests de cohérence du dépôt
         run: python3 -m unittest discover -s tests -v
+
+  securite:
+    name: Sécurité de l'historique
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Récupérer tout l'historique
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Installer gitleaks
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          sudo install -m 0755 "$RUNNER_TEMP/gitleaks" /usr/local/bin/gitleaks
+
+      # --all couvre toutes les branches et tous les tags récupérés grâce à
+      # fetch-depth: 0, pas seulement les commits du checkout de la PR.
+      - name: Chercher des secrets dans l'historique (gitleaks)
+        run: gitleaks git --no-banner --redact --config .gitleaks.toml --log-opts=--all .

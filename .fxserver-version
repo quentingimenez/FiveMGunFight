@@ -1,0 +1,22 @@
+# Version de FXServer téléchargée par l'image Docker.
+#
+# Format simple CLE=valeur, sans espace ni guillemet. Les trois clés sont
+# obligatoires : la CI refuse un fichier où FX_VERSION, FX_URL ou FX_SHA256 est
+# vide, et le build vérifie l'empreinte de l'archive avant de l'extraire.
+#
+# Procédure de mise à jour :
+#   1. choisir une version sur https://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/
+#      (canal recommandé) ;
+#   2. relever l'URL exacte de l'archive fx.tar.xz et sa taille ;
+#   3. la télécharger dans un dossier temporaire, puis calculer son empreinte :
+#        curl.exe -fL -o fx.tar.xz "<URL>"
+#        Get-FileHash -Algorithm SHA256 fx.tar.xz      # PowerShell
+#        sha256sum fx.tar.xz                           # Linux / WSL
+#   4. reporter FX_VERSION, FX_URL et FX_SHA256 ci-dessous, puis supprimer
+#      l'archive : elle ne doit jamais être commitée.
+#
+# Une montée de version se teste par une PR : le job smoke reconstruit l'image
+# et vérifie que le serveur démarre avec cette archive.
+FX_VERSION=38435
+FX_URL=https://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/38435-5c3065c261fb3ba82032fee6803f247198fec221/fx.tar.xz
+FX_SHA256=1b58507f68086ca3578c187f31e7b4a2259b7192d76b0c80cfc1af682fdf2be9

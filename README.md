@@ -168,19 +168,27 @@ Dockerfile              image du serveur (Debian + FXServer + server-data par d�
 docker-compose.yml      socle commun : fxserver + MariaDB (ne se lance jamais seul)
 docker-compose.dev.yml  surcouche dev : build local et montage de ./server-data
 docker-compose.prod.yml surcouche prod : image GHCR, volumes gunfight-prod-*
+docker-compose.staging.yml préproduction autonome : projet gunfight-staging, ports 30121/40121
 docker/entrypoint.sh    démarrage : secrets.cfg, amorçage de maps.json en prod
 docker/mariadb.cnf      réglages MariaDB (cache, connexions, encodage)
 docker/db/init/         scripts SQL exécutés au tout premier démarrage
 .env.example            modèle de configuration (.env = ta vraie config, secrète)
 start.bat / stop.bat / status.bat / console.bat
+.editorconfig           conventions d'indentation et de fins de ligne
 .github/workflows/      intégration continue (qualité, image Docker, test de démarrage)
 .github/dependabot.yml  mises à jour des actions et des images Docker
 .github/                modèle de pull request, CODEOWNERS, règles de branche
 scripts/verifier.sh     contrôles statiques (Lua, JSON, JS, shell, compose)
 scripts/sauvegarder.sh  sauvegarde de la production (base, txdata, maps)
-scripts/proteger-branche.sh  applique la protection de main (plan GitHub Pro requis)
+scripts/restaurer.sh    vérifie et extrait une sauvegarde hors production
+scripts/deployer.sh     déploie un digest, contrôle la santé, rollback
+scripts/verifier-sante.sh  santé HTTP, conteneurs, base, disque, redémarrages
+scripts/appliquer-protection.sh  lit ou applique la protection de main (GitHub Pro requis)
+scripts/proteger-branche.sh  ancien nom du script de protection (conservé)
 tests/                  tests automatiques du dépôt (unittest)
-docs/                   architecture, lobby, qualité, protection de branche
+docs/                   architecture, lobby, qualité, exploitation, décisions
+docs/runbooks/          incident, restauration, mise à jour, rotation des secrets
+docs/adr/               décisions d'architecture (protection, FXServer épinglé)
 .githooks/pre-push      refuse un envoi direct sur main
 CONTRIBUTING.md         branches, commits, pull requests, revue
 SECURITY.md             signalement de faille, gestion des secrets
@@ -368,7 +376,8 @@ contient que :
 - `docker-compose.yml` et `docker-compose.prod.yml` ;
 - `.env.example` (modèle) et `.env` (configuration, dont `IMAGE_REF`) ;
 - `docker/` (`mariadb.cnf` et `db/init/`, montés par le socle) ;
-- `scripts/sauvegarder.sh` (facultatif, mais recommandé).
+- `scripts/` (`deployer.sh`, `verifier-sante.sh`, `sauvegarder.sh`,
+  `restaurer.sh`) et, pour consultation, `docs/runbooks/`.
 
 `server-data/` n'est **pas** copié : il vient de l'image. Seul le volume des maps est
 conservé séparément pour que les maps créées en jeu survivent aux mises à jour.
@@ -386,14 +395,23 @@ conservé séparément pour que les maps créées en jeu survivent aux mises à 
    ```
    Ne mets jamais ce token dans `.env`, dans une commande enregistrée ou dans le dépôt.
 5. `cp .env.example .env`, remplis `LICENSE_KEY`, `MAX_PLAYERS` et les mots de passe
-   `MARIADB_*`, puis décommente `IMAGE_REF` et mets le tag publié, par exemple :
+   `MARIADB_*`, puis renseigne `IMAGE_REF` avec un **digest** (pas un tag), par exemple :
    ```
-   IMAGE_REF=ghcr.io/compte/fivemgunfight:v1.2.3
+   IMAGE_REF=ghcr.io/compte/fivemgunfight@sha256:0123456789abcdef...
    ```
-6. Télécharge l'image et démarre la pile :
+   Le digest se lit avec `docker buildx imagetools inspect ghcr.io/compte/fivemgunfight:v1.2.3`
+   (ligne `Digest`). Un tag peut être réécrit ; le digest non.
+6. Contrôle le plan, puis déploie :
+   ```
+   bash scripts/deployer.sh --dry-run
+   bash scripts/deployer.sh --force
+   ```
+   Le script tire l'image, attend la santé, vérifie `dynamic.json` et revient au
+   digest précédent en cas d'échec. Il ne lit jamais le contenu de `.env`. Pour un
+   premier déploiement manuel, les commandes équivalentes restent :
    ```
    docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --wait
    docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
    docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f fxserver
    ```
@@ -415,12 +433,36 @@ surcouche prod). Ne supprime pas ces volumes : `down -v` efface la base, txAdmin
 maps. Si tu reprends des données d'un ancien déploiement, copie-les dans les volumes,
 conteneurs arrêtés, **avant** le premier démarrage.
 
-**Mise à jour** : quand un tag `v*` est publié, la CI produit l'image correspondante.
-Change `IMAGE_REF` dans `.env`, puis `pull` et `up -d` avec la surcouche prod. Aucun
-build n'est nécessaire.
+**Mise à jour** : quand un tag `v*` est publié, la CI produit l'image et son
+digest. Valide-le en préproduction (`docker-compose.staging.yml`), sauvegarde,
+puis déploie :
 
-**Retour arrière** : remets l'ancien tag dans `IMAGE_REF`, puis `pull` et `up -d` avec la
-surcouche prod. Les volumes ne sont pas supprimés par ce changement d'image.
+```
+IMAGE_REF='ghcr.io/compte/fivemgunfight@sha256:...' bash scripts/deployer.sh --dry-run
+IMAGE_REF='ghcr.io/compte/fivemgunfight@sha256:...' bash scripts/deployer.sh --force
+```
+
+Le script mémorise le digest précédent dans `backups/.image-precedente` et
+effectue un rollback automatique si le contrôle de santé échoue. Procédure
+complète : [docs/runbooks/mise-a-jour.md](docs/runbooks/mise-a-jour.md).
+
+**Retour arrière** : `bash scripts/deployer.sh --force --rollback`, ou remets
+l'ancien digest dans `IMAGE_REF` et relance `--force`. Les volumes ne sont pas
+supprimés par un changement d'image. Voir
+[docs/runbooks/incident.md](docs/runbooks/incident.md).
+
+La préproduction se lance avec une image désignée par digest et n'expose pas
+les ports de production :
+
+```
+export STAGING_IMAGE_REF='ghcr.io/compte/fivemgunfight@sha256:...'
+docker compose -f docker-compose.staging.yml up -d --wait
+docker compose -f docker-compose.staging.yml down   # sans -v : volumes conservés
+```
+
+La variable `STAGING_IMAGE_REF` doit rester définie pour **toutes** les
+commandes Compose sur ce fichier, y compris `logs` et `down` : Compose résout
+le modèle entier à chaque appel.
 
 ### Sauvegarde et restauration
 
@@ -431,23 +473,36 @@ bash scripts/sauvegarder.sh
 ```
 
 Le script crée `backups/<horodatage>/` avec trois archives : `base.sql.gz` (dump
-MariaDB), `txdata.tar.gz` (volume txAdmin) et `maps.tar.gz` (données `gf_maps`), puis
-purge les sauvegardes de plus de 14 jours. Il utilise la surcouche prod et exige
-`IMAGE_REF`.
+MariaDB), `txdata.tar.gz` (volume txAdmin) et `maps.tar.gz` (données `gf_maps`),
+plus un `manifeste.sha256`. Il utilise la surcouche prod et exige `IMAGE_REF`.
 
-Pour restaurer, arrête d'abord `fxserver` (pour que la base et les maps ne bougent plus) :
+Options facultatives :
+
+- `AGE_RECIPIENT=age1…` : chiffre chaque archive en `.age` et supprime le clair ;
+- `RCLONE_REMOTE=s3:bucket/gunfight` : copie le dossier horodaté hors site ;
+- verrou `backups/.sauvegarde.lock` : refuse deux sauvegardes simultanées.
+
+La rétention conserve les **14 sauvegardes quotidiennes** les plus récentes
+(une par jour) et les **4 hebdomadaires** les plus récentes (une par semaine
+ISO), puis supprime les autres dossiers horodatés. Les archives `*.age` et
+`backups/` sont ignorés par Git.
+
+Pour vérifier une sauvegarde sans rien écraser :
 
 ```
-docker compose -f docker-compose.yml -f docker-compose.prod.yml stop fxserver
-gunzip -c backups/<horodatage>/base.sql.gz | \
-  docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T mariadb \
-  sh -c 'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'
+bash scripts/restaurer.sh --verifier backups/<horodatage>
 ```
 
-Pour `txdata` et `maps`, extrais chaque archive dans un conteneur jetable avec le volume
-correspondant monté (`tar -xzf ... -C /data`), puis relance `up -d`. Ces commandes de
-restauration ne sont pas automatisées : répète-les sur une copie avant d'en dépendre en
-production.
+Pour l'extraire hors production et l'importer dans une pile jetable
+(`gunfight-restore`, volumes séparés, aucun port publié) :
+
+```
+bash scripts/restaurer.sh --oui --destination restauration/<horodatage> backups/<horodatage>
+```
+
+La procédure complète, y compris la bascule réelle en production, est dans
+[docs/runbooks/restauration.md](docs/runbooks/restauration.md). Le script
+`restaurer.sh` ne touche **jamais** aux volumes `gunfight-prod-*`.
 
 ## 13. Problèmes fréquents
 
@@ -459,7 +514,7 @@ production.
 | `Could not authenticate server license key` | clé invalide, révoquée ou mal copiée (`\r` : réenregistre `.env` en UTF-8 sans retour chariot) |
 | Ressource `sessionmanager` / `hardcap` introuvable | n'existe plus dans les versions récentes de FXServer : les lignes ont été retirées de `server.cfg`, ne pas les remettre |
 | `docker compose up` échoue : « service fxserver has neither an image nor a build context » | le socle seul ne démarre pas : ajoute `-f docker-compose.dev.yml` (local) ou `-f docker-compose.prod.yml` (VPS) ; `start.bat` le fait déjà |
-| `IMAGE_REF` manquante ou vide (prod) | renseigne `IMAGE_REF=ghcr.io/...:tag` dans `.env` ; en développement, utilise la surcouche dev, qui n'en a pas besoin |
+| `IMAGE_REF` manquante ou vide (prod) | renseigne `IMAGE_REF=ghcr.io/...@sha256:...` dans `.env` ; en développement, utilise la surcouche dev, qui n'en a pas besoin |
 | `mariadb` reste `unhealthy` | regarde `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs mariadb` ; si le disque est plein ou le volume corrompu, `down -v` puis relance (**efface les données**) |
 | Impossible de se connecter | vérifie dans les journaux qu'il n'y a pas d'erreur rouge ; essaie `connect 127.0.0.1` |
 | Le port 30120 est déjà utilisé | un autre serveur FiveM tourne sur la machine : arrête-le |
@@ -471,6 +526,50 @@ production.
 | Comptes txAdmin, base ou maps vides en production | vérifie `docker volume ls` : la prod utilise `gunfight-prod-*`, pas `gunfight_txdata`/`gunfight_dbdata` ; un `up` avec la surcouche dev ne voit pas les données de prod |
 | `denied` ou `manifest unknown` au `pull` | l'image GHCR est privée : reconnecte-toi avec un token `read:packages` (`docker login ghcr.io`) |
 | Le smoke est « sauté » sur une PR | normal sans secret `CFX_LICENSE_KEY` (PR de fork ou Dependabot) : la CI le signale sans échouer |
+
+## 14. Exploitation et structure cible
+
+Les outils d'exploitation vivent dans `scripts/` et sont documentés par des
+runbooks courts, à suivre le jour de l'incident plutôt qu'à réinventer :
+
+| Besoin | Outil | Runbook |
+|---|---|---|
+| constater une panne | `scripts/verifier-sante.sh` | [incident](docs/runbooks/incident.md) |
+| déployer un digest | `scripts/deployer.sh` | [mise à jour](docs/runbooks/mise-a-jour.md) |
+| sauvegarder | `scripts/sauvegarder.sh` | [restauration](docs/runbooks/restauration.md) |
+| vérifier/extraire une sauvegarde | `scripts/restaurer.sh` | [restauration](docs/runbooks/restauration.md) |
+| remplacer un secret | procédures manuelles | [rotation](docs/runbooks/rotation-secrets.md) |
+| lire/appliquer la protection de `main` | `scripts/appliquer-protection.sh` | [protection](docs/protection-branche.md) |
+
+Structure cible :
+
+```
+production   docker-compose.yml + docker-compose.prod.yml, digest GHCR
+préprod      docker-compose.staging.yml, projet gunfight-staging, ports 30121/40121
+sauvegardes  backups/ (14 quotidiennes + 4 hebdomadaires, chiffrement age optionnel)
+restauration restauration/ (extraction locale, pile jetable gunfight-restore)
+décisions    docs/adr/ (protection de branche, FXServer épinglé)
+```
+
+Décisions consignées : [ADR 0001 — protection de branche](docs/adr/0001-protection-branche.md)
+et [ADR 0002 — FXServer épinglé](docs/adr/0002-fxserver-epingle.md).
+
+État réel à ne pas surinterpréter :
+
+- la protection GitHub de `main` est **toujours à activer** (plan gratuit) ;
+- `cosign` est appelé s'il est présent au déploiement, mais la CI ne signe pas
+  encore les images ; FXServer est en revanche épinglé par `.fxserver-version`
+  (URL + SHA256) et l'image est scannée par Trivy sur les PR ;
+- le conteneur tourne en **non-root** (`fivem`, uid 10001) avec `cap_drop: ALL`
+  et `no-new-privileges` ; le système de fichiers n'est pas encore monté en
+  `read_only` ;
+- la préproduction monte les **mêmes secrets** que la production (licence,
+  mots de passe base, clé Steam), mais dans des volumes et des noms distincts.
+  Ne la lance pas en parallèle sans accepter le partage de la licence et des
+  identifiants de base ;
+- les volumes `gunfight-prod-*` créés avant le passage non-root appartiennent à
+  `root` : avant le premier démarrage durci, applique la procédure de migration
+  décrite dans [docs/runbooks/mise-a-jour.md](docs/runbooks/mise-a-jour.md).
 
 ## Pour la suite (phase 2)
 

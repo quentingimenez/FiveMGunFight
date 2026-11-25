@@ -2,13 +2,17 @@ name: Docker
 
 # Construit l'image à chaque envoi, la publie sur GitHub Container Registry,
 # puis vérifie qu'elle démarre réellement avec toutes les ressources du serveur.
-# Le test de démarrage tourne aussi sur les pull requests : dans ce cas, aucune
-# image n'étant publiée, il la construit localement.
+# Sur les pull requests, aucune image n'est publiée : le job smoke la construit
+# localement, même sans secret. Un test statique sans licence (obligatoire)
+# vérifie le refus de la valeur d'exemple ; le démarrage complet n'a lieu que si
+# la clé CI est disponible. Une analyse Trivy bloque les PR sur les
+# vulnérabilités corrigeables CRITICAL/HIGH.
 #
 # Le secret CFX_LICENSE_KEY doit être une clé CI dédiée, jamais la clé du
-# serveur de production : seule cette vérification l'utilise. Les pull requests
-# Dependabot (et celles venues d'un fork) n'ont pas accès aux secrets Actions :
-# le job affiche alors une note et réussit sans rien lancer.
+# serveur de production : seule la vérification de démarrage l'utilise. Les pull
+# requests Dependabot (et celles venues d'un fork) n'ont pas accès aux secrets
+# Actions : le démarrage complet est alors sauté avec une note, mais le test
+# statique et la construction restent exécutés.
 on:
   push:
     branches: [main]
@@ -16,6 +20,9 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  # Relance hebdomadaire sur main, hors heures pleines (lundi 03:17 UTC).
+  schedule:
+    - cron: "17 3 * * 1"
 
 permissions:
   contents: read
@@ -23,11 +30,16 @@ permissions:
 jobs:
   image:
     name: Construire et publier l'image
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
+    # Une construction par référence : on annule les runs PR obsolètes, jamais
+    # un envoi sur main (l'image publiée doit rester la dernière du commit).
+    concurrency:
+      group: image-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -37,6 +49,42 @@ jobs:
       - name: Calculer le nom d'image en minuscules
         run: |
           echo "IMAGE_LC=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Lire la version FXServer épinglée
+        run: |
+          set -euo pipefail
+          if [ ! -f .fxserver-version ]; then
+            echo "::error::.fxserver-version manquant"
+            exit 1
+          fi
+          lire_cle() {
+            grep -E "^${1}=" .fxserver-version | head -n 1 | cut -d= -f2-
+          }
+          FX_VERSION="$(lire_cle FX_VERSION)"
+          FX_URL="$(lire_cle FX_URL)"
+          FX_SHA256="$(lire_cle FX_SHA256)"
+          if [ -z "$FX_VERSION" ] || [ -z "$FX_URL" ] || [ -z "$FX_SHA256" ]; then
+            echo "::error::FX_VERSION, FX_URL et FX_SHA256 sont obligatoires dans .fxserver-version"
+            exit 1
+          fi
+          if ! printf '%s' "$FX_VERSION" | grep -Eq '^[0-9]+$'; then
+            echo "::error::FX_VERSION doit être un numéro de build"
+            exit 1
+          fi
+          if ! printf '%s' "$FX_URL" | grep -Eq '^https://[^[:space:]]+$'; then
+            echo "::error::FX_URL doit être une URL HTTPS sans espace"
+            exit 1
+          fi
+          if ! printf '%s' "$FX_SHA256" | grep -Eq '^[0-9a-f]{64}$'; then
+            echo "::error::FX_SHA256 doit être une empreinte SHA256 en minuscules"
+            exit 1
+          fi
+          {
+            echo "FX_VERSION=$FX_VERSION"
+            echo "FX_URL=$FX_URL"
+            echo "FX_SHA256=$FX_SHA256"
+          } >> "$GITHUB_ENV"
+          echo "FXServer $FX_VERSION épinglé."
 
       - name: Configurer Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -60,26 +108,43 @@ jobs:
             type=ref,event=tag
             type=sha,format=long,prefix=ci-
 
-      # FX_URL et FX_SHA256 sont des variables de dépôt optionnelles (vides par
-      # défaut) : les définir fige la version de FXServer téléchargée.
+      # Sur PR, l'image est chargée localement pour Trivy et le smoke. Le
+      # docker exporter de Buildx ne sait pas exporter d'attestations avec
+      # --load : provenance et SBOM sont donc réservés aux images publiées.
       - name: Build et push
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            FX_URL=${{ vars.FX_URL }}
-            FX_SHA256=${{ vars.FX_SHA256 }}
+            FX_URL=${{ env.FX_URL }}
+            FX_SHA256=${{ env.FX_SHA256 }}
+          provenance: ${{ github.event_name == 'pull_request' && 'false' || 'mode=max' }}
+          sbom: ${{ github.event_name != 'pull_request' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Le scan tourne sur l'image PR réellement construite. Une vulnérabilité
+      # corrigeable CRITICAL/HIGH fait échouer le job.
+      - name: Scanner l'image (Trivy)
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_LC }}:ci-${{ github.sha }}
+          version: v0.76.2
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
 
   smoke:
     name: Vérifier le démarrage des ressources
     needs: image
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     permissions:
       contents: read
       packages: read
@@ -90,6 +155,7 @@ jobs:
       cancel-in-progress: false
     env:
       CFX_LICENSE_KEY: ${{ secrets.CFX_LICENSE_KEY }}
+      LOGS_SURS: "false"
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -98,13 +164,49 @@ jobs:
         run: |
           echo "IMAGE_LC=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
+      - name: Lire la version FXServer épinglée
+        run: |
+          set -euo pipefail
+          if [ ! -f .fxserver-version ]; then
+            echo "::error::.fxserver-version manquant"
+            exit 1
+          fi
+          lire_cle() {
+            grep -E "^${1}=" .fxserver-version | head -n 1 | cut -d= -f2-
+          }
+          FX_VERSION="$(lire_cle FX_VERSION)"
+          FX_URL="$(lire_cle FX_URL)"
+          FX_SHA256="$(lire_cle FX_SHA256)"
+          if [ -z "$FX_VERSION" ] || [ -z "$FX_URL" ] || [ -z "$FX_SHA256" ]; then
+            echo "::error::FX_VERSION, FX_URL et FX_SHA256 sont obligatoires dans .fxserver-version"
+            exit 1
+          fi
+          if ! printf '%s' "$FX_VERSION" | grep -Eq '^[0-9]+$'; then
+            echo "::error::FX_VERSION doit être un numéro de build"
+            exit 1
+          fi
+          if ! printf '%s' "$FX_URL" | grep -Eq '^https://[^[:space:]]+$'; then
+            echo "::error::FX_URL doit être une URL HTTPS sans espace"
+            exit 1
+          fi
+          if ! printf '%s' "$FX_SHA256" | grep -Eq '^[0-9a-f]{64}$'; then
+            echo "::error::FX_SHA256 doit être une empreinte SHA256 en minuscules"
+            exit 1
+          fi
+          {
+            echo "FX_VERSION=$FX_VERSION"
+            echo "FX_URL=$FX_URL"
+            echo "FX_SHA256=$FX_SHA256"
+          } >> "$GITHUB_ENV"
+          echo "FXServer $FX_VERSION épinglé."
+
       # Le runner ne reçoit jamais la clé sur une PR de fork ou de Dependabot :
-      # on le constate ici, puis les étapes suivantes se contentent de vérifier
-      # que le test est disponible.
+      # on le constate ici. Le test statique reste obligatoire ; seul le
+      # démarrage complet est conditionné par la clé.
       - name: Détecter la clé de licence CI
         run: |
           if [ -z "${CFX_LICENSE_KEY:-}" ]; then
-            echo "::notice::Le secret CFX_LICENSE_KEY n'est pas disponible (PR de fork, Dependabot ou secret non configuré) : test de démarrage ignoré."
+            echo "::notice::Le secret CFX_LICENSE_KEY n'est pas disponible (PR de fork, Dependabot ou secret non configuré) : démarrage complet ignoré, test statique sans licence exécuté."
             echo "disponible=false" >> "$GITHUB_ENV"
           else
             echo "disponible=true" >> "$GITHUB_ENV"
@@ -113,24 +215,50 @@ jobs:
       # Même étiquette que celle publiée par le job image (metadata-action) :
       # ci-<sha long>, grâce à type=sha,format=long,prefix=ci-.
       - name: Construire l'image localement (pull request)
-        if: github.event_name == 'pull_request' && env.disponible == 'true'
+        if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          docker build --tag "$IMAGE_LC:ci-${{ github.sha }}" .
+          docker build \
+            --tag "$IMAGE_LC:ci-${{ github.sha }}" \
+            --build-arg "FX_URL=$FX_URL" \
+            --build-arg "FX_SHA256=$FX_SHA256" \
+            .
 
-      - name: Connexion à GHCR (envoi ou tag)
-        if: github.event_name != 'pull_request' && env.disponible == 'true'
+      - name: Connexion à GHCR (envoi, tag ou planification)
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Récupérer l'image publiée (envoi ou tag)
-        if: github.event_name != 'pull_request' && env.disponible == 'true'
+      - name: Récupérer l'image publiée (envoi, tag ou planification)
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           docker pull "$IMAGE_LC:ci-${{ github.sha }}"
+
+      # Check obligatoire qui fonctionne sans secret : l'entrypoint doit refuser
+      # la valeur d'exemple et sortir en code 1. Le conteneur est conservé pour
+      # que le nettoyage final le supprime même en cas d'échec.
+      - name: Vérifier le refus de la licence d'exemple (sans secret)
+        run: |
+          set +e
+          docker run --name smoke-static \
+            -e LICENSE_KEY=change_moi \
+            "$IMAGE_LC:ci-${{ github.sha }}" > smoke-static.log 2>&1
+          statut=$?
+          set -e
+          cat smoke-static.log
+          if [ "$statut" -ne 1 ]; then
+            echo "::error::Le conteneur devait sortir en code 1 sans licence valide (obtenu : $statut)."
+            exit 1
+          fi
+          if ! grep -q "LICENSE_KEY" smoke-static.log; then
+            echo "::error::Le message d'erreur ne mentionne pas LICENSE_KEY."
+            exit 1
+          fi
+          echo "Refus sans licence vérifié (code 1 et message LICENSE_KEY)."
 
       - name: Démarrer le serveur
         if: env.disponible == 'true'
@@ -207,8 +335,44 @@ jobs:
           done
           echo "Ressources scannées et ressources gunfight démarrées."
 
-      # Même si une étape précédente a échoué : le conteneur ne doit pas rester
-      # sur le runner, et son nom doit être libre au prochain run.
+      # Même en échec : on rassemble les journaux, puis on vérifie qu'aucune
+      # clé de licence n'y figure avant de publier l'artefact. Le grep ne
+      # l'affiche jamais (sortie redirigée vers /dev/null).
+      - name: Collecter les journaux
+        if: always()
+        run: |
+          set -uo pipefail
+          if docker inspect smoke >/dev/null 2>&1; then
+            docker logs smoke > smoke.log 2>&1 || true
+          else
+            : > smoke.log
+          fi
+          touch smoke-static.log
+          if [ -n "${CFX_LICENSE_KEY:-}" ]; then
+            for fichier in smoke.log smoke-static.log; do
+              if grep -Fq -- "$CFX_LICENSE_KEY" "$fichier"; then
+                echo "::error::La clé de licence apparaît dans $fichier : artefact non publié."
+                exit 1
+              fi
+            done
+          fi
+          echo "LOGS_SURS=true" >> "$GITHUB_ENV"
+
+      - name: Publier les journaux
+        if: always() && env.LOGS_SURS == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: journaux-smoke
+          path: |
+            smoke.log
+            smoke-static.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # Même si une étape précédente a échoué : les conteneurs ne doivent pas
+      # rester sur le runner, et leurs noms être libres au prochain run.
       - name: Nettoyer
         if: always()
-        run: docker rm -f smoke || true
+        run: |
+          docker rm -f smoke 2>/dev/null || true
+          docker rm -f smoke-static 2>/dev/null || true

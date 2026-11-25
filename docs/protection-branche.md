@@ -52,8 +52,8 @@ Deux solutions, au choix :
 - **GitHub Pro** (~4 $/mois, dépôt conservé privé) — recommandé, aucun code
   exposé ;
 - **dépôt public** — la protection devient gratuite ; le dépôt ne contient
-  aucun secret (vérifié : `.env` et `server-data/secrets.cfg` sont ignorés et
-  les tests le contrôlent), mais tout le code et la configuration de jeu
+  aucun secret (vérifié : `.env`, `secrets/` et `server-data/secrets.cfg` sont
+  ignorés et les tests le contrôlent), mais tout le code et la configuration de jeu
   deviennent visibles.
 
 La procédure ci-dessous s'applique aussitôt après le changement de plan.
@@ -89,13 +89,15 @@ La procédure ci-dessous s'applique aussitôt après le changement de plan.
 Identique à la procédure A, à partir du fichier de règles versionné :
 
 ```bash
-bash scripts/proteger-branche.sh
+bash scripts/appliquer-protection.sh --check   # lit l'état, explique un refus de plan
+bash scripts/appliquer-protection.sh --apply   # envoie le JSON versionné
 ```
 
 Le script vérifie l'authentification `gh`, applique
 `.github/branch-protection.json` avec `PUT /repos/{owner}/{repo}/branches/main/protection`,
 puis relit la configuration et affiche l'état. Il échoue proprement avec le
-message à afficher si le plan ne le permet pas encore.
+message à afficher si le plan ne le permet pas encore, ne paie rien et ne
+modifie jamais le JSON. `scripts/proteger-branche.sh` reste l'ancien nom.
 
 ## Vérifier que la protection est active
 
