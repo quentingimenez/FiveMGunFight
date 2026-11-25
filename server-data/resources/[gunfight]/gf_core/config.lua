@@ -96,6 +96,11 @@ Config.DefaultSelection = { 'carbine', 'pistol' }
 
 -- Nombre d'armes à choisir et gilet pare-balles donné avec
 Config.SelectionCount = 2
+
+-- Changement d'arme : la roue de GTA est désactivée. Les touches 1, 2...
+-- sortent l'arme choisie en 1re, 2e... position (modifiable par chaque joueur
+-- dans Paramètres > Raccourcis clavier > FiveM).
+Config.WeaponSlots = 2
 Config.SelectionArmour = 100
 
 -- Équipements fixes (Redzone). armour = gilet pare-balles (0 à 100). Noms des armes :
