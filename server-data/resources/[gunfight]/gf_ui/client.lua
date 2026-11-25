@@ -115,3 +115,8 @@ RegisterCommand('-gf_scoreboard', function()
     SendNUIMessage({ type = 'scoreboard_visible', visible = false })
 end, false)
 RegisterKeyMapping('+gf_scoreboard', 'Gunfight : afficher le classement', 'keyboard', 'Z')
+
+-- Résultat du match, conservé à l'écran jusqu'au changement de mode.
+RegisterNetEvent('gf_ui:match_results', function(data)
+    SendNUIMessage({ type = 'match_results', data = data })
+end)
