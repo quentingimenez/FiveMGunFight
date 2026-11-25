@@ -165,5 +165,5 @@ GF_ALLOW_MAIN=1 git push
 | `HTTP 403 ... Upgrade to GitHub Pro` | dépôt privé en plan gratuit | passer à GitHub Pro ou rendre le dépôt public, puis relancer |
 | Les checks n'apparaissent pas dans la liste | aucun run de CI sur une pull request n'existe encore | ouvrir une pull request, attendre le premier run, puis éditer la règle |
 | Une pull request reste « blocked » | un check requis est en échec ou jamais lancé | corriger et relancer ; vérifier les noms exacts des jobs dans `.github/workflows/` |
-| Fusion impossible malgré tout vert | branche en retard sur `main` (checks stricts) | mettre à jour la branche (`git merge origin/main` puis envoi) |
+| Fusion impossible malgré tout vert | branche en retard sur `main` (checks stricts) | rebaser la branche (`git rebase origin/main` puis `git push --force-with-lease`) |
 | Urgence en production | `enforce_admins: true` bloque aussi le propriétaire | modifier temporairement la règle dans l'interface, corriger, puis remettre la règle immédiatement après |

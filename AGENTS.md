@@ -163,11 +163,26 @@ gh pr view --json number,state,mergeable,statusCheckRollup
   `Construire et publier l'image` (3–8 min) et `Vérifier le démarrage des
   ressources` (10–20 min, sauté avec une note si le secret CI est absent).
 - **Rouge** : corriger sur la même branche, commit additionnel, `git push`, puis
-  relancer le suivi. Pas de réécriture d'historique après le début de la revue,
-  pas de force-push, pas de désactivation ni de contournement d'un check
+  relancer le suivi. Pas de désactivation ni de contournement d'un check
   (`--admin` interdit).
-- **Conflit avec `main`** : `git fetch origin`, `git merge origin/main` sur la
-  branche, résoudre, push, puis attendre les nouveaux checks. Pas de rebase.
+- **Branche en retard ou en conflit avec `main`** : rebaser, jamais de merge de
+  `main` dans la branche :
+
+  ```bash
+  git fetch origin
+  git rebase origin/main          # résoudre chaque conflit, puis git rebase --continue
+  python -m unittest discover -s tests -v && bash scripts/verifier.sh
+  git push --force-with-lease
+  ```
+
+  La branche reste une suite linéaire de commits au-dessus de `main`, sans
+  commit de fusion, et la PR ne montre que ses propres changements. Les checks
+  étant stricts (branche à jour exigée), c'est aussi la manière de débloquer une
+  PR verte mais en retard.
+- **Force-push** : uniquement `--force-with-lease`, uniquement sur la branche de
+  la PR en cours. Jamais sur `main` (refusé par la protection de branche et par
+  le hook `pre-push`). Si un relecteur a déjà commenté, le prévenir dans la PR
+  que la branche a été rebasée.
 - Une PR ne se laisse jamais « en attente » en fin de session : elle est menée
   jusqu'à la fusion ou explicitement signalée comme bloquée (§ 7).
 
