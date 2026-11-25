@@ -18,7 +18,11 @@
 -- =============================================================================
 Config = {}
 
-Config.MinPlayers = 2          -- joueurs nécessaires pour lancer automatiquement
+-- Recherche de partie (/attack) : la partie se lance quand PlayersToStart
+-- joueurs cherchent ; au plus MaxPlayers joueurs par partie (40 = 20 contre 20).
+-- Un admin peut lancer de force avec /startround, quel que soit le nombre.
+Config.PlayersToStart = 16
+Config.MaxPlayers = 40
 Config.WinRounds = 2           -- manches à gagner pour remporter le match
 Config.SelectTime = 10         -- secondes pour choisir ses armes (gelé dans la voiture)
 Config.PlacementTime = 15      -- secondes de placement (zone fermée aux attaquants)

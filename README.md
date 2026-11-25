@@ -104,13 +104,14 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | Commande | Qui | Effet |
 |---|---|---|
 | `/lobby` | tous | retour au lobby |
-| `/attack` | tous | rejoindre l'Attaque de zone |
+| `/attack` | tous | rechercher une partie d’Attaque de zone |
+| `/annuler` | tous | quitter la file d’Attaque de zone |
 | `/redzone` | tous | rejoindre la Redzone |
 | `/pos` | tous | affiche ta position (pour créer de nouvelles zones) |
 | `/lobbyui` | tous | réaffiche l'interface du lobby si elle a disparu |
 | touche **Z** (maintenue) | tous | classement |
 | touches **1** et **2** | tous | sortir l'arme choisie en 1re / 2e position (la roue des armes de GTA est désactivée) |
-| `/startround` | admin | force le lancement d'une manche (marche même seul pour tester) |
+| `/startround` | admin | force le lancement d’un match avec les joueurs en file (possible en solo) |
 | `/endmatch` | admin | arrête le match, scores à zéro |
 | `/nextzone` | admin | zone d'attaque suivante (hors match) |
 | `/setteam [id] [A\|B]` | admin | change l'équipe d'un joueur |
@@ -122,7 +123,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
 
-> **Tester seul** : `/attack` puis `/startround`. Comme l'autre équipe est vide,
+> **Recherche** : le match démarre dès que 16 joueurs sont en file. Il accepte jusqu’à 40 joueurs (20 contre 20). Les places sont attribuées dans l’ordre d’inscription. Les joueurs en attente passent au prochain match, et les participants reviennent au lobby à la fin du leur.
+
+> **Tester seul** : tape `/startround` en tant qu’admin. Comme l'autre équipe est vide,
 > la manche ne se termine qu'au chrono (mode test).
 
 ## 5. Créer des maps en jeu (`/editor`)
@@ -533,7 +536,7 @@ La procédure complète, y compris la bascule réelle en production, est dans
 | `mariadb` reste `unhealthy` | regarde `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs mariadb` ; si le disque est plein ou le volume corrompu, `down -v` puis relance (**efface les données**) |
 | Impossible de se connecter | vérifie dans les journaux qu'il n'y a pas d'erreur rouge ; essaie `connect 127.0.0.1` |
 | Le port 30120 est déjà utilisé | un autre serveur FiveM tourne sur la machine : arrête-le |
-| Le mode ne démarre pas | il faut 2 joueurs (un par équipe) ou `/startround` en admin |
+| Le mode ne démarre pas | il faut 16 joueurs en file ou `/startround` en admin |
 | L'interface du lobby ne s'affiche pas | tape `/lobbyui` ; vérifie que `gf_lobby` est démarrée et que `data/characters.json` est accessible |
 | Le personnage n'apparaît pas / est invisible | attends la fin du fondu de connexion ; vérifie que `gf_core` et `gf_lobby` sont démarrées dans cet ordre |
 | Je veux recommencer la création de personnage | un admin lance `/resetchar [id]` ; le joueur retourne à l'écran de création |

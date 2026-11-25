@@ -516,8 +516,14 @@ RegisterCommand('lobby', function(src)
     if src > 0 then setMode(src, 'lobby') end
 end, false)
 
+-- /attack : lance la recherche de partie (file d'attente de gf_attack)
 RegisterCommand('attack', function(src)
-    if src > 0 then setMode(src, 'attack') end
+    if src <= 0 then return end
+    if GetResourceState('gf_attack') == 'started' then
+        exports.gf_attack:Search(src)
+    else
+        notify(src, 'Le mode Attaque de zone est indisponible pour le moment.')
+    end
 end, false)
 
 RegisterCommand('redzone', function(src)
@@ -530,6 +536,12 @@ RegisterCommand('setmode', function(src, args)
     local target, mode = tonumber(args[1]), args[2]
     if not target or not GetPlayerName(target) or not Config.Modes[mode or ''] then
         if src > 0 then notify(src, 'Utilisation : /setmode [id] [lobby|attack|redzone]') else print('setmode [id] [lobby|attack|redzone]') end
+        return
+    end
+    if mode == 'attack' and GetResourceState('gf_attack') == 'started'
+        and not exports.gf_attack:CanJoin() then
+        if src > 0 then notify(src, 'Le match est déjà en cours ou complet.')
+        else print('Le match est déjà en cours ou complet.') end
         return
     end
     setMode(target, mode)
