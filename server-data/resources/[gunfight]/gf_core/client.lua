@@ -111,6 +111,32 @@ local function applyLoadout(ped, name)
     SetPedArmour(ped, lo.armour or 0)
 end
 
+-- Armes au choix : list = { { name, ammo, components = {}, tint }, ... }
+local function applyWeapons(ped, list, armour)
+    RemoveAllPedWeapons(ped, true)
+    for _, w in ipairs(list or {}) do
+        local hash = joaat(w.name)
+        GiveWeaponToPed(ped, hash, w.ammo or 250, false, false)
+        for _, comp in ipairs(w.components or {}) do
+            GiveWeaponComponentToPed(ped, hash, joaat(comp))
+        end
+        if w.tint then SetPedWeaponTintIndex(ped, hash, w.tint) end
+    end
+    if list and list[1] then SetCurrentPedWeapon(ped, joaat(list[1].name), true) end
+    SetPedArmour(ped, armour or 0)
+end
+
+-- Gèle / dégèle le joueur ET son véhicule s'il est dedans
+local function setFrozen(on)
+    local ped = PlayerPedId()
+    FreezeEntityPosition(ped, on)
+    local veh = GetVehiclePedIsIn(ped, false)
+    if veh ~= 0 then
+        FreezeEntityPosition(veh, on)
+        SetVehicleEngineOn(veh, true, true, false)
+    end
+end
+
 local function setProtected(on)
     protected = on
     SetEntityInvincible(PlayerPedId(), on)
@@ -149,11 +175,14 @@ RegisterNetEvent('gf_core:spawn', function(o)
             end
 
             -- L'ancien véhicule est supprimé par le serveur ; on oublie la référence
-            if modeVehicle and DoesEntityExist(modeVehicle) then
-                SetEntityAsMissionEntity(modeVehicle, true, true)
-                DeleteVehicle(modeVehicle)
+            -- (sauf keepVehicle : il reste dans la manche)
+            if not o.keepVehicle then
+                if modeVehicle and DoesEntityExist(modeVehicle) then
+                    SetEntityAsMissionEntity(modeVehicle, true, true)
+                    DeleteVehicle(modeVehicle)
+                end
+                modeVehicle = nil
             end
-            modeVehicle = nil
 
             local x, y, z = o.x + 0.0, o.y + 0.0, o.z + 0.0
             RequestCollisionAtCoord(x, y, z)
@@ -173,17 +202,25 @@ RegisterNetEvent('gf_core:spawn', function(o)
             SetEntityHeading(ped, (o.heading or 0.0) + 0.0)
 
             setSpectator(o.spectator and true or false)
-            if not o.spectator then applyLoadout(ped, o.loadout) end
+            if not o.spectator then
+                if o.weapons then
+                    applyWeapons(ped, o.weapons, o.armour) -- armes au choix
+                else
+                    applyLoadout(ped, o.loadout)           -- équipement fixe
+                end
+            end
             setProtected((o.protected or o.spectator) and true or false)
             FreezeEntityPosition(ped, (o.freeze or o.spectator) and true or false)
 
             if o.vehicle and not o.spectator then
                 local p = GetEntityCoords(ped)
+                FreezeEntityPosition(ped, false) -- un personnage gelé ne monte pas en voiture
                 giveVehicle(o.vehicle, p.x, p.y, p.z, (o.heading or 0.0) + 0.0)
+                if o.freeze then setFrozen(true) end
             end
 
             -- Événement local pour les modes (ex. gf_redzone suit le véhicule)
-            TriggerEvent('gf_core:spawned', { vehicle = modeVehicle })
+            TriggerEvent('gf_core:spawned', { vehicle = modeVehicle, spectator = o.spectator and true or false })
         end)
 
         if not ok then
@@ -213,7 +250,11 @@ RegisterNetEvent('gf_core:modeChanged', function()
 end)
 
 RegisterNetEvent('gf_core:freeze', function(on)
-    FreezeEntityPosition(PlayerPedId(), on)
+    setFrozen(on)
+end)
+
+RegisterNetEvent('gf_core:giveWeapons', function(list, armour)
+    applyWeapons(PlayerPedId(), list, armour)
 end)
 
 -- ---------------------------------------------------------------- Boucle permanente

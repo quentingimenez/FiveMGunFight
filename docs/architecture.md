@@ -138,10 +138,10 @@ modifiées, démarrées avant nos ressources.
 
 | Ressource | Responsabilité | Fichiers |
 |---|---|---|
-| `gf_core` | base commune : modes, apparition, armes, morts, anti-tir entre coéquipiers, multi-kills | `config.lua` (partagé), `server.lua`, `client.lua` |
-| `gf_ui` | interface NUI : HUD, kill feed, dégâts, annonces, classement | `html/` (page `ui_page`), `client.lua` |
+| `gf_core` | base commune : modes, apparition, armes (catalogue, armes possédées, choix validé côté serveur), morts, anti-tir entre coéquipiers, multi-kills | `config.lua` (partagé), `server.lua`, `client.lua` |
+| `gf_ui` | interface NUI : HUD, kill feed, dégâts, annonces, classement, menu de choix des armes | `html/` (page `ui_page`), `client.lua` |
 | `gf_maps` | éditeur de maps en jeu (`/editor`), liste (`/maps`), stockage `data/maps.json` | `html/`, `server.lua`, `client.lua` |
-| `gf_attack` | mode Attaque de zone : deux équipes, manches, chrono | `config.lua`, `server.lua`, `client.lua` |
+| `gf_attack` | mode Attaque de zone : deux équipes, manches en 3 phases (choix des armes, placement, combat), voitures, spectateur sur les alliés | `config.lua`, `server.lua`, `client.lua` |
 | `gf_redzone` | mode Redzone : zone libre, prise de véhicule, podium | `config.lua`, `server.lua`, `client.lua` |
 
 Chaque ressource déclare ses scripts dans `fxmanifest.lua`

@@ -128,9 +128,13 @@ end
 --- Fait apparaître un joueur.
 --- opts = { x, y, z, heading, loadout = 'attack'|'redzone'|nil,
 ---          protected = bool, freeze = bool, spectator = bool,
----          vehicle = 'modele' (le joueur apparaît dans ce véhicule) }
+---          vehicle = 'modele' (le joueur apparaît dans ce véhicule),
+---          keepVehicle = bool (ne pas supprimer le véhicule précédent),
+---          weapons = liste de BuildWeaponList (armes au choix), armour = 0..100 }
 local function spawn(src, opts)
-    deleteVehicle(src) -- l'ancien véhicule disparaît à chaque réapparition
+    -- L'ancien véhicule disparaît à chaque réapparition, sauf si keepVehicle
+    -- (ex. un joueur mort qui passe spectateur : sa voiture reste dans la manche)
+    if not opts.keepVehicle then deleteVehicle(src) end
     Player(src).state:set('gf_protected', (opts.protected or opts.spectator) and true or false, true)
     print(('[gf_core] spawn %s mode=%s'):format(src, tostring(Modes[src])))
     -- Fenêtre courte : un ready qui arrive juste après le spawn en cours ne
@@ -205,6 +209,73 @@ exports('Freeze', freeze)
 exports('IsAdmin', isAdmin)
 exports('Notify', notify)
 exports('DeleteVehicle', deleteVehicle)
+
+-- ---------------------------------------------------------------- Armes au choix
+-- Armes possédées par un joueur : liste d'entrées { id, label, category }.
+-- Aujourd'hui tout le monde a Config.StarterWeapons ; le futur système de
+-- caisses ajoutera ici les armes gagnées (lues en base de données).
+local function ownedWeapons(src)
+    local list = {}
+    for _, id in ipairs(Config.StarterWeapons) do
+        local w = Config.Weapons[id]
+        if w then list[#list + 1] = { id = id, label = w.label, category = w.category } end
+    end
+    return list
+end
+
+local function owns(src, id)
+    for _, w in ipairs(ownedWeapons(src)) do
+        if w.id == id then return true end
+    end
+    return false
+end
+
+-- Valide un choix envoyé par le client : Config.SelectionCount armes
+-- différentes, toutes possédées. Sinon : choix par défaut.
+local function resolveSelection(src, ids)
+    local result, seen = {}, {}
+    if type(ids) == 'table' then
+        for _, id in ipairs(ids) do
+            if type(id) == 'string' and not seen[id] and owns(src, id) and #result < Config.SelectionCount then
+                seen[id] = true
+                result[#result + 1] = id
+            end
+        end
+    end
+    for _, id in ipairs(Config.DefaultSelection) do
+        if #result >= Config.SelectionCount then break end
+        if not seen[id] and owns(src, id) then
+            seen[id] = true
+            result[#result + 1] = id
+        end
+    end
+    return result
+end
+
+-- Liste d'armes prête à donner (accessoires et couleur compris)
+local function buildWeaponList(ids)
+    local list = {}
+    for _, id in ipairs(ids or {}) do
+        local w = Config.Weapons[id]
+        if w then
+            list[#list + 1] = { name = w.name, ammo = w.ammo or 250, components = w.components, tint = w.tint }
+        end
+    end
+    return list
+end
+
+-- Donne les armes choisies (ids) à un joueur déjà apparu
+local function giveWeapons(src, ids, armour)
+    TriggerClientEvent('gf_core:giveWeapons', src, buildWeaponList(ids), armour or Config.SelectionArmour)
+end
+
+exports('GetOwnedWeapons', ownedWeapons)
+exports('ResolveSelection', resolveSelection)
+exports('BuildWeaponList', buildWeaponList)
+exports('GiveWeapons', giveWeapons)
+exports('GetSelectionSettings', function()
+    return { count = Config.SelectionCount, armour = Config.SelectionArmour }
+end)
 
 -- ---------------------------------------------------------------- Démarrage
 CreateThread(function()
