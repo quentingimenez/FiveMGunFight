@@ -5,20 +5,37 @@
 --  Pas de réapparition pendant une manche : la dernière équipe en vie gagne.
 --  Si le temps est écoulé, c'est la DÉFENSE qui gagne.
 --  Les rôles s'inversent à chaque manche. Premier à WinRounds manches = victoire.
+--
+--  Déroulement d'une manche :
+--   1. Choix des armes (SelectTime) : chacun apparaît DANS SA VOITURE, gelé,
+--      et choisit 2 armes parmi celles qu'il possède.
+--   2. Placement (PlacementTime) : on peut rouler. Les défenseurs se placent,
+--      les attaquants ne peuvent PAS encore entrer dans la zone.
+--   3. Combat (RoundTime) : la zone est ouverte. Les voitures restent : on peut
+--      descendre et remonter. Un joueur mort regarde ses alliés (clic gauche /
+--      clic droit pour changer de joueur).
 -- =============================================================================
 Config = {}
 
 Config.MinPlayers = 2          -- joueurs nécessaires pour lancer automatiquement
 Config.WinRounds = 5           -- manches à gagner pour remporter le match
-Config.PrepTime = 15           -- secondes de préparation (joueurs gelés)
-Config.RoundTime = 180         -- durée max d'une manche (secondes)
+Config.SelectTime = 10         -- secondes pour choisir ses armes (gelé dans la voiture)
+Config.PlacementTime = 15      -- secondes de placement (zone fermée aux attaquants)
+Config.RoundTime = 180         -- durée max du combat (secondes)
 Config.EndDelay = 8            -- pause entre deux manches (secondes)
 Config.MatchEndDelay = 15      -- pause après la fin d'un match (secondes)
 Config.SwapSidesEveryRound = true
 
-Config.AttackSpawnDistance = 70.0  -- distance (m) des attaquants AU-DELÀ du bord de la zone
-Config.SpawnSpread = 8.0           -- dispersion aléatoire (m) autour du point d'apparition
-Config.OutOfZoneDamage = 8         -- dégâts / seconde pour un défenseur hors de la zone
+Config.Vehicle = 'sultan'          -- voiture donnée en début de manche (nom de modèle GTA)
+Config.VehicleSpacing = 5.0        -- écart (m) entre les voitures d'une même équipe
+
+Config.AttackSpawnDistance = 70.0  -- (zones de secours) distance des attaquants au-delà du bord
+Config.OutOfZoneDamage = 8         -- dégâts / seconde pour un défenseur hors de la zone (combat)
+
+-- Opacité du remplissage rouge de la zone sur la carte (0 à 255).
+-- 255 = rouge plein ; plus bas = on voit les rues à travers, mais les cercles
+-- qui composent le remplissage se devinent un peu là où ils se chevauchent.
+Config.MapFillAlpha = 210
 
 Config.Teams = {
     A = { label = 'Équipe Rouge', color = '#ff5a5f' },

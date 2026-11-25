@@ -187,6 +187,85 @@ html, body {
     100% { transform: scale(1);   opacity: 1; }
 }
 
+/* ------------------------------------------------------------------ Choix des armes */
+#loadout {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, .35), rgba(0, 0, 0, .7));
+}
+.lo-panel {
+    width: min(760px, 92vw);
+    max-height: 86vh;
+    overflow-y: auto;
+    background: var(--bg-strong);
+    border-radius: 14px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, .6);
+}
+.lo-head { display: flex; justify-content: space-between; align-items: center; }
+.lo-title { font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+.lo-sub { color: var(--muted); font-size: 13px; }
+.lo-timer { font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.lo-timer.low { color: var(--red); }
+
+.lo-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lo-slot {
+    border: 2px dashed rgba(255, 255, 255, .2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-weight: 700;
+    min-height: 52px;
+}
+.lo-slot small { display: block; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+.lo-slot.filled { border-style: solid; border-color: var(--red); background: rgba(255, 90, 95, .1); }
+
+.lo-grid { display: flex; flex-direction: column; gap: 10px; }
+.lo-cat { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.lo-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.lo-card {
+    font: inherit;
+    color: var(--text);
+    background: rgba(255, 255, 255, .06);
+    border: 2px solid transparent;
+    border-radius: 9px;
+    padding: 10px 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+}
+.lo-card:hover { background: rgba(255, 255, 255, .12); }
+.lo-card.on { border-color: var(--red); background: rgba(255, 90, 95, .18); }
+.lo-card .n {
+    display: inline-block;
+    margin-right: 6px;
+    min-width: 18px;
+    border-radius: 9px;
+    background: var(--red);
+    color: #0c0e14;
+    font-size: 11px;
+    text-align: center;
+}
+
+.lo-ok {
+    font: inherit;
+    align-self: flex-end;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    padding: 10px 26px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.lo-ok:disabled { opacity: .4; cursor: not-allowed; }
+.lo-ok.done { background: #3ddc84; color: #0c0e14; }
+
 /* ------------------------------------------------------------------ Annonces */
 #announce {
     position: absolute;

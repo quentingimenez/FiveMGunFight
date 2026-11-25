@@ -3,10 +3,17 @@
 Serveur FiveM « standalone » (sans ESX/QBCore), qui tourne dans **Docker**.
 Deux modes de jeu :
 
-- **Attaque de zone** (`/attack`) : 2 équipes. L'une attaque une zone, l'autre la défend.
-  Pas de réapparition pendant la manche : **la dernière équipe en vie gagne**.
-  Si le temps est écoulé, la défense gagne. Les rôles s'inversent à chaque manche,
-  premier à 5 manches gagne le match.
+- **Attaque de zone** (`/attack`) : 2 équipes. L'une attaque une zone (en rouge), l'autre la défend.
+  Chaque manche se déroule en 3 temps :
+  1. **Choix des armes (10 s)** : tout le monde apparaît **dans sa voiture**, gelé, et choisit
+     **2 armes** parmi celles qu'il possède (plus tard : armes customisées gagnées dans des caisses).
+  2. **Placement (15 s)** : on peut rouler ; les défenseurs se placent, la zone est **fermée aux
+     attaquants**.
+  3. **Combat** : la zone s'ouvre. Les voitures restent, on peut en descendre et y remonter.
+     Pas de réapparition : **la dernière équipe en vie gagne**. Un joueur mort regarde ses
+     **alliés** (clic gauche / clic droit pour changer). Temps écoulé = victoire de la défense.
+
+  Les rôles s'inversent à chaque manche, premier à 5 manches gagne le match.
 - **Redzone** (`/redzone`) : chacun pour soi. Une seule partie à la fois (10 min).
   On apparaît **à pied** près de la zone, on va au **point véhicule** (marqueur bleu) et on
   appuie sur **E** pour monter dans sa voiture, on roule jusqu'à la zone rouge, on appuie sur
@@ -149,9 +156,9 @@ Les autres réglages sont dans les fichiers `config.lua` :
 
 | Fichier | Contenu |
 |---|---|
-| `server-data/resources/[gunfight]/gf_core/config.lua` | lobby, armes, gilet, régénération, délai des multi-kills |
+| `server-data/resources/[gunfight]/gf_core/config.lua` | lobby, catalogue d'armes et armes de départ (choix des 2 armes), gilet, régénération, délai des multi-kills |
 | `server-data/resources/[gunfight]/gf_lobby/config.lua` | scène et caméra du lobby, taille d'escouade, catalogue des modes, apparence |
-| `server-data/resources/[gunfight]/gf_attack/config.lua` | durées, manches gagnantes, couleurs d'équipes, zones de secours |
+| `server-data/resources/[gunfight]/gf_attack/config.lua` | durées (choix, placement, combat), voiture, manches gagnantes, couleurs d'équipes, opacité de la zone sur la carte, zones de secours |
 | `server-data/resources/[gunfight]/gf_redzone/config.lua` | durée de partie, véhicule, délai de réapparition, zones de secours |
 
 Le volume des sons de touche et de kill se règle en haut de

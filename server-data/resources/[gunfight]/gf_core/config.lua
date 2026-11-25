@@ -60,7 +60,45 @@ Config.MultiKillWindow = 6
 -- Régénération naturelle de la vie (false = pas de régénération, plus "gunfight")
 Config.HealthRegen = false
 
--- Équipements. armour = gilet pare-balles (0 à 100). Noms des armes :
+-- ---------------------------------------------------------------------------
+-- Armes au choix (Attaque de zone : chaque joueur choisit 2 armes avant la manche)
+--
+-- Catalogue de toutes les armes connues du serveur. Plus tard, le système de
+-- caisses ajoutera des armes customisées (components = accessoires, tint =
+-- couleur) que chaque joueur pourra gagner. Pour l'instant, tout le monde
+-- possède les armes de Config.StarterWeapons.
+--   name       : nom GTA de l'arme
+--   label      : nom affiché dans le menu
+--   category   : catégorie affichée dans le menu
+--   ammo       : munitions données
+--   components : (optionnel) accessoires GTA, ex. { 'COMPONENT_AT_SCOPE_MEDIUM' }
+--   tint       : (optionnel) couleur de l'arme (0 à 7)
+-- ---------------------------------------------------------------------------
+Config.Weapons = {
+    carbine     = { name = 'WEAPON_CARBINERIFLE',   label = 'Carabine',            category = 'Fusil d\'assaut', ammo = 300 },
+    assault     = { name = 'WEAPON_ASSAULTRIFLE',   label = 'Fusil d\'assaut',     category = 'Fusil d\'assaut', ammo = 300 },
+    special     = { name = 'WEAPON_SPECIALCARBINE', label = 'Carabine spéciale',   category = 'Fusil d\'assaut', ammo = 300 },
+    bullpup     = { name = 'WEAPON_BULLPUPRIFLE',   label = 'Fusil bullpup',       category = 'Fusil d\'assaut', ammo = 300 },
+    smg         = { name = 'WEAPON_SMG',            label = 'SMG',                 category = 'Mitraillette',    ammo = 360 },
+    pdw         = { name = 'WEAPON_COMBATPDW',      label = 'PDW',                 category = 'Mitraillette',    ammo = 360 },
+    pump        = { name = 'WEAPON_PUMPSHOTGUN',    label = 'Fusil à pompe',       category = 'Fusil à pompe',   ammo = 60 },
+    marksman    = { name = 'WEAPON_MARKSMANRIFLE',  label = 'Fusil de précision',  category = 'Précision',       ammo = 60 },
+    pistol      = { name = 'WEAPON_PISTOL',         label = 'Pistolet',            category = 'Pistolet',        ammo = 96 },
+    pistol50    = { name = 'WEAPON_PISTOL50',       label = 'Pistolet .50',        category = 'Pistolet',        ammo = 72 },
+    heavypistol = { name = 'WEAPON_HEAVYPISTOL',    label = 'Pistolet lourd',      category = 'Pistolet',        ammo = 72 },
+}
+
+-- Armes que tout le monde possède dès le départ (identifiants de Config.Weapons)
+Config.StarterWeapons = { 'carbine', 'assault', 'special', 'bullpup', 'smg', 'pdw', 'pump', 'marksman', 'pistol', 'pistol50', 'heavypistol' }
+
+-- Choix par défaut si le joueur ne choisit rien
+Config.DefaultSelection = { 'carbine', 'pistol' }
+
+-- Nombre d'armes à choisir et gilet pare-balles donné avec
+Config.SelectionCount = 2
+Config.SelectionArmour = 100
+
+-- Équipements fixes (Redzone). armour = gilet pare-balles (0 à 100). Noms des armes :
 -- https://wiki.rage.mp/index.php?title=Weapons (colonne "Name")
 Config.Loadouts = {
     attack = {
