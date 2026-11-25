@@ -266,6 +266,56 @@ html, body {
 .lo-ok:disabled { opacity: .4; cursor: not-allowed; }
 .lo-ok.done { background: #3ddc84; color: #0c0e14; }
 
+/* ------------------------------------------------------------------ Vie et kevlar */
+#vitals {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    pointer-events: none;
+}
+.vbar {
+    position: relative;
+    height: 18px;
+    background: rgba(12, 14, 20, 0.7);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
+}
+.vbar.armour { height: 10px; }
+.vbar .fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    transition: width .15s ease-out;
+}
+.vbar.health .fill { background: #f4f6fa; }
+.vbar.armour .fill { background: #3d8bff; }
+.vbar.health.low .fill { background: #ff5a5f; }
+.vbar .val {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    color: #0c0e14;
+}
+.vbar.armour .val { display: none; }
+.vbar.health.low .val { color: #fff; }
+.vbar.hit { animation: vhit .25s ease-out; }
+@keyframes vhit {
+    0%   { box-shadow: 0 0 0 2px rgba(255, 90, 95, .9); }
+    100% { box-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
+}
+
 /* ------------------------------------------------------------------ Annonces */
 #announce {
     position: absolute;

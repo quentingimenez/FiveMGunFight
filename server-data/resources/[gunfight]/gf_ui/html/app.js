@@ -348,11 +348,43 @@ $('.lo-ok').onclick = () => {
     renderLoadout();
 };
 
+// ------------------------------------------------------------------ Vie et kevlar
+const VITALS = { health: null, armour: null };
+
+function setBar(sel, value, showValue) {
+    const bar = $(sel);
+    const v = Math.max(0, Math.min(100, Math.round(value)));
+    $('.fill', bar).style.width = v + '%';
+    if (showValue) $('.val', bar).textContent = v;
+    return v;
+}
+
+function flash(sel) {
+    const bar = $(sel);
+    bar.classList.remove('hit');
+    void bar.offsetWidth;
+    bar.classList.add('hit');
+}
+
+function renderVitals(d) {
+    const box = $('#vitals');
+    if (!d) { box.classList.add('hidden'); VITALS.health = VITALS.armour = null; return; }
+    box.classList.remove('hidden');
+    const h = setBar('#vitals .health', d.health, true);
+    const a = setBar('#vitals .armour', d.armour, false);
+    $('#vitals .health').classList.toggle('low', h <= 25);
+    if (VITALS.health !== null && h < VITALS.health) flash('#vitals .health');
+    if (VITALS.armour !== null && a < VITALS.armour) flash('#vitals .armour');
+    VITALS.health = h;
+    VITALS.armour = a;
+}
+
 // ------------------------------------------------------------------ Messages du jeu
 window.addEventListener('message', (event) => {
     const msg = event.data || {};
     switch (msg.type) {
         case 'hud': renderHud(msg.data); break;
+        case 'vitals': renderVitals(msg.data); break;
         case 'killfeed': addKill(msg.data); break;
         case 'killfeed_clear': $('#killfeed').replaceChildren(); break;
         case 'loadout_open': openLoadout(msg.data || {}); break;

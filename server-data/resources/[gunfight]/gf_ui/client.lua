@@ -120,3 +120,33 @@ RegisterKeyMapping('+gf_scoreboard', 'Gunfight : afficher le classement', 'keybo
 RegisterNetEvent('gf_ui:match_results', function(data)
     SendNUIMessage({ type = 'match_results', data = data })
 end)
+
+
+-- ---------------------------------------------------------------- Vie et kevlar
+-- Barres en bas au centre, dans les modes de jeu (pas au lobby).
+-- Vie d'un joueur GTA : 100 = mort, 200 = pleine -> affichée de 0 à 100.
+CreateThread(function()
+    local lastH, lastA, shown = -1, -1, false
+    while true do
+        local ped = PlayerPedId()
+        local mode = LocalPlayer.state.gf_mode
+        local visible = mode and mode ~= 'lobby' and IsEntityVisible(ped)
+        if visible then
+            local maxH = GetEntityMaxHealth(ped)
+            local h = IsEntityDead(ped) and 0 or math.floor((GetEntityHealth(ped) - 100) / math.max(maxH - 100, 1) * 100 + 0.5)
+            local a = GetPedArmour(ped)
+            h = math.max(0, math.min(100, h))
+            if h ~= lastH or a ~= lastA or not shown then
+                SendNUIMessage({ type = 'vitals', data = { health = h, armour = a } })
+                lastH, lastA, shown = h, a, true
+            end
+            Wait(50)
+        else
+            if shown then
+                SendNUIMessage({ type = 'vitals', data = nil })
+                shown, lastH, lastA = false, -1, -1
+            end
+            Wait(250)
+        end
+    end
+end)
