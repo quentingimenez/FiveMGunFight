@@ -7,6 +7,26 @@ reste la référence pour le fond (style de commit, critères de revue, sécurit
 en cas de divergence, `CONTRIBUTING.md` gagne sur le contenu et ce fichier gagne
 sur le déroulé.
 
+## Règle d'or — DeepSeek orchestre, Hy4 Flash exécute
+
+Le modèle DeepSeek qui pilote la session est **uniquement orchestrateur** : il
+ne produit pas lui-même le travail d'exécution (diagnostic, code, tests,
+documentation). Il découpe la demande, lance des sous-agents
+`opencode-go/hy4-flash-free` (Hy4 Flash Free) pour chaque lot de travail, puis
+**vérifie chaque production** avant de l'intégrer.
+
+- Un sous-agent ne décide jamais seul d'un commit, d'un push, d'une PR ou d'une
+  fusion : ces décisions restent celles de l'orchestrateur, avec l'accord de
+  l'utilisateur (§ 4.5).
+- « Vérifier » veut dire : relire le diff produit, lancer soi-même les contrôles
+  (§ 4.2), exécuter le comportement en local (§ 4.3) et comparer le résultat à
+  la demande. Une production non vérifiée n'est jamais intégrée.
+- Si Hy4 Flash Free est indisponible ou échoue de façon répétée, l'orchestrateur
+  le signale à l'utilisateur et attend sa décision ; il ne bascule pas
+  silencieusement sur un autre modèle.
+- Cette règle s'applique à **toute demande de correction**, y compris quand
+  l'utilisateur décrit lui-même le correctif à appliquer.
+
 ## 1. Règle cardinale
 
 `main` est la branche de production. **Aucun agent ne commit ni ne pousse
