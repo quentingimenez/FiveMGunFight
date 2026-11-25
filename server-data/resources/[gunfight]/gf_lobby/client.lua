@@ -323,10 +323,22 @@ local function setCameraTargets(pos, look, fov)
     end
 end
 
+-- Le ped est posé sur le sol réel (placeSelfOnSlot), pas sur Config.Stage.z :
+-- ancrer la caméra sur la même hauteur pour ne pas cadrer ~1 m au-dessus.
+local function groundOrigin()
+    local origin, forward, right = stageBasis()
+    local z = (Config.Stage.z or 20.2) - 0.98
+    local ped = PlayerPedId()
+    if ped and ped ~= 0 and DoesEntityExist(ped) then
+        z = GetEntityCoords(ped).z
+    end
+    return vector3(origin.x, origin.y, z), forward, right
+end
+
 local function groupCameraTargets(count)
     local s = Config.Stage
     local c = s.camera or {}
-    local origin, forward = stageBasis()
+    local origin, forward = groundOrigin()
     local n = math.max(1, count or 1)
     local distance = (c.baseDistance or 3.2) + (n - 1) * (c.distancePerMember or 0.95)
     local pos = origin + forward * distance + vector3(0.0, 0.0, c.height or 1.52)
@@ -337,7 +349,7 @@ end
 local function creatorCameraTargets()
     local s = Config.Stage
     local c = s.camera or {}
-    local origin, forward, right = stageBasis()
+    local origin, forward, right = groundOrigin()
     local pos = origin + forward * (c.creatorDistance or 2.9)
         + right * (c.creatorOffset or -0.75) + vector3(0.0, 0.0, c.height or 1.52)
     local look = origin + vector3(0.0, 0.0, c.lookHeight or 1.12)
@@ -402,6 +414,9 @@ local function enterLobbyUi()
     -- inoffensif.
     DoScreenFadeIn(400)
     local ped = PlayerPedId()
+    -- Un mode précédent (ex. redzone) peut avoir laissé le joueur en
+    -- spectateur : le ped reste masqué malgré IsEntityVisible=1.
+    NetworkSetInSpectatorMode(false, PlayerPedId())
     if ped and ped ~= 0 then SetEntityVisible(ped, true, false) end
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
@@ -684,8 +699,18 @@ local CALLBACKS = {
         local character = normalizeCharacter(data)
         if not character then fail(cb, 'invalid_character') return end
         previewCharacter = character
-        if inLobby and state and state.me and state.me.character == nil then
-            local ok, err = pcall(presentCreator)
+        if inLobby then
+            local me = state and state.me
+            local ok, err = pcall(function()
+                if me and me.character ~= nil then
+                    -- Personnage déjà créé : appliquer l'aperçu au ped existant.
+                    if applyLocalModel(character.gender) then
+                        applyAppearance(PlayerPedId(), character)
+                    end
+                else
+                    presentCreator()
+                end
+            end)
             if not ok then
                 print(('[gf_lobby] previewCharacter: %s'):format(tostring(err)))
             end
