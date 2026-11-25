@@ -657,6 +657,24 @@ class ChaineCI(unittest.TestCase):
         self.assertIn('grep -Fq -- "$CFX_LICENSE_KEY"', bloc)
         self.assertIn("if: always()", bloc, "les journaux doivent être collectés en échec")
 
+    def test_smoke_echoue_sans_secret_hors_fork_et_dependabot(self) -> None:
+        texte = lire(self.WORKFLOWS / "docker.yml")
+        etape = re.search(
+            r"(?ms)^      - name: Détecter la clé de licence CI.*?(?=^      - name:|\Z)",
+            texte,
+        )
+        if etape is None:
+            self.fail("étape de détection de la clé absente du job smoke")
+        bloc = etape.group(0)
+        self.assertIn('"$ACTEUR" = "dependabot[bot]"', bloc)
+        self.assertIn('"$DEPOT_PR" != "$DEPOT"', bloc)
+        self.assertIn("::error::", bloc)
+        self.assertIn(
+            "exit 1",
+            bloc,
+            "hors PR de fork ou de Dependabot, un secret absent doit faire échouer le job",
+        )
+
     def test_nom_du_check_smoke_inchange(self) -> None:
         texte = lire(self.WORKFLOWS / "docker.yml")
         self.assertIn(f"name: {self.NOM_SMOKE}", texte)
