@@ -125,8 +125,10 @@ pas le test.
 2. Ouvre la pull request vers `main` et remplis le modèle proposé :
    **résumé**, **pourquoi**, **comment tu as testé**, cases de la checklist.
 3. Reste disponible pendant la revue : réponds aux commentaires par des
-   commits supplémentaires sur la même branche (pas de réécriture d'historique
-   après une première revue).
+   commits supplémentaires sur la même branche. Si la branche est en retard
+   ou en conflit avec `main`, rebase-la (`git fetch origin`,
+   `git rebase origin/main`, puis `git push --force-with-lease`) plutôt que
+   d'y fusionner `main`, et signale-le dans la PR si quelqu'un l'a déjà relue.
 
 Une pull request doit être **petite** : une fonctionnalité ou une correction.
 Au-delà de ~400 lignes modifiées, découpe.
