@@ -348,10 +348,6 @@ local function eligibleForQueue(src)
     return player ~= nil and player.inLobby == true and type(player.character) == 'table'
 end
 
-local function isQueued(src)
-    return Queue.members[src] == true
-end
-
 -- Recalcule l'éligibilité de tous les joueurs présents dans le lobby.
 -- Un joueur sans personnage ou hors lobby est retiré ; un nouvel arrivant
 -- avec personnage est ajouté automatiquement pendant une recherche active.
@@ -745,11 +741,10 @@ local function launchQueuedMatch(src, mode, members)
         local launched = 0
         for _, member in ipairs(members) do
             if eligibleForQueue(member) then
-                local already = false
                 local okMode, currentMode = pcall(function()
                     return exports.gf_core:GetMode(member)
                 end)
-                already = okMode and currentMode == mode.id
+                local already = okMode and currentMode == mode.id
                 local ok, result = false, false
                 if not already then
                     ok, result = pcall(function()
