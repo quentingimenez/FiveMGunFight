@@ -40,6 +40,10 @@ invitations, barre de modes et bouton **Jouer**. Les onglets **Armes** et
 de l'interface, du protocole NUI et des règles d'escouade est dans
 [docs/lobby.md](docs/lobby.md).
 
+Les **accès** (ports, journaux, console, admin, base de données) et le
+**déroulé de débogage/test** sont rassemblés dans
+[docs/debug-test.md](docs/debug-test.md).
+
 ---
 
 ## 1. Ce qu'il te faut (une seule fois)
