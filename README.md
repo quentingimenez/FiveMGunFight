@@ -5,8 +5,9 @@ Deux modes de jeu :
 
 - **Attaque de zone** (`/attack`) : 2 équipes. L'une attaque une zone (en rouge), l'autre la défend.
   Chaque manche se déroule en 3 temps :
-  1. **Choix des armes (10 s)** : les attaquants apparaissent **dans leur voiture**, les
-     défenseurs **à pied** dans la zone ; tout le monde est gelé et choisit
+  1. **Choix des armes (10 s)** : les attaquants apparaissent **dans leur voiture**, garées
+     côte à côte en rangées de 3, les défenseurs **à pied**, en groupe serré dans la zone ;
+     tout le monde est gelé et choisit
      **2 armes** parmi celles qu'il possède (plus tard : armes customisées gagnées dans des caisses).
   2. **Placement (15 s)** : on peut rouler ; les défenseurs se placent, la zone est **fermée aux
      attaquants**.
@@ -24,6 +25,8 @@ Deux modes de jeu :
   **F** : la voiture disparaît et on se bat. On ne peut tirer et être touché **que dans la zone**.
   À la mort, retour au point d'apparition, à pied.
   À la fin de la partie : podium, puis nouvelle partie sur la map suivante.
+
+Les véhicules ne se percutent pas entre eux (pas de « pit »), seuls les piétons peuvent être renversés.
 
 Sur tous les modes : chiffre de dégâts + son à chaque touche, son de kill, messages
 **DOUBLÉ / TRIPLÉ / QUADRUPLÉ / QUINTUPLÉ…** et kill feed propre au mode (en haut à droite).
