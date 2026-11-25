@@ -922,6 +922,11 @@ end
 local function checkQueueThreshold()
     if not Queue.active then return end
     if queueSize() < queueMin() then return end
+    -- Un match d'Attaque est déjà en cours ou complet : la file attend la fin.
+    if Queue.mode == 'attack' and GetResourceState('gf_attack') == 'started' then
+        local ok, canJoin = pcall(function() return exports.gf_attack:CanJoin() end)
+        if ok and canJoin == false then return end
+    end
 
     local members = {}
     for src in pairs(Queue.members) do

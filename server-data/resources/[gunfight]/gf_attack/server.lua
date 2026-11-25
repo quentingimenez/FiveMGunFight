@@ -521,18 +521,11 @@ sendMatchResults = function(winner)
     end)
 end
 
--- ---------------------------------------------------------------- Recherche de partie
--- /attack inscrit le joueur dans la file. Une partie se forme dès que
--- Config.PlayersToStart joueurs cherchent (16), avec au plus Config.MaxPlayers
--- joueurs (40, soit 20 contre 20). Les joueurs en trop attendent la suivante.
--- On ne rejoint jamais un match en cours : la file se vide entre deux matchs.
-local Queue = {}       -- liste ordonnée des joueurs en recherche (premier arrivé, premier servi)
-
-local function queueIndex(src)
-    for i, s in ipairs(Queue) do if s == src then return i end end
-    return nil
-end
-
+-- ---------------------------------------------------------------- Entrée dans le mode
+-- La recherche de partie est gérée par gf_lobby (file serveur globale, voir
+-- docs/lobby.md) : elle fait entrer les joueurs via gf_core:SetMode quand le
+-- seuil est atteint. Ici on dit seulement si un match accepte encore du monde.
+-- On ne rejoint jamais un match en cours.
 local function inMatchCount() return count('A') + count('B') end
 
 -- Un match est « ouvert » aux nouveaux joueurs s'il n'a pas encore commencé
@@ -540,76 +533,8 @@ local function matchOpen()
     return S.phase == 'waiting'
 end
 
-local function sendSearchHud(src)
-    local total = #Queue + (matchOpen() and inMatchCount() or 0)
-    TriggerClientEvent('gf_ui:hud', src, {
-        title = 'Recherche de partie · Attaque de zone',
-        subtitle = matchOpen()
-            and '/annuler pour quitter la recherche'
-            or 'Un match est en cours : tu joueras le prochain  ·  /annuler pour quitter',
-        badge = { text = ('%d / %d JOUEURS'):format(math.min(total, Config.PlayersToStart), Config.PlayersToStart), color = '#ff8a3d' },
-    })
-end
-
-local function refreshSearchHud()
-    for _, src in ipairs(Queue) do sendSearchHud(src) end
-end
-
-local function leaveQueue(src, silent)
-    local i = queueIndex(src)
-    if not i then return false end
-    table.remove(Queue, i)
-    if GetPlayerName(src) and not silent then
-        TriggerClientEvent('gf_ui:hud', src, nil)
-        core:Notify(src, 'Recherche de partie annulée.')
-    end
-    refreshSearchHud()
-    return true
-end
-
--- Fait entrer des joueurs de la file dans le match (dans la limite des places)
-local function pullFromQueue()
-    while #Queue > 0 and inMatchCount() < Config.MaxPlayers do
-        local src = table.remove(Queue, 1)
-        if GetPlayerName(src) and Player(src).state.gf_mode == 'lobby' then
-            core:SetMode(src, 'attack')
-        end
-    end
-    refreshSearchHud()
-end
-
-local function processQueue()
-    if #Queue == 0 or not matchOpen() then return end
-    if #Queue + inMatchCount() >= Config.PlayersToStart then
-        pullFromQueue()
-    end
-end
-
--- /attack (via gf_core) : chercher une partie
-local function search(src)
-    if S.team[src] then return core:Notify(src, 'Tu es déjà dans une partie.') end
-    if Player(src).state.gf_mode ~= 'lobby' then core:SetMode(src, 'lobby') end
-    if queueIndex(src) then return sendSearchHud(src) end
-    Queue[#Queue + 1] = src
-    core:Notify(src, ('Recherche de partie… La partie se lance à %d joueurs (max %d, %d contre %d).')
-        :format(Config.PlayersToStart, Config.MaxPlayers, Config.MaxPlayers // 2, Config.MaxPlayers // 2))
-    refreshSearchHud()
-end
-exports('Search', search)
-
 exports('CanJoin', function()
     return matchOpen() and inMatchCount() < Config.MaxPlayers
-end)
-
-RegisterCommand('annuler', function(src)
-    if src > 0 and not leaveQueue(src) then core:Notify(src, "Tu n'es pas en recherche de partie.") end
-end, false)
-
-AddEventHandler('playerDropped', function() leaveQueue(source, true) end)
-
--- Rejoindre un autre mode (Redzone...) fait quitter la file
-AddEventHandler('gf:modeJoined', function(src, mode)
-    if mode ~= 'lobby' then leaveQueue(src, true) end
 end)
 
 -- Boucle principale (1 fois par seconde)
@@ -618,7 +543,6 @@ CreateThread(function()
         Wait(1000)
         local t = now()
         if S.phase == 'waiting' then
-            processQueue()
             if canStart() then startSelect() end
         elseif S.phase == 'select' then
             if t >= S.endsAt then startPlacement() end
@@ -752,7 +676,6 @@ end
 local function startTestRound(src)
     if not matchOpen() then return false, 'Un match est déjà en cours.' end
 
-    pullFromQueue()
     if inMatchCount() < Config.MaxPlayers and src and src > 0 and not S.team[src] then
         core:SetMode(src, 'attack')
     end

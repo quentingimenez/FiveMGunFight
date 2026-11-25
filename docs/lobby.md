@@ -144,8 +144,11 @@ Le personnage existe : le lobby s'affiche directement, sans écran de création.
      restauré. Le client ne ferme jamais la NUI pendant l'attente.
    - À `size >= Config.Matchmaking.attackMin` (20, configurable), un thread
      serveur fige la file et appelle `exports.gf_core:SetMode(member, 'attack')`
-     pour **tous** les membres. `gf_attack.Config.MinPlayers = 20` empêche le
-     démarrage à 2 joueurs.
+     pour **tous** les membres. `gf_attack.Config.PlayersToStart = 20` empêche le
+     démarrage à 2 joueurs (garder `PlayersToStart = attackMin` et
+     `MaxPlayers = attackMax`). Si un match d'Attaque est déjà en cours ou
+     complet (`exports.gf_attack:CanJoin()` faux), la file attend sa fin.
+   - `/attack` ramène le joueur au lobby : la recherche se lance depuis la NUI.
 3. **Redzone** : comportement inchangé (`minPlayers = 1`), lancement pour
    l'escouade via `play`.
 4. Dans les deux cas, `party.launching = true` est posé côté serveur et diffusé.
