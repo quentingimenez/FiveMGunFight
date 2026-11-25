@@ -14,19 +14,29 @@ directement sur `main`.** Toute modification — même une ligne de documentatio
 passe par une branche, une pull request suivie jusqu'à la CI verte, puis une
 fusion en squash par l'agent.
 
+Avant tout envoi, l'agent **exécute la modification en local**, explique
+explicitement l'**avant** et l'**après**, et attend l'**accord de
+l'utilisateur** (§ 4.3 et § 4.5). Sans accord, rien n'est poussé.
+
 ## 2. Définition de « session terminée »
 
 Une session qui a modifié le dépôt n'est terminée que lorsque, dans cet ordre :
 
-1. la pull request est **mergée** sur `main` (squash) ;
-2. la **branche distante** est supprimée (le dépôt s'en charge après fusion) ;
-3. la **branche locale** est supprimée ;
-4. on est revenu sur `main`, à jour de `origin/main` ;
-5. l'arbre ne contient plus aucun fichier modifié ou non suivi **appartenant à
+1. la modification a été **exécutée et vérifiée en local** (§ 4.3) ;
+2. l'utilisateur a donné son **accord explicite** sur l'avant/après (§ 4.5) ;
+3. la branche a été poussée et la pull request est **mergée** sur `main` (squash) ;
+4. la **branche distante** est supprimée (le dépôt s'en charge après fusion) ;
+5. la **branche locale** est supprimée ;
+6. on est revenu sur `main`, à jour de `origin/main` ;
+7. l'arbre ne contient plus aucun fichier modifié ou non suivi **appartenant à
    la session** (les changements préexistants laissés par l'utilisateur restent
    intacts) ;
-6. l'utilisateur reçoit le **lien de la pull request** et le **sha du commit de
+8. l'utilisateur reçoit le **lien de la pull request** et le **sha du commit de
    fusion**.
+
+Si l'utilisateur refuse ou ne donne pas son accord, la session s'arrête à
+l'étape 2 : la branche et le commit restent **locaux**, ne sont pas poussés, et
+l'utilisateur est informé de ce qui attend son feu vert.
 
 Une session en lecture seule (analyse, question, revue) n'ouvre ni branche ni
 pull request.
@@ -59,6 +69,9 @@ Types : `feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `perf`, `test`.
 Une branche = un sujet. Deux sujets indépendants = deux branches, deux pull
 requests, dans l'ordre.
 
+Avant de toucher au code, annoncer l'intention en une phrase : ce qui va être
+modifié et pourquoi.
+
 ### 4.2 Contrôles locaux avant le commit
 
 ```bash
@@ -73,8 +86,27 @@ bash scripts/verifier.sh
   (`docker compose build`, `docker compose up -d`, puis `docker compose logs -f
   fxserver` jusqu'à « Started resource gf_ »), et tester le comportement en jeu.
 - Un contrôle rouge se corrige, jamais ne se contourne.
+- Une relecture de diff ne prouve rien : la modification doit être **exécutée**
+  en local (§ 4.3) avant d'être proposée.
 
-### 4.3 Commit
+### 4.3 Exécution locale et preuve
+
+Toute modification doit être **lancée en local** avant d'être proposée. Lancer
+le composant concerné et observer le résultat :
+
+- ressource Lua / serveur : `docker compose up -d`, attendre « Started resource
+  gf_… » dans `docker compose logs -f fxserver`, puis reproduire le scénario en
+  jeu ou par commande ;
+- interface NUI : ouvrir l'écran concerné, vérifier le rendu et les actions ;
+- script / outillage : l'exécuter sur un cas nominal **et** sur le cas d'erreur
+  qu'il doit traiter ;
+- documentation seule : le déclarer explicitement (« sans exécution :
+  documentation »), vérifier les liens et lancer `bash scripts/verifier.sh`.
+
+Consigner la commande lancée et le résultat observable (sortie, capture, log) :
+c'est la preuve qui accompagne l'avant/après.
+
+### 4.4 Commit
 
 ```bash
 git add <fichiers du sujet>
@@ -87,7 +119,28 @@ git commit -m "type(scope): sujet à l'impératif" -m "Pourquoi ce changement (c
 - Ne pas embarquer de fichiers hors sujet (notamment les changements
   préexistants de l'utilisateur).
 
-### 4.4 Envoi et pull request
+### 4.5 Explication avant/après et accord utilisateur (porte de push)
+
+Avant **tout envoi**, présenter à l'utilisateur, explicitement :
+
+1. **Avant** — l'état ou le comportement actuel, le symptôme, la limite
+   constatée ;
+2. **Après** — l'état attendu et ce qui change concrètement (joueurs,
+   exploitation, outils) ;
+3. **Preuve locale** — ce qui a été lancé (§ 4.3) et le résultat observé ;
+4. **Portée** — fichiers touchés et ce qui n'est pas modifié.
+
+Puis **attendre un accord explicite** (« ok », « go », « envoie », « merge »…).
+Sans accord : ne pas pousser, ne pas ouvrir de PR, ne pas fusionner. Un accord
+donné pour un autre sujet ne vaut pas. Si l'utilisateur demande des
+modifications : les faire, relancer l'exécution locale, réexpliquer, redemander.
+
+Le commit local peut exister avant l'accord ; il ne part sur le dépôt distant
+qu'une fois celui-ci obtenu.
+
+### 4.6 Envoi et pull request
+
+Une fois l'accord obtenu (§ 4.5), pousser la branche et ouvrir la PR :
 
 ```bash
 git push -u origin "$(git branch --show-current)"
@@ -98,7 +151,7 @@ Le corps de la PR reprend [`.github/pull_request_template.md`](.github/pull_requ
 **Résumé**, **Pourquoi**, **Comment tester**, **Checklist** avec les cases
 cochées. Décrire ce qui a réellement été exécuté.
 
-### 4.5 Suivi obligatoire de la CI
+### 4.7 Suivi obligatoire de la CI
 
 ```bash
 gh pr checks --watch
@@ -116,7 +169,7 @@ gh pr view --json number,state,mergeable,statusCheckRollup
 - Une PR ne se laisse jamais « en attente » en fin de session : elle est menée
   jusqu'à la fusion ou explicitement signalée comme bloquée (§ 7).
 
-### 4.6 Fusion
+### 4.8 Fusion
 
 Fusionner **uniquement** quand la CI est verte et la PR fusionnable :
 
@@ -129,7 +182,7 @@ gh pr merge --squash --delete-branch
 - Le dépôt supprime la branche distante après fusion ; `--delete-branch` retire
   aussi la branche locale.
 
-### 4.7 Retour sur `main`
+### 4.9 Retour sur `main`
 
 ```bash
 git switch main
@@ -147,6 +200,10 @@ request de correction immédiatement — jamais de commit direct sur `main`.
 ## 5. Interdits
 
 - Commit ou push direct sur `main`, y compris `git commit --allow-empty` de test.
+- Pousser une branche ou ouvrir une PR **sans l'accord explicite** de
+  l'utilisateur, même si tout est vert en local.
+- Proposer un changement sans l'avoir **exécuté en local**, hors documentation
+  déclarée comme telle.
 - `git push --force` / `--force-with-lease`, `GF_ALLOW_MAIN=1`, `gh pr merge --admin`.
 - Fusionner avec un check rouge, en attente, ou en ignorant une conversation de
   revue non résolue.
@@ -180,9 +237,11 @@ répondre par des commits sur la même branche, puis fusionner une fois les
   hotfix direct sur `main`.
 - **Modification de ce fichier, de `.github/` ou des workflows** : PR dédiée,
   explication dans le corps ; ce sont des fichiers à impact fort (`CODEOWNERS`).
+- **Pas d'accord utilisateur** : la branche et le commit restent locaux
+  (§ 4.5) ; ne rien pousser ; indiquer précisément ce qui attend son feu vert.
 - **Session interrompue** : au redémarrage, reprendre la PR existante
   (`gh pr list --head type/sujet-en-kebab-case`) plutôt que d'en ouvrir une
-  seconde.
+  seconde ; sans PR, reprendre la branche locale et redemander l'accord.
 
 ## 8. Contexte du dépôt
 
