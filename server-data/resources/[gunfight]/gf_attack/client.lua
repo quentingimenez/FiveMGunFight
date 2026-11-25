@@ -348,3 +348,137 @@ CreateThread(function()
         end
     end
 end)
+
+-- =============================================================================
+--  Soins : bandage (touche 3) et kevlar (touche 4)
+--  Le serveur tient le nombre d'objets ; le client joue l'animation (on peut
+--  marcher, pas tirer) puis applique le soin à la fin.
+-- =============================================================================
+local items = nil          -- { bandage = n, kevlar = n } ou nil hors du mode
+local using = nil          -- { item, endsAt, total } pendant une utilisation
+local message = nil        -- { text, untilT } petit message d'information
+
+local function info(text)
+    message = { text = text, untilT = GetGameTimer() + 1800 }
+end
+
+-- Envoie les quantités à l'interface (affichées sous les barres de vie / kevlar)
+local function pushItems()
+    if not items then return TriggerEvent('gf_ui:items', nil) end
+    local list = {}
+    for _, id in ipairs({ 'bandage', 'kevlar' }) do
+        local def = Config.Items[id]
+        list[#list + 1] = { id = id, key = def.key, label = def.label, count = items[id] or 0 }
+    end
+    TriggerEvent('gf_ui:items', list)
+end
+
+RegisterNetEvent('gf_attack:items', function(inv)
+    items = inv
+    pushItems()
+end)
+
+local function tryUse(item)
+    if not items or LocalPlayer.state.gf_mode ~= 'attack' or using then return end
+    local def = Config.Items[item]
+    local ped = PlayerPedId()
+    if IsEntityDead(ped) or not LocalPlayer.state.gf_alive then return end
+    if zone and zone.phase == 'select' then return end
+    if IsPedInAnyVehicle(ped, false) then return info('Descends du véhicule pour te soigner') end
+    if (items[item] or 0) <= 0 then return info(('Plus de %s'):format(def.label:lower())) end
+    if def.stat == 'health' and GetEntityHealth(ped) >= GetEntityMaxHealth(ped) then
+        return info('Vie déjà au maximum')
+    end
+    if def.stat == 'armour' and GetPedArmour(ped) >= 100 then
+        return info('Kevlar déjà au maximum')
+    end
+    TriggerServerEvent('gf_attack:useItem', item)
+end
+
+for item, def in pairs(Config.Items) do
+    RegisterCommand('+gf_' .. item, function() tryUse(item) end, false)
+    RegisterCommand('-gf_' .. item, function() end, false)
+    RegisterKeyMapping('+gf_' .. item, ('Gunfight : %s'):format(def.label:lower()), 'keyboard', def.key)
+end
+
+-- Le serveur a validé : animation puis soin
+RegisterNetEvent('gf_attack:applyItem', function(item)
+    local def = Config.Items[item]
+    if not def or using then return end
+    CreateThread(function()
+        local ped = PlayerPedId()
+        using = { item = item, endsAt = GetGameTimer() + def.duration * 1000, total = def.duration * 1000 }
+
+        RequestAnimDict(def.anim.dict)
+        local t = GetGameTimer() + 2000
+        while not HasAnimDictLoaded(def.anim.dict) and GetGameTimer() < t do Wait(0) end
+        -- 49 = haut du corps seulement + en boucle + on peut se déplacer
+        TaskPlayAnim(ped, def.anim.dict, def.anim.name, 8.0, -8.0, -1, 49, 0, false, false, false)
+
+        local ok = true
+        while using and GetGameTimer() < using.endsAt do
+            ped = PlayerPedId()
+            if IsEntityDead(ped) or IsPedInAnyVehicle(ped, false) then ok = false break end
+            DisablePlayerFiring(PlayerId(), true)
+            DisableControlAction(0, 24, true)   -- tirer
+            DisableControlAction(0, 25, true)   -- viser
+            DisableControlAction(0, 257, true)
+            DisableControlAction(0, 140, true)
+            DisableControlAction(0, 141, true)
+            DisableControlAction(0, 142, true)
+            Wait(0)
+        end
+
+        StopAnimTask(ped, def.anim.dict, def.anim.name, 2.0)
+        RemoveAnimDict(def.anim.dict)
+        if ok and using and not IsEntityDead(ped) then
+            if def.stat == 'health' then
+                SetEntityHealth(ped, math.min(GetEntityMaxHealth(ped), GetEntityHealth(ped) + def.amount))
+            else
+                SetPedArmour(ped, math.min(100, GetPedArmour(ped) + def.amount))
+            end
+        end
+        using = nil
+    end)
+end)
+
+AddEventHandler('gf_core:spawned', function() using = nil end)
+
+local function text(str, x, y, scale, r, g, b, align)
+    SetTextFont(4)
+    SetTextScale(scale, scale)
+    SetTextColour(r, g, b, 255)
+    SetTextOutline()
+    if align == 'right' then
+        SetTextRightJustify(true)
+        SetTextWrap(0.0, x)
+    else
+        SetTextCentre(true)
+    end
+    BeginTextCommandDisplayText('STRING')
+    AddTextComponentSubstringPlayerName(str)
+    EndTextCommandDisplayText(x, y)
+end
+
+-- Affichage : barre de progression du soin et petits messages
+-- (les quantités sont affichées par gf_ui, sous les barres de vie / kevlar)
+CreateThread(function()
+    while true do
+        if not items or LocalPlayer.state.gf_mode ~= 'attack' or not LocalPlayer.state.gf_alive then
+            Wait(300)
+        else
+            if using then
+                local left = math.max(0, using.endsAt - GetGameTimer())
+                local p = 1.0 - left / using.total
+                DrawRect(0.5, 0.80, 0.16, 0.012, 0, 0, 0, 160)
+                DrawRect(0.5 - 0.08 + 0.08 * p, 0.80, 0.16 * p, 0.012, 120, 220, 120, 230)
+                text(('%s… %.1f s'):format(Config.Items[using.item].label, left / 1000), 0.5, 0.765, 0.42, 255, 255, 255)
+            end
+
+            if message and GetGameTimer() < message.untilT then
+                text(message.text, 0.5, 0.74, 0.45, 255, 200, 80)
+            end
+            Wait(0)
+        end
+    end
+end)

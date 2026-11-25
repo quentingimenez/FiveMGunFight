@@ -42,6 +42,32 @@ Config.FootSpacing = 1.6           -- écart (m) entre les joueurs à pied (déf
 Config.AttackSpawnDistance = 70.0  -- (zones de secours) distance des attaquants au-delà du bord
 Config.OutOfZoneDamage = 8         -- dégâts / seconde pour un défenseur hors de la zone (combat)
 
+-- ---------------------------------------------------------------------------
+-- Vie et soins (attaquants ET défenseurs)
+-- Chaque joueur commence la manche avec 100 points de vie et 100 de kevlar
+-- (gilet donné avec les armes : Config.SelectionArmour de gf_core).
+-- Objets de soin, remis à chaque début de manche :
+--   touche 3 : bandage  -> +50 points de vie
+--   touche 4 : kevlar   -> +50 de kevlar
+-- Utilisation : petite animation, on peut continuer à se déplacer mais pas
+-- tirer pendant ce temps. Chaque kill sur un ennemi rapporte 1 kevlar.
+-- ---------------------------------------------------------------------------
+Config.StartBandages = 2
+Config.StartKevlars = 2
+Config.KevlarPerKill = 1
+Config.MaxKevlars = 2              -- kevlars qu'on peut porter au maximum (un kill à 2 n'en rapporte pas)
+
+Config.Items = {
+    bandage = {
+        label = 'Bandage', key = '3', stat = 'health', amount = 50, duration = 3.0,
+        anim = { dict = 'mp_arresting', name = 'a_uncuff' },
+    },
+    kevlar = {
+        label = 'Kevlar', key = '4', stat = 'armour', amount = 50, duration = 3.5,
+        anim = { dict = 'clothingtie', name = 'try_tie_negative_a' },
+    },
+}
+
 -- Opacité du remplissage rouge de la zone sur la carte (0 à 255).
 -- 255 = rouge plein ; plus bas = on voit les rues à travers, mais les cercles
 -- qui composent le remplissage se devinent un peu là où ils se chevauchent.

@@ -19,6 +19,11 @@ Deux modes de jeu :
   À la fin de chaque manche, chacun voit **MANCHE GAGNÉE** ou **MANCHE PERDUE** pendant quelques
   secondes, puis les camps s'inversent (annonce **CHANGEMENT DE CAMP**). La première équipe à
   **2 manches gagnées** remporte le match (**VICTOIRE** / **DÉFAITE**).
+  **Vie et soins** (attaquants et défenseurs) : chaque manche commence avec **100 PV + 100 de
+  kevlar**, **2 bandages** (touche **3**, +50 PV) et **2 kevlars** (touche **4**, +50 de kevlar).
+  Utiliser un objet prend quelques secondes (animation, on peut marcher mais pas tirer).
+  Chaque kill sur un ennemi rapporte **1 kevlar** (2 kevlars au maximum : un kill à 2 n'en rapporte pas).
+  Les quantités s'affichent sous les barres de vie, avec la touche à utiliser.
 - **Redzone** (`/redzone`) : chacun pour soi. Une seule partie à la fois (10 min).
   On apparaît **à pied** près de la zone, on va au **point véhicule** (marqueur bleu) et on
   appuie sur **E** pour monter dans sa voiture, on roule jusqu'à la zone rouge, on appuie sur
@@ -28,7 +33,8 @@ Deux modes de jeu :
 
 Les véhicules ne se percutent pas entre eux (pas de « pit »), seuls les piétons peuvent être renversés.
 
-Sur tous les modes : chiffre de dégâts + son à chaque touche, son de kill, messages
+Sur tous les modes : **barre de vie** (blanche) et **barre de kevlar** (bleue, au-dessus) en bas au
+centre de l'écran, avec la valeur sur 100 écrite à droite de chaque barre (ex. 70 après 30 de dégâts) ; chiffre de dégâts + son à chaque touche, son de kill, messages
 **DOUBLÉ / TRIPLÉ / QUADRUPLÉ / QUINTUPLÉ…** et kill feed propre au mode (en haut à droite).
 
 Les maps (redzones et zones d'attaque) se créent **en jeu** avec l'éditeur `/editor`.
