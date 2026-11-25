@@ -27,8 +27,11 @@ Le contenu exact est dans [`.github/branch-protection.json`](../.github/branch-p
 | `enforce_admins: true` | le propriétaire est soumis aux mêmes règles |
 
 Le check **`Vérifier le démarrage des ressources`** est requis même quand le
-secret `CFX_LICENSE_KEY` manque (PR de fork ou Dependabot) : le job affiche
-alors une note et reste vert, ce qui rend le cas visible sans bloquer la PR.
+secret `CFX_LICENSE_KEY` manque. Sur une PR de fork ou de Dependabot, qui n'a
+jamais accès aux secrets, le job affiche une note et reste vert (le test
+statique sans licence tourne quand même). Partout ailleurs (push sur `main`,
+PR interne, planification), un secret absent **fait échouer** le job : le
+démarrage réel ne peut pas être sauté en silence.
 
 ## Contrainte de plan GitHub
 

@@ -12,7 +12,8 @@ name: Docker
 # serveur de production : seule la vérification de démarrage l'utilise. Les pull
 # requests Dependabot (et celles venues d'un fork) n'ont pas accès aux secrets
 # Actions : le démarrage complet est alors sauté avec une note, mais le test
-# statique et la construction restent exécutés.
+# statique et la construction restent exécutés. Dans tous les autres cas, un
+# secret absent fait échouer le job.
 on:
   push:
     branches: [main]
@@ -201,15 +202,23 @@ jobs:
           echo "FXServer $FX_VERSION épinglé."
 
       # Le runner ne reçoit jamais la clé sur une PR de fork ou de Dependabot :
-      # on le constate ici. Le test statique reste obligatoire ; seul le
-      # démarrage complet est conditionné par la clé.
+      # seul ce cas saute le démarrage complet (le test statique reste
+      # obligatoire). Partout ailleurs (push, PR interne, planification), une clé
+      # absente fait échouer le job : le démarrage réel est un check bloquant.
       - name: Détecter la clé de licence CI
+        env:
+          ACTEUR: ${{ github.actor }}
+          DEPOT_PR: ${{ github.event.pull_request.head.repo.full_name }}
+          DEPOT: ${{ github.repository }}
         run: |
-          if [ -z "${CFX_LICENSE_KEY:-}" ]; then
-            echo "::notice::Le secret CFX_LICENSE_KEY n'est pas disponible (PR de fork, Dependabot ou secret non configuré) : démarrage complet ignoré, test statique sans licence exécuté."
+          if [ -n "${CFX_LICENSE_KEY:-}" ]; then
+            echo "disponible=true" >> "$GITHUB_ENV"
+          elif [ "$ACTEUR" = "dependabot[bot]" ] || { [ -n "$DEPOT_PR" ] && [ "$DEPOT_PR" != "$DEPOT" ]; }; then
+            echo "::notice::PR de fork ou de Dependabot : pas d'accès au secret CFX_LICENSE_KEY, démarrage complet ignoré, test statique sans licence exécuté."
             echo "disponible=false" >> "$GITHUB_ENV"
           else
-            echo "disponible=true" >> "$GITHUB_ENV"
+            echo "::error::Le secret CFX_LICENSE_KEY est absent : le démarrage réel est obligatoire hors PR de fork ou de Dependabot. Ajoute-le dans Settings > Secrets and variables > Actions."
+            exit 1
           fi
 
       # Même étiquette que celle publiée par le job image (metadata-action) :
