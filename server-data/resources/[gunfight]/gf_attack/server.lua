@@ -276,7 +276,7 @@ end
 local function startSelect()
     -- Début de match : on recharge la map (prend en compte les modifications de /editor)
     if S.round == 0 then loadMap(S.zoneIndex) end
-    autobalance()
+    if S.round == 0 then autobalance() end
     S.round = S.round + 1
     S.phase = 'select'
     S.endsAt = now() + Config.SelectTime
@@ -561,7 +561,13 @@ CreateThread(function()
         elseif S.phase == 'place' then
             if t >= S.endsAt then startLive() end
         elseif S.phase == 'live' then
-            if t >= S.endsAt then endRound(defenders(), 'Temps écoulé : la défense a tenu la zone') end
+            if t >= S.endsAt then
+                if S.solo and count(S.attackers) > 0 then
+                    endRound(S.attackers, 'Temps écoulé : manche de test terminée')
+                else
+                    endRound(defenders(), 'Temps écoulé : la défense a tenu la zone')
+                end
+            end
         elseif S.phase == 'ended' then
             if t >= S.endsAt then nextRound() end
         end

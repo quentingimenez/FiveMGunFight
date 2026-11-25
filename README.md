@@ -126,7 +126,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 > **Recherche** : le match démarre dès que 16 joueurs sont en file. Il accepte jusqu’à 40 joueurs (20 contre 20). Les places sont attribuées dans l’ordre d’inscription. Les joueurs en attente passent au prochain match, et les participants reviennent au lobby à la fin du leur.
 
 > **Tester seul** : tape `/startround` en tant qu’admin. Comme l'autre équipe est vide,
-> la manche ne se termine qu'au chrono (mode test).
+> la manche se termine au chrono et le point revient à ton équipe (mode test).
 
 ## 5. Créer des maps en jeu (`/editor`)
 
