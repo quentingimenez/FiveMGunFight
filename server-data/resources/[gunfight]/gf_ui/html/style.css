@@ -320,3 +320,38 @@ html, body {
 #scoreboard td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, .05); }
 #scoreboard td:first-child { border-left: 3px solid transparent; }
 #scoreboard .sb-empty { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+
+/* Résultats de fin de match */
+#match-results {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(6, 10, 18, .82);
+}
+#match-results.hidden { display: none; }
+.results-panel {
+    width: min(1200px, 94vw);
+    max-height: 94vh;
+    overflow: auto;
+    padding: 20px 24px;
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 14px;
+    background: #111a28;
+    box-shadow: 0 16px 60px #000a;
+}
+.results-title { text-align: center; color: #ff747b; font-size: 36px; font-weight: 900; letter-spacing: 3px; }
+.results-title.won { color: #70e7ad; }
+.results-score { text-align: center; margin: 3px 0 18px; color: #cbd5e1; }
+.results-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.results-tables table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: clamp(10px, 1.35vh, 15px); }
+.results-tables th { color: #a9b8ca; text-align: left; }
+.results-tables th, .results-tables td { padding: clamp(2px, .38vh, 5px) 7px; border-bottom: 1px solid #ffffff12; }
+.results-tables th:first-child { width: 52%; }
+.results-tables th:nth-child(2) { width: 28%; }
+.results-tables td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results-tables tr.mine { background: #24618b; box-shadow: inset 3px 0 #6ed4ff; font-weight: 800; }
+.results-tables tr.best td:first-child { color: #ffdc75; }
+.results-tables .crown { color: #ffd357; font-size: 1.25em; }

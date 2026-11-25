@@ -124,6 +124,46 @@ function renderScoreboard(d) {
     });
 }
 
+function renderMatchResults(data) {
+    const screen = $('#match-results');
+    screen.classList.toggle('hidden', !data);
+    if (!data) return;
+
+    const title = $('.results-title', screen);
+    title.textContent = data.won ? 'VICTOIRE' : 'DÉFAITE';
+    title.classList.toggle('won', data.won);
+    $('.results-score', screen).textContent = data.score || '';
+    const tables = $('.results-tables', screen);
+    tables.replaceChildren();
+    const rows = data.rows || [];
+    const split = Math.ceil(rows.length / 2);
+    [rows.slice(0, split), rows.slice(split)].forEach(group => {
+        if (!group.length) return;
+        const table = el('table');
+        const header = el('tr');
+        ['Joueur', 'Équipe', 'K', 'D'].forEach(label => header.appendChild(el('th', null, label)));
+        table.appendChild(header);
+        group.forEach(player => {
+            const row = el('tr', (player.mine ? 'mine ' : '') + (player.best ? 'best' : ''));
+            const name = el('td');
+            if (player.best) {
+                const crown = el('span', 'crown', '♛ ');
+                crown.title = 'Plus grand nombre d’éliminations';
+                name.appendChild(crown);
+            }
+            name.appendChild(document.createTextNode(player.name));
+            row.appendChild(name);
+            const team = el('td', 'results-team', player.team);
+            team.style.color = player.color || '';
+            row.appendChild(team);
+            row.appendChild(el('td', null, player.kills));
+            row.appendChild(el('td', null, player.deaths));
+            table.appendChild(row);
+        });
+        tables.appendChild(table);
+    });
+}
+
 // ------------------------------------------------------------------ Sons (générés, pas de fichier)
 const VOLUME = 0.35; // volume général des sons (0 à 1)
 let audio = null;
@@ -321,6 +361,7 @@ window.addEventListener('message', (event) => {
         case 'kill': showKill(msg.data || {}); break;
         case 'announce': announce(msg.data); break;
         case 'scoreboard': renderScoreboard(msg.data); break;
+        case 'match_results': renderMatchResults(msg.data); break;
         case 'scoreboard_visible': $('#scoreboard').classList.toggle('hidden', !msg.visible); break;
     }
 });

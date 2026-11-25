@@ -19,6 +19,7 @@ local function resetState()
     S.team = {}           -- [src] = 'A' | 'B'
     S.alive = {}          -- [src] = true | false
     S.stats = {}          -- [src] = { kills, deaths }
+    S.departed = {}       -- joueurs partis pendant le match
     S.score = { A = 0, B = 0 }
     S.attackers = 'A'
     S.round = 0
@@ -358,6 +359,8 @@ local function startLive()
     sendZoneAll()
 end
 
+local sendMatchResults
+
 local function endRound(winner, reason)
     if S.phase ~= 'live' then return end
     S.phase = 'ended'
@@ -375,14 +378,12 @@ local function endRound(winner, reason)
     local scoreText = ('%s %d - %d %s'):format(Config.Teams.A.label, S.score.A, S.score.B, Config.Teams.B.label)
     eachPlayer(function(src)
         local won = S.team[src] == winner
-        if matchOver then
-            announce(src, won and 'VICTOIRE' or 'DÉFAITE', 'Score final : ' .. scoreText,
-                Config.MatchEndDelay * 1000 - 1000)
-        else
+        if not matchOver then
             announce(src, won and 'MANCHE GAGNÉE' or 'MANCHE PERDUE', reason .. '  ·  ' .. scoreText,
                 Config.EndDelay * 1000 - 1000)
         end
     end)
+    if matchOver then sendMatchResults(winner) end
     sendZoneAll()
     S.scoreboardDirty = true
 end
@@ -484,6 +485,40 @@ local function sendScoreboard()
         rows = rows,
     }
     eachPlayer(function(src) TriggerClientEvent('gf_ui:scoreboard', src, data) end)
+end
+
+sendMatchResults = function(winner)
+    local players = {}
+    for _, entry in ipairs(S.departed) do players[#players + 1] = entry end
+    for src, team in pairs(S.team) do
+        local stats = S.stats[src]
+        players[#players + 1] = {
+            id = src, name = GetPlayerName(src) or '?', team = team,
+            kills = stats.kills, deaths = stats.deaths,
+        }
+    end
+    table.sort(players, function(a, b)
+        if a.kills ~= b.kills then return a.kills > b.kills end
+        if a.deaths ~= b.deaths then return a.deaths < b.deaths end
+        return a.name < b.name
+    end)
+    local best = players[1] and players[1].kills or 0
+    eachPlayer(function(src)
+        local rows = {}
+        for _, player in ipairs(players) do
+            rows[#rows + 1] = {
+                name = player.name, team = Config.Teams[player.team].label,
+                color = Config.Teams[player.team].color, kills = player.kills,
+                deaths = player.deaths, mine = player.id == src,
+                best = best > 0 and player.kills == best,
+            }
+        end
+        TriggerClientEvent('gf_ui:match_results', src, {
+            won = S.team[src] == winner, score = ('%s %d - %d %s'):format(
+                Config.Teams.A.label, S.score.A, S.score.B, Config.Teams.B.label),
+            rows = rows,
+        })
+    end)
 end
 
 -- ---------------------------------------------------------------- Recherche de partie
@@ -631,13 +666,20 @@ AddEventHandler('gf:modeJoined', function(src, mode)
     local a, b = count('A'), count('B')
     local t = a < b and 'A' or (b < a and 'B' or (math.random(2) == 1 and 'A' or 'B'))
     setTeam(src, t)
-    S.stats[src] = { kills = 0, deaths = 0 }
+    S.stats[src] = { name = GetPlayerName(src) or '?', kills = 0, deaths = 0 }
     core:Notify(src, ('Tu rejoins l\'%s. Tape /lobby pour quitter.'):format(Config.Teams[t].label))
     placeForPhase(src)
 end)
 
 AddEventHandler('gf:modeLeft', function(src, mode)
     if mode ~= 'attack' or not S.team[src] then return end
+    if S.round > 0 and not S.matchOver then
+        local stats = S.stats[src]
+        S.departed[#S.departed + 1] = {
+            name = stats.name, team = S.team[src], kills = stats.kills, deaths = stats.deaths,
+        }
+    end
+    TriggerClientEvent('gf_ui:match_results', src, nil)
     S.team[src], S.alive[src], S.stats[src] = nil, nil, nil
     if GetPlayerName(src) then
         Player(src).state:set('gf_team', nil, true)
@@ -730,6 +772,11 @@ end, false)
 RegisterCommand('endmatch', function(src)
     if not core:IsAdmin(src) then return end
     S.score = { A = 0, B = 0 }
+    S.departed = {}
+    eachPlayer(function(p)
+        TriggerClientEvent('gf_ui:match_results', p, nil)
+        S.stats[p].kills, S.stats[p].deaths = 0, 0
+    end)
     S.round = 0
     S.matchOver = false
     S.attackers = 'A'
