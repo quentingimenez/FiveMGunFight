@@ -32,7 +32,7 @@ env:
 jobs:
   qualite:
     name: Qualité du dépôt
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 15
     permissions:
       contents: read
@@ -110,7 +110,7 @@ jobs:
 
   securite:
     name: Sécurité de l'historique
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     permissions:
       contents: read

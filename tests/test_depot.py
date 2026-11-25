@@ -553,9 +553,9 @@ class ChaineCI(unittest.TestCase):
                         "chaque job doit borner sa durée",
                     )
                     self.assertIn(
-                        "runs-on: ubuntu-24.04",
+                        "runs-on: [self-hosted, Linux, X64]",
                         bloc,
-                        "les jobs doivent tourner sur Ubuntu 24.04",
+                        "les jobs doivent tourner sur les runners auto-hébergés (Ubuntu 24.04)",
                     )
                     self.assertRegex(
                         bloc,
