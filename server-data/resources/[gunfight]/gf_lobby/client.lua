@@ -7,6 +7,8 @@
 
 local RESOURCE = 'gf_lobby'
 local WATCHDOG_MS = 15000
+local RETRY_INTERVAL_MS = 2000
+local RETRY_MAX = 8   -- ~15 s (8 × 2 s)
 
 -- Garde de déploiement : si `shared_script 'config.lua'` manque sur une
 -- installation, le client doit quand même charger ses callbacks. Sans ça,
@@ -54,8 +56,8 @@ local camTargetFov = Config.Stage.camera.fov
 
 local lastAppearanceSeed = nil  -- seed du ped local pour éviter les reapplications
 local remoteAppearance = {}     -- [ped] = clé d'apparence déjà appliquée
-local lastCoreSpawnAt = 0       -- dernier gf_core:spawned / gf_core:spawn reçu
 local previewCharacter = nil    -- aperçu local, jamais sauvegardé
+local stateRetryActive = false  -- boucle de récupération de gf_lobby:state
 
 -- ---------------------------------------------------------------- Utilitaires
 local function now()
@@ -394,12 +396,11 @@ local function enterLobbyUi()
     -- reste sur un écran noir alors que la NUI est déjà chargée.
     ShutdownLoadingScreen()
     ShutdownLoadingScreenNui()
-    -- gf_core:spawn fait son propre DoScreenFadeIn(400) à la fin du spawn.
-    -- Un second fondu ici annule le sien et laisse l'écran noir si le lapse
-    -- entre les deux est court. On ne force donc le fondu que si aucun spawn
-    -- gf_core n'est récent ; le filet du watchdog gf_core couvre les 10 s sans
-    -- spawn, le nôtre couvre le reste (entrée manuelle /lobbyui).
-    if now() - lastCoreSpawnAt > 2000 then DoScreenFadeIn(300) end
+    -- Toujours forcer le fondu : si gf_core n'a pas exécuté le sien (spawn
+    -- perdu, erreur silencieuse ou arrivée après l'état lobby), l'écran reste
+    -- noir alors que la NUI est déjà visible. Un second fondu entrant est
+    -- inoffensif.
+    DoScreenFadeIn(400)
     local ped = PlayerPedId()
     if ped and ped ~= 0 then SetEntityVisible(ped, true, false) end
     SetNuiFocus(true, true)
@@ -459,12 +460,21 @@ local function presentLobby(currentState)
         end
     end
     placeSelfOnSlot(slot or 1, count)
+    local dbgPed = PlayerPedId()
+    if dbgPed and dbgPed ~= 0 then
+        local c = GetEntityCoords(dbgPed)
+        print(('[gf_lobby] presentLobby ped=%s model=%s visible=%s coords=%.2f,%.2f,%.2f'):format(
+            tostring(dbgPed), tostring(GetEntityModel(dbgPed)), tostring(IsEntityVisible(dbgPed)),
+            c.x, c.y, c.z
+        ))
+    end
 
     -- La caméra et le ped local d'abord : une erreur d'apparence distante ne
     -- doit jamais laisser le joueur sur un écran noir ou sans caméra.
     if not ensureCamera() then return end
     local pos, look, fov = groupCameraTargets(count)
     setCameraTargets(pos, look, fov)
+    DoScreenFadeIn(400)
 
     local ok, err = pcall(applyRemoteAppearances, currentState)
     if not ok then
@@ -493,12 +503,16 @@ local function presentCreator()
     if not ensureCamera() then return end
     local pos, look, fov = creatorCameraTargets()
     setCameraTargets(pos, look, fov)
+    DoScreenFadeIn(400)
 end
 
 local function applyState(currentState)
     if type(currentState) ~= 'table' or type(currentState.me) ~= 'table' then return end
     state = currentState
     local me = state.me
+    print(('[gf_lobby] applyState (inLobby=%s, camera=%s)'):format(
+        tostring(me.inLobby), tostring(cam ~= nil and DoesCamExist(cam))
+    ))
 
     if not me.inLobby then
         if inLobby then leaveLobbyUi() end
@@ -570,6 +584,51 @@ RegisterCommand('lobbyui', function()
 end, false)
 TriggerEvent('chat:addSuggestion', '/lobbyui', 'Rouvrir l’interface du lobby')
 
+-- ---------------------------------------------------------------- Récupération d'état
+-- Une course au chargement peut faire arriver gf_lobby:state avant que le
+-- handler ne soit en place, ou voir le serveur répondre avant que la page NUI
+-- n'écoute. On retente tant qu'aucun état n'est reçu, puis on s'arrête.
+local function stopStateRetry()
+    stateRetryActive = false
+end
+
+local function startStateRetry()
+    if stateRetryActive then return end
+    stateRetryActive = true
+    CreateThread(function()
+        for attempt = 1, RETRY_MAX do
+            Wait(RETRY_INTERVAL_MS)
+            if not stateRetryActive or (state and state.me and state.me.inLobby == true) then return end
+            print(('[gf_lobby] requestState retry %d'):format(attempt))
+            TriggerServerEvent('gf_lobby:requestState')
+        end
+        stateRetryActive = false
+    end)
+end
+
+-- ---------------------------------------------------------------- Serveur → NUI
+-- Enregistré avant les callbacks NUI : le `ready` de la page déclenche un
+-- requestState, le handler doit déjà exister quand la réponse revient.
+RegisterNetEvent('gf_lobby:state', function(data)
+    if type(data) ~= 'table' then return end
+    -- La state replication peut être en retard au premier spawn : on ignore
+    -- seulement un état arrivé après un changement de mode explicite.
+    local mode = LocalPlayer.state and LocalPlayer.state.gf_mode
+    if mode and mode ~= 'lobby' then return end
+    touchNui()
+    local me = data.me or {}
+    -- Un état `inLobby=false` est transitoire (gf_core n'a pas encore attribué
+    -- le mode lobby) : il ne doit pas couper la boucle de récupération.
+    if me.inLobby == true then stopStateRetry() end
+    print(('[gf_lobby] gf_lobby:state reçu (id=%s, inLobby=%s, character=%s)'):format(
+        tostring(me.id), tostring(me.inLobby), tostring(me.character ~= nil)
+    ))
+    local ok, err = pcall(applyState, data)
+    if not ok then
+        print(('[gf_lobby] gf_lobby:state: %s'):format(tostring(err)))
+    end
+end)
+
 -- ---------------------------------------------------------------- NUI → Lua
 -- Chaque callback répond via sa fonction cb, y compris en erreur.
 local function respond(cb, payload)
@@ -595,11 +654,17 @@ local CALLBACKS = {
         nuiReady = true
         touchNui()
         print(('[gf_lobby] NUI ready (state=%s)'):format(state and 'oui' or 'non'))
-        if state then
-            sendUi('state', state)
-        else
-            TriggerServerEvent('gf_lobby:requestState')
-        end
+        -- Différer : la page peut appeler `ready` avant que le handler réseau
+        -- gf_lobby:state soit enregistré par le moteur FiveM.
+        SetTimeout(250, function()
+            if state and state.me and state.me.inLobby then
+                stopStateRetry()
+                sendUi('state', state)
+            else
+                TriggerServerEvent('gf_lobby:requestState')
+                startStateRetry()
+            end
+        end)
         respond(cb, { ok = true })
     end,
     heartbeat = function(cb)
@@ -608,7 +673,11 @@ local CALLBACKS = {
         respond(cb, { ok = true })
     end,
     requestState = function(cb)
-        TriggerServerEvent('gf_lobby:requestState')
+        print('[gf_lobby] NUI requestState')
+        SetTimeout(250, function()
+            TriggerServerEvent('gf_lobby:requestState')
+            startStateRetry()
+        end)
         respond(cb, { ok = true })
     end,
     previewCharacter = function(cb, data)
@@ -635,8 +704,10 @@ local CALLBACKS = {
         respond(cb, { ok = true })
     end,
     requestPlayers = function(cb)
+        print('[gf_lobby] NUI requestPlayers')
         TriggerServerEvent('gf_lobby:requestPlayers')
         respond(cb, { ok = true })
+        print('[gf_lobby] NUI requestPlayers -> ok')
     end,
     invite = function(cb, data)
         relay(cb, data, 'gf_lobby:invite', function(d)
@@ -661,14 +732,20 @@ local CALLBACKS = {
         end)
     end,
     selectMode = function(cb, data)
+        local mode = type(data) == 'table' and tostring(data.mode) or 'nil'
+        print(('[gf_lobby] NUI selectMode entrée (mode=%s)'):format(mode))
         relay(cb, data, 'gf_lobby:selectMode', function(d)
             return type(d) == 'table' and type(d.mode) == 'string' and #d.mode > 0
         end)
+        print(('[gf_lobby] NUI selectMode sortie (mode=%s)'):format(mode))
     end,
     play = function(cb, data)
+        local mode = type(data) == 'table' and tostring(data.mode) or 'nil'
+        print(('[gf_lobby] NUI play entrée (mode=%s)'):format(mode))
         relay(cb, data, 'gf_lobby:play', function(d)
             return type(d) == 'table' and type(d.mode) == 'string' and #d.mode > 0
         end)
+        print(('[gf_lobby] NUI play sortie (mode=%s)'):format(mode))
     end,
 }
 
@@ -703,19 +780,6 @@ for _, kind in ipairs(RELAYED) do
     end)
 end
 
-RegisterNetEvent('gf_lobby:state', function(data)
-    if type(data) ~= 'table' then return end
-    -- La state replication peut être en retard au premier spawn : on ignore
-    -- seulement un état arrivé après un changement de mode explicite.
-    local mode = LocalPlayer.state and LocalPlayer.state.gf_mode
-    if mode and mode ~= 'lobby' then return end
-    touchNui()
-    local ok, err = pcall(applyState, data)
-    if not ok then
-        print(('[gf_lobby] gf_lobby:state: %s'):format(tostring(err)))
-    end
-end)
-
 RegisterNetEvent('gf_lobby:createResult', function(result)
     sendUi('createResult', result)
 end)
@@ -731,7 +795,6 @@ RegisterNetEvent('gf_core:modeChanged', function(mode)
 end)
 
 RegisterNetEvent('gf_core:spawned', function()
-    lastCoreSpawnAt = now()
     if not inLobby or not state then return end
     -- Le spawn de gf_core peut se terminer après l'état : on réapplique après
     -- un court délai, une seule fois.

@@ -64,6 +64,22 @@
     return firstAvailable();
   }
 
+  function currentQueue() {
+    var state = Lobby.state;
+    var queue = state && state.queue;
+    if (!queue || typeof queue !== 'object') return null;
+    return queue;
+  }
+
+  function canCancelQueue() {
+    var queue = currentQueue();
+    var state = Lobby.state;
+    if (!queue || !state || !state.me) return false;
+    if (!isLeader()) return false;
+    if (queue.ownerId == null) return true;
+    return Number(queue.ownerId) === Number(state.me.id);
+  }
+
   function displayLabel(mode) {
     if (!mode) return 'Aucun mode';
     return mode.short || mode.label || mode.id || 'Mode';
@@ -169,17 +185,24 @@
         Lobby.toast('Le chef choisit le mode.', 'info');
         return;
       }
+      var queue = currentQueue();
       var request = ++pendingPlay;
       playing = true;
       clearLaunchTimer();
       launchTimer = window.setTimeout(finishAction, 6000);
-      Lobby.send('play', { mode: mode.id }).then(function (result) {
+      var callback = 'play';
+      var payload = { mode: mode.id };
+      if (queue && canCancelQueue()) {
+        callback = 'selectMode';
+        payload = { mode: queue.mode || mode.id, cancel: true };
+      }
+      Lobby.send(callback, payload).then(function (result) {
         if (request !== pendingPlay) return;
         playing = false;
         if (result && result.ok === false) {
           clearLaunchTimer();
           launching = false;
-          Lobby.toast(result.error || 'Impossible de lancer la partie.', 'error');
+          Lobby.toast(result.error || 'Action impossible.', 'error');
           render();
         }
       });
@@ -241,7 +264,6 @@
       grid.appendChild(card);
     }
 
-    var partySize = (Lobby.state && Lobby.state.party && Lobby.state.party.size) || 1;
     var currentId = current ? current.id : null;
     for (var j = 0; j < cards.length; j += 1) {
       var c = cards[j];
@@ -260,31 +282,50 @@
       ? 'Sélection : ' + displayLabel(current) + (list.length ? ' · ' + list.length + ' modes' : '')
       : 'Aucun mode disponible';
 
-    var minPlayers = (current && current.minPlayers) || 1;
-    var enoughPlayers = partySize >= minPlayers;
-    var canPlay = !!(
-      leader &&
-      current &&
-      current.available &&
-      !current.placeholder &&
-      enoughPlayers &&
-      !launching &&
-      !playing
-    );
+    var queue = currentQueue();
+    var queuing = !!queue;
+    var canCancel = queuing && canCancelQueue();
+    var canPlay;
+
+    if (queuing) {
+      /* Recherche serveur en cours : le bouton devient ANNULER pour le chef
+         qui a lancé la recherche, désactivé avec le compteur pour les autres.
+         La taille de l'escouade n'est plus un critère. */
+      canPlay = canCancel && !playing;
+    } else {
+      canPlay = !!(
+        leader &&
+        current &&
+        current.available &&
+        !current.placeholder &&
+        !launching &&
+        !playing
+      );
+    }
+
     playButton.disabled = !canPlay;
     playButton.setAttribute('aria-disabled', canPlay ? 'false' : 'true');
-    playSub.textContent = current ? displayLabel(current) : 'Aucun mode';
-    playButton.setAttribute(
-      'aria-label',
-      canPlay ? 'Lancer ' + displayLabel(current) : 'Lancement indisponible'
-    );
-
-    if (!leader) hintNode.textContent = 'Le chef choisit le mode';
-    else if (!enoughPlayers) {
-      hintNode.textContent = 'Il faut ' + minPlayers + ' joueurs (escouade : ' + partySize + ')';
-    } else if (launching) hintNode.textContent = 'Lancement en cours…';
-    else if (!current) hintNode.textContent = 'Aucun mode disponible';
-    else hintNode.textContent = '';
+    if (queuing) {
+      var size = Number(queue.size) || 0;
+      var min = Number(queue.min) || 20;
+      var label = queue.mode || (current && current.id) || 'attack';
+      playLabel.textContent = canCancel ? 'ANNULER' : 'RECHERCHE';
+      playSub.textContent = label === 'attack' ? 'Attaque de zone' : label;
+      playButton.setAttribute('aria-label', canCancel ? 'Annuler la recherche' : 'Recherche en cours');
+      hintNode.textContent = 'Recherche ' + size + '/' + min;
+      statusNode.textContent = 'Recherche serveur · ' + size + '/' + min + ' joueurs';
+    } else {
+      playLabel.textContent = 'JOUER';
+      playSub.textContent = current ? displayLabel(current) : 'Aucun mode';
+      playButton.setAttribute(
+        'aria-label',
+        canPlay ? 'Lancer ' + displayLabel(current) : 'Lancement indisponible'
+      );
+      if (!leader) hintNode.textContent = 'Le chef choisit le mode';
+      else if (launching) hintNode.textContent = 'Lancement en cours…';
+      else if (!current) hintNode.textContent = 'Aucun mode disponible';
+      else hintNode.textContent = '';
+    }
   }
 
   Lobby.on('state', function (state) {

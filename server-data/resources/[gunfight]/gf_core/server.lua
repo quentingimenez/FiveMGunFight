@@ -516,14 +516,15 @@ RegisterCommand('lobby', function(src)
     if src > 0 then setMode(src, 'lobby') end
 end, false)
 
--- /attack : lance la recherche de partie (file d'attente de gf_attack)
+-- /attack : la recherche de partie se lance depuis le lobby (file serveur de
+-- gf_lobby) ; la commande y ramène le joueur.
 RegisterCommand('attack', function(src)
     if src <= 0 then return end
-    if GetResourceState('gf_attack') == 'started' then
-        exports.gf_attack:Search(src)
-    else
-        notify(src, 'Le mode Attaque de zone est indisponible pour le moment.')
+    if GetResourceState('gf_attack') ~= 'started' then
+        return notify(src, 'Le mode Attaque de zone est indisponible pour le moment.')
     end
+    if getMode(src) ~= 'lobby' then setMode(src, 'lobby') end
+    notify(src, 'Choisis Attaque de zone dans le lobby puis JOUER pour lancer la recherche.')
 end, false)
 
 RegisterCommand('redzone', function(src)

@@ -175,7 +175,7 @@ button {
   right: 0;
   z-index: 25;
   display: grid;
-  grid-template-columns: 300px minmax(320px, 1fr) auto;
+  grid-template-columns: 300px minmax(320px, 1fr) auto auto;
   align-items: center;
   gap: 20px;
   height: 90px;
@@ -301,6 +301,38 @@ button {
   font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
+}
+
+/* Badge build — ancré à droite, après la barre de statut */
+.build-badge {
+  justify-self: end;
+  max-width: 180px;
+  overflow: hidden;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(10, 13, 18, 0.62);
+  color: #b6c0ce;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.build-badge.is-sync {
+  border-color: rgba(255, 200, 87, 0.4);
+  color: var(--amber);
+}
+
+.build-badge.is-ok {
+  border-color: rgba(70, 211, 154, 0.38);
+  color: var(--green);
+}
+
+.build-badge.is-offline {
+  border-color: rgba(255, 77, 87, 0.4);
+  color: var(--red);
 }
 
 /* Panneaux */
@@ -902,7 +934,7 @@ button {
 /* Adaptations */
 @media (max-width: 1500px) {
   #topbar {
-    grid-template-columns: 260px minmax(280px, 1fr) auto;
+    grid-template-columns: 260px minmax(280px, 1fr) auto auto;
     padding: 0 28px;
   }
 
@@ -933,7 +965,7 @@ button {
 
 @media (max-width: 1180px) {
   #topbar {
-    grid-template-columns: 220px minmax(240px, 1fr) auto;
+    grid-template-columns: 220px minmax(240px, 1fr) auto auto;
     gap: 12px;
   }
 
@@ -947,6 +979,13 @@ button {
 
   .status-pill {
     padding: 6px 9px;
+  }
+
+  .build-badge {
+    max-width: 132px;
+    padding: 5px 7px;
+    font-size: 8px;
+    letter-spacing: 0.08em;
   }
 
   #profile-panel {
