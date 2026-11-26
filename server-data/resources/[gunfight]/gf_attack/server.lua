@@ -266,6 +266,7 @@ RegisterNetEvent('gf_attack:useItem', function(item)
     inv[item] = inv[item] - 1
     Using[src] = t + math.floor(def.duration * 1000)
     TriggerClientEvent('gf_attack:applyItem', src, item)
+    TriggerEvent('gf:itemUsed', src, def.stat, def.amount, math.floor(def.duration * 1000))
     sendItems(src)
 end)
 

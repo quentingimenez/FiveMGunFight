@@ -288,7 +288,10 @@ AddEventHandler('gf:playerKilled', function(victim, killer, weapon, mode)
         k.kills = k.kills + 1
         k.streak = k.streak + 1
         if k.streak > k.best then k.best = k.streak end
-        if Config.HealOnKill then TriggerClientEvent('gf_redzone:heal', killer) end
+        if Config.HealOnKill then
+            TriggerClientEvent('gf_redzone:heal', killer)
+            TriggerEvent('gf:healGranted', killer)
+        end
         for _, n in ipairs(Config.StreakAnnounces) do
             if k.streak == n then
                 eachPlayer(function(src)
