@@ -104,8 +104,13 @@ RegisterNetEvent('gf_lobby:state', function(data)
         and data.me.inLobby == true
 end)
 
---- Un changement de mode ou un spawn rend la main au jeu.
-RegisterNetEvent('gf_core:modeChanged', function()
+--- Un changement de mode ou un spawn rend la main au jeu. Le lobby ferme son
+--- UI sur ce même événement sans renvoyer `gf_lobby:state` : sans ce nettoyage
+--- le garde-fou resterait posé et Échap n'ouvrirait jamais le menu en partie.
+RegisterNetEvent('gf_core:modeChanged', function(mode)
+    if type(mode) == 'string' and mode ~= 'lobby' then
+        lobbyUiOpen = false
+    end
     if menuOuvert then fermerMenu() end
 end)
 
