@@ -124,3 +124,26 @@ Config.Loadouts = {
         },
     },
 }
+
+-- ---------------------------------------------------------------------------
+-- Validation des tirs (côté serveur, module pur shot_validation.lua)
+-- enabled : active la vérification des dégâts reçus par weaponDamageEvent.
+-- alwaysAllowed : armes toujours autorisées, même hors loadout (armes
+--   environnementales, explosions). Liste à confirmer en jeu.
+-- damageCaps : par nom d'arme, plafonds de dégâts { body = n, head = n }.
+--   LAISSE VIDE tant que le chantier C6 n'a pas extrait les valeurs de
+--   weapons.meta : ne jamais inventer de chiffre.
+-- fireIntervals : par nom d'arme, millisecondes entre deux tirs.
+--   LAISSE VIDE tant que le chantier C6 n'a pas extrait les valeurs de
+--   weapons.meta : ne jamais inventer de chiffre.
+-- headComponents : composants GTA comptés comme « tête ». À confirmer en jeu.
+-- networkToleranceMs : tolérance sur l'horodatage réseau des tirs.
+-- ---------------------------------------------------------------------------
+Config.ShotValidation = {
+    enabled = true,
+    alwaysAllowed = { 'WEAPON_UNARMED', 'WEAPON_RUN_OVER_BY_CAR', 'WEAPON_RAMMED_BY_CAR', 'WEAPON_EXPLOSION' },
+    damageCaps = {},
+    fireIntervals = {},
+    headComponents = { 20 },
+    networkToleranceMs = 50,
+}
