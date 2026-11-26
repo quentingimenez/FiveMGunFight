@@ -1268,8 +1268,8 @@
         // Course au chargement : la page NUI peut envoyer son premier aperçu
         // avant que les callbacks Lua soient enregistrés. L'aperçu suivant
         // rétablit l'état ; inutile d'afficher une erreur de transport brute.
-        if (response && response.error === 'callback_unreachable') return;
-        toast(window.NUI.errorText(response && response.error, 'Impossible d\'afficher l\'aperçu.'), 'error');
+        response = response || {};
+        if (response.error !== 'callback_unreachable') toast(window.NUI.errorText(response.error, 'Impossible d\'afficher l\'aperçu.'), 'error');
         return;
       }
       if (!forceDefaults || seq !== syncSeq) return;
@@ -1754,7 +1754,8 @@
       applyState(state);
     });
     Lobby.on('appearanceResult', function (result) {
-      if (result && result.ok) {
+      result = result || {};
+      if (result.ok) {
         finishSubmit(true);
         setSubmitting(false);
         model.mode = 'create';
@@ -1763,17 +1764,18 @@
         Lobby.releaseScreen();
         toast('Apparence enregistrée.', 'success');
       } else {
-        finishSubmit(false, window.NUI.errorText(result && result.error, 'Enregistrement refusé.'));
+        finishSubmit(false, window.NUI.errorText(result.error, 'Enregistrement refusé.'));
       }
     });
     Lobby.on('createResult', function (result) {
-      if (result && result.ok) {
+      result = result || {};
+      if (result.ok) {
         createHandled = true;
         finishSubmit(true);
         setSubmitting(false);
         Lobby.releaseScreen();
       } else {
-        finishSubmit(false, window.NUI.errorText(result && result.error, 'Création refusée.'));
+        finishSubmit(false, window.NUI.errorText(result.error, 'Création refusée.'));
       }
     });
   }
