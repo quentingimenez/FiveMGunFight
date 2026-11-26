@@ -20,7 +20,7 @@ Le contenu exact est dans [`.github/branch-protection.json`](../.github/branch-p
 | 1 approbation | l'auteur ne peut pas s'auto-approuver |
 | Revue `CODEOWNERS` obligatoire | `@WardenPro` ou `@Zhics` doit approuver |
 | Approbation invalidée après un nouvel envoi | une modification après revue doit être relue |
-| Status checks requis (stricts) | `Qualité du dépôt`, `Construire et publier l'image` et `Vérifier le démarrage des ressources` doivent passer, sur la pointe de la branche |
+| Status checks requis (non stricts) | `Qualité du dépôt`, `Construire et publier l'image` et `Vérifier le démarrage des ressources` doivent passer ; la branche n'a pas à être à jour avec `main` (sinon chaque fusion relancerait la CI complète de toutes les PR ouvertes), l'envoi sur `main` rejoue la CI après fusion |
 | Conversations résolues | aucun commentaire bloquant ne reste ouvert |
 | Force-push interdit | pas de réécriture d'historique sur `main` |
 | Suppression interdite | `main` ne peut pas être supprimée |
@@ -74,8 +74,8 @@ La procédure ci-dessous s'applique aussitôt après le changement de plan.
    - `Dismiss stale pull request approvals when new commits are pushed` ;
    - `Require review from Code Owners` ;
    - `Require conversation resolution before merging` ;
-   - `Require status checks to pass before merging` →
-     `Require branches to be merged up to date` ;
+   - `Require status checks to pass before merging`, **sans** cocher
+     `Require branches to be up to date before merging` ;
    - dans la liste des checks, sélectionner **`Qualité du dépôt`**,
      **`Construire et publier l'image`** et
      **`Vérifier le démarrage des ressources`** (ils n'apparaissent qu'après un
@@ -165,5 +165,4 @@ GF_ALLOW_MAIN=1 git push
 | `HTTP 403 ... Upgrade to GitHub Pro` | dépôt privé en plan gratuit | passer à GitHub Pro ou rendre le dépôt public, puis relancer |
 | Les checks n'apparaissent pas dans la liste | aucun run de CI sur une pull request n'existe encore | ouvrir une pull request, attendre le premier run, puis éditer la règle |
 | Une pull request reste « blocked » | un check requis est en échec ou jamais lancé | corriger et relancer ; vérifier les noms exacts des jobs dans `.github/workflows/` |
-| Fusion impossible malgré tout vert | branche en retard sur `main` (checks stricts) | rebaser la branche (`git rebase origin/main` puis `git push --force-with-lease`) |
 | Urgence en production | `enforce_admins: true` bloque aussi le propriétaire | modifier temporairement la règle dans l'interface, corriger, puis remettre la règle immédiatement après |

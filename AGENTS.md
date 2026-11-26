@@ -196,9 +196,9 @@ gh pr view --json number,state,mergeable,statusCheckRollup
   ```
 
   La branche reste une suite linéaire de commits au-dessus de `main`, sans
-  commit de fusion, et la PR ne montre que ses propres changements. Les checks
-  étant stricts (branche à jour exigée), c'est aussi la manière de débloquer une
-  PR verte mais en retard.
+  commit de fusion, et la PR ne montre que ses propres changements. Une PR en
+  retard sur `main` mais sans conflit n'a pas besoin d'être rebasée : les checks
+  ne sont pas stricts, et chaque mise à jour relancerait toute la CI.
 - **Force-push** : uniquement `--force-with-lease`, uniquement sur la branche de
   la PR en cours. Jamais sur `main` (refusé par la protection de branche et par
   le hook `pre-push`). Si un relecteur a déjà commenté, le prévenir dans la PR

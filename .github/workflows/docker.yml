@@ -31,7 +31,7 @@ permissions:
 jobs:
   image:
     name: Construire et publier l'image
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -151,13 +151,12 @@ jobs:
   smoke:
     name: Vérifier le démarrage des ressources
     needs: image
-    # Une seule vérification à la fois : la clé de licence CI est partagée par
-    # tous les runs, et Cfx.re déconseille deux serveurs simultanés sur une
-    # même clé. Le label smoke-licence n'est porté que par un seul runner : les
-    # jobs attendent leur tour dans sa file, sans jamais être annulés. Un groupe
-    # de concurrence partagé ne convient pas : GitHub n'y garde qu'un run en
-    # attente et annule les autres (« higher priority waiting request »).
-    runs-on: [self-hosted, Linux, X64, smoke-licence]
+    # Pas de groupe de concurrence partagé entre références : GitHub n'y garde
+    # qu'un run en attente et annule les autres (« higher priority waiting
+    # request »), ce qui faisait perdre leur smoke à d'autres PR et à main.
+    # Deux smoke de références différentes peuvent donc tourner en même temps
+    # sur la clé CI, chacun sur sa propre machine GitHub (voir docs/qualite.md).
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
       contents: read

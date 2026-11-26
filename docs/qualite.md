@@ -37,41 +37,27 @@ sauté, avec une note, sans échec. Les journaux `smoke.log` et
 `smoke-static.log` sont publiés en artefact pendant 7 jours, y compris en cas
 d'échec, après vérification qu'ils ne contiennent pas la clé de licence.
 
-### Un seul smoke à la fois : le runner `smoke-licence`
+### Smoke tests de plusieurs PR : pas de file commune
 
-La clé de licence CI est partagée par tous les runs. Cfx.re n'empêche pas
-techniquement deux serveurs simultanés sur une même clé, mais le déconseille
-(connexions perturbées, un serveur peut en masquer un autre dans la liste) :
-un compte a droit à trois clés, une par serveur lancé en même temps. Les smoke
-tests sont donc sérialisés.
+Tous les jobs tournent sur les runners hébergés par GitHub (`ubuntu-24.04`),
+gratuits et illimités pour un dépôt public, avec une machine neuve par job.
 
-La sérialisation passe par le **label de runner `smoke-licence`**, porté par un
-seul runner : le job `smoke` demande `[self-hosted, Linux, X64, smoke-licence]`
-et attend son tour dans la file de ce runner, sans jamais être annulé. Les
-autres jobs peuvent aussi tourner sur ce runner, ils ne font qu'occuper la
-file.
-
-Un groupe `concurrency` global (l'ancien `smoke-licence`) ne convient pas :
-GitHub n'y garde qu'**un seul** run en attente et annule les autres
-(« Canceling since a higher priority waiting request for smoke-licence
-exists »). Quand plusieurs PR étaient mises à jour ensemble, le check requis
+Le job `smoke` n'a plus de groupe `concurrency` partagé. Un tel groupe
+(l'ancien `smoke-licence`) ne garde qu'**un seul** run en attente et annule les
+autres (« Canceling since a higher priority waiting request for smoke-licence
+exists ») : quand plusieurs PR étaient mises à jour ensemble, le check requis
 `Vérifier le démarrage des ressources` était annulé sur certaines, et un envoi
 sur `main` pouvait perdre son smoke au profit d'une PR. Le groupe est
 désormais `smoke-${{ github.ref }}` : seul un nouvel envoi sur la même PR
 annule son smoke obsolète, comme pour le job `image`
 (`image-${{ github.ref }}`).
 
-Un verrou dans le job ne remplace pas ce label : chaque runner a son propre
-démon Docker (l'image de base est retéléchargée à chaque smoke), il n'existe
-donc pas d'état partagé entre runners où poser ce verrou.
-
-**À configurer sur l'hôte des runners** : un et un seul runner (par exemple
-celui nommé `gh-fivem-<horodatage>`) s'enregistre avec le label
-supplémentaire `smoke-licence` (`config.sh --labels smoke-licence`, ou la
-variable de labels du script ou de l'image qui recrée les runners éphémères
-`gh-fivem-N-<horodatage>`). Sans ce runner, le smoke reste en file jusqu'à ce
-qu'il apparaisse (24 h au plus avant échec côté GitHub) ; avec deux runners
-portant le label, deux smoke peuvent à nouveau tourner en même temps.
+Contrepartie : les smoke de deux références différentes peuvent démarrer en
+même temps avec la même clé de licence CI, chacun sur sa machine. Cfx.re ne
+l'empêche pas techniquement mais le déconseille ; le smoke ne dure que
+quelques minutes et ne reçoit aucun joueur. Si cela pose problème, la parade
+est une deuxième clé CI (un compte a droit à trois clés), pas un groupe de
+concurrence partagé.
 
 ## Les vérifications statiques (`scripts/verifier.sh`)
 
@@ -108,7 +94,7 @@ que `fetch-depth: 0` ne ralentisse pas le job principal.
 | `ConfigurationServeur` | les six ressources `gf_*` sont démarrées dans `server.cfg` ; `sessionmanager`/`hardcap` n'y reviennent pas ; `.env.example` contient toutes les clés attendues et aucun secret ; `.gitignore` et `.dockerignore` protègent `.env`, `secrets.cfg`, le cache et `gf_lobby/data/characters.json` |
 | `InfraDocker` | txAdmin limité à 127.0.0.1, healthcheck FXServer, plafonds mémoire des deux services, nom de projet Compose, `secrets.cfg` en 600, `FROM` Debian épinglé par digest, image MariaDB épinglée par digest, `GF_SEED_MAPS`/`MAPS_DEFAUT` dans l'entrypoint |
 | `EnvironnementsCompose` | les trois fichiers Compose existent ; le dev construit l'image et monte `./server-data` ; la prod utilise `${IMAGE_REF}`, le volume `maps` et les volumes `gunfight-prod-*` distincts ; le socle ne déclare ni `build` ni `image` pour `fxserver` |
-| `ChaineCI` | toutes les actions sont épinglées par SHA ; chaque job a un timeout, des permissions explicites et tourne sur Ubuntu 24.04 ; les nouveaux contrôles (luacheck, actionlint, hadolint, gitleaks, ruff) sont présents ; `.fxserver-version` est renseigné avec une URL et un SHA256 valides ; Dependabot suit les actions, les images et `docker-compose` et ignore MariaDB ≥ 11.5 ; `docker.yml` a la concurrence de l'image, le smoke sur le runner `smoke-licence` avec un groupe par référence, l'artefact de journaux et le test statique sans licence ; le nom du check de démarrage et sa présence dans la protection de branche sont inchangés |
+| `ChaineCI` | toutes les actions sont épinglées par SHA ; chaque job a un timeout, des permissions explicites et tourne sur les runners GitHub `ubuntu-24.04` ; les nouveaux contrôles (luacheck, actionlint, hadolint, gitleaks, ruff) sont présents ; `.fxserver-version` est renseigné avec une URL et un SHA256 valides ; Dependabot suit les actions, les images et `docker-compose` et ignore MariaDB ≥ 11.5 ; `docker.yml` a la concurrence de l'image, le smoke avec un groupe de concurrence par référence, l'artefact de journaux et le test statique sans licence ; le nom du check de démarrage et sa présence dans la protection de branche sont inchangés |
 | `MapsEnJeu` | structure de `maps.json` : noms, rayons positifs, polygones d'au moins trois sommets, points de départ présents, identifiants uniques |
 | `Documentation` | les documents (`README`, `CONTRIBUTING`, `SECURITY`, `docs/`, dont `docs/lobby.md`, modèle de PR, `CODEOWNERS`) existent et ne sont pas vides ; le README cite chaque ressource ; chaque workflow déclare `on:` et `jobs:` |
 | `DepotGit` | aucun fichier secret n'est suivi par Git (`git ls-files`), y compris `gf_lobby/data/characters.json` |

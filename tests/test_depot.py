@@ -608,11 +608,10 @@ class ChaineCI(unittest.TestCase):
                         r"(?m)^    timeout-minutes:\s*\d+\s*$",
                         "chaque job doit borner sa durée",
                     )
-                    # Un label supplémentaire (ex. smoke-licence) reste permis.
                     self.assertRegex(
                         bloc,
-                        r"(?m)^    runs-on: \[self-hosted, Linux, X64(?:, [\w-]+)*\]\s*$",
-                        "les jobs doivent tourner sur les runners auto-hébergés (Ubuntu 24.04)",
+                        r"(?m)^    runs-on: ubuntu-24\.04\s*$",
+                        "les jobs doivent tourner sur les runners GitHub Ubuntu 24.04",
                     )
                     self.assertRegex(
                         bloc,
@@ -732,19 +731,13 @@ class ChaineCI(unittest.TestCase):
             "hors PR de fork ou de Dependabot, un secret absent doit faire échouer le job",
         )
 
-    def test_smoke_serialise_par_label_sans_annuler_les_autres_refs(self) -> None:
+    def test_smoke_sans_annuler_les_autres_refs(self) -> None:
         # GitHub ne garde qu'un run en attente par groupe de concurrence : un
-        # groupe global annulait le smoke des autres PR (et même de main). La
-        # sérialisation passe par un runner unique portant le label dédié ;
-        # le groupe ne regroupe plus que les runs d'une même référence.
+        # groupe global annulait le smoke des autres PR (et même de main). Le
+        # groupe ne regroupe donc que les runs d'une même référence.
         bloc = bloc_service(lire(self.WORKFLOWS / "docker.yml"), "smoke")
         if bloc is None:
             self.fail("job smoke absent de docker.yml")
-        self.assertRegex(
-            bloc,
-            r"(?m)^    runs-on: \[self-hosted, Linux, X64, smoke-licence\]\s*$",
-            "le smoke doit tourner sur le runner unique portant le label smoke-licence",
-        )
         groupe = re.search(r"(?m)^      group:\s*(.+?)\s*$", bloc)
         if groupe is None:
             self.fail("concurrence absente du job smoke")
