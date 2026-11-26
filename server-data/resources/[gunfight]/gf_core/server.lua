@@ -437,6 +437,16 @@ local function giveWeapons(src, ids, armour)
     TriggerEvent('gf:armourGranted', src)
 end
 
+-- Le changement en Redzone conserve la vie, le gilet et les armes inchangées.
+local function updateRedzoneWeapons(src, ids)
+    if Modes[src] ~= 'redzone' then return end
+    local liste = buildWeaponList(resolveSelection(src, ids))
+    local noms = {}
+    for _, entree in ipairs(liste) do noms[#noms + 1] = entree.name end
+    Armes[src] = ShotValidation.ensembleArmes(noms)
+    TriggerClientEvent('gf_core:updateRedzoneWeapons', src, liste)
+end
+
 exports('GetOwnedWeapons', ownedWeapons)
 exports('GetEquippedWeapons', equippedWeapons)
 exports('OwnsWeapon', owns)
@@ -456,6 +466,7 @@ exports('GetStarterWeapons', function() return Config.StarterWeapons end)
 exports('ResolveSelection', resolveSelection)
 exports('BuildWeaponList', buildWeaponList)
 exports('GiveWeapons', giveWeapons)
+exports('UpdateRedzoneWeapons', updateRedzoneWeapons)
 exports('GetSelectionSettings', function()
     return { count = Config.SelectionCount, armour = Config.SelectionArmour }
 end)

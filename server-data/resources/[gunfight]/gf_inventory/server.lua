@@ -110,6 +110,15 @@ RegisterNetEvent('gf_inventory:equip', function(slot, weaponId)
     if (slot ~= 1 and slot ~= 2) or type(weaponId) ~= 'string' or #weaponId > 48 then return end
     withInventory(src, function(entry)
         if not core:OwnsWeapon(src, weaponId) then return end
+        if core:GetMode(src) == 'redzone' then
+            local canChange = GetResourceState('gf_redzone') == 'started'
+                and exports.gf_redzone:CanChangeWeapons(src)
+            if not canChange then
+                core:Notify(src, 'Sors de la zone de combat pour changer d’arme.')
+                TriggerClientEvent('gf_inventory:locker', src, lockerData(src, entry))
+                return
+            end
+        end
         local slots = core:ResolveSelection(src, entry.slots)
         local other = slot == 1 and 2 or 1
         if slots[other] == weaponId then slots[other] = slots[slot] end
@@ -119,6 +128,7 @@ RegisterNetEvent('gf_inventory:equip', function(slot, weaponId)
             { entry.id, slots[1], slots[2] })
         if not GetPlayerName(src) or identifierOf(src) ~= entry.id then return end
         entry.slots = slots
+        TriggerEvent('gf_inventory:selectionChanged', src)
         TriggerClientEvent('gf_inventory:locker', src, lockerData(src, entry))
     end)
 end)

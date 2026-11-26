@@ -95,6 +95,23 @@ local function insideZone(src, margin)
     return distToZone(src) <= (margin or 0.0)
 end
 
+local function canChangeWeapons(src)
+    if not S.players[src] or not S.map or GetPlayerPed(src) == 0 then return false end
+    -- La marge est identique à celle qui autorise les dégâts entre joueurs.
+    return not insideZone(src, 3.0)
+end
+
+exports('CanChangeWeapons', canChangeWeapons)
+
+AddEventHandler('gf_inventory:selectionChanged', function(src)
+    if core:GetMode(src) ~= 'redzone' then return end
+    if not canChangeWeapons(src) then
+        core:Notify(src, 'Équipement enregistré : il sera appliqué à ta prochaine apparition.')
+        return
+    end
+    core:UpdateRedzoneWeapons(src, core:ResolveSelection(src, core:GetEquippedWeapons(src)))
+end)
+
 -- Appelé par gf_core pour chaque tir : on ne peut toucher / être touché que dans la zone
 exports('AllowDamage', function(sender, victim)
     if S.phase ~= 'live' then return false end

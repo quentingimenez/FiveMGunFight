@@ -392,6 +392,37 @@ RegisterNetEvent('gf_core:giveWeapons', function(list, armour)
     applyWeapons(PlayerPedId(), list, armour)
 end)
 
+RegisterNetEvent('gf_core:updateRedzoneWeapons', function(list)
+    local ped = PlayerPedId()
+    if LocalPlayer.state.gf_mode ~= 'redzone' or IsEntityDead(ped) then return end
+    if type(list) ~= 'table' then return end
+    local selected, oldSlot = GetSelectedPedWeapon(ped), nil
+    local wanted, nextSlots = {}, {}
+    for i, hash in ipairs(slots) do if hash == selected then oldSlot = i end end
+    for _, weapon in ipairs(list) do
+        local hash = joaat(weapon.name)
+        wanted[hash] = true
+        nextSlots[#nextSlots + 1] = hash
+    end
+    for _, hash in ipairs(slots) do
+        if not wanted[hash] then RemoveWeaponFromPed(ped, hash) end
+    end
+    for i, weapon in ipairs(list) do
+        local hash = nextSlots[i]
+        if not HasPedGotWeapon(ped, hash, false) then
+            GiveWeaponToPed(ped, hash, weapon.ammo or 250, false, false)
+            SetPedInfiniteAmmo(ped, true, hash)
+            for _, comp in ipairs(weapon.components or {}) do
+                GiveWeaponComponentToPed(ped, hash, joaat(comp))
+            end
+            if weapon.tint then SetPedWeaponTintIndex(ped, hash, weapon.tint) end
+        end
+    end
+    slots = nextSlots
+    if wanted[selected] then SetCurrentPedWeapon(ped, selected, true)
+    elseif oldSlot and slots[oldSlot] then SetCurrentPedWeapon(ped, slots[oldSlot], true) end
+end)
+
 -- ---------------------------------------------------------------- Boucle permanente
 CreateThread(function()
     SetMaxWantedLevel(0)
