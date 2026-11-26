@@ -8,18 +8,34 @@
   captures en rafale font clignoter le jeu en noir, donc le script refuse une
   nouvelle capture moins de 5 secondes après la précédente.
 
-  Windows PowerShell 5.1 :
-    powershell -File scripts\capturer-jeu.ps1 -Sortie capture.png
-    powershell -File scripts\capturer-jeu.ps1 -Sortie capture.png -Pleine
+  Sans -Sortie, l'image va dans %TEMP%\gf-captures\capture-<heure>.png. Une
+  sortie dans le dépôt est refusée (AGENTS.md § 5 : aucun fichier de travail
+  dans l'arbre).
 
-  Codes de sortie : 0 capture écrite, 1 jeu absent, 2 capture trop rapprochée.
+  Windows PowerShell 5.1 :
+    powershell -File scripts\capturer-jeu.ps1
+    powershell -File scripts\capturer-jeu.ps1 -Sortie $env:TEMP\lobby.png -Pleine
+
+  Codes de sortie : 0 capture écrite, 1 jeu absent, 2 capture trop rapprochée,
+  3 sortie dans le dépôt.
   Ne publie jamais une capture sans l'avoir regardée (docs/debug-test.md § 6).
 #>
 param(
-  [Parameter(Mandatory = $true)][string]$Sortie,
+  [string]$Sortie,
   # Taille réelle ; par défaut l'image est réduite de moitié (plus légère à lire).
   [switch]$Pleine
 )
+
+if (-not $Sortie) {
+  $Sortie = Join-Path $env:TEMP ('gf-captures\capture-{0:yyyyMMdd-HHmmss}.png' -f (Get-Date))
+}
+# Relatif au dossier courant de PowerShell (GetFullPath suivrait celui du processus).
+$chemin = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Sortie)
+$depot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\') + '\'
+if ($chemin.StartsWith($depot, [System.StringComparison]::OrdinalIgnoreCase)) {
+  Write-Error "Sortie refusée : $chemin est dans le dépôt. Écris la capture hors du dépôt (sans -Sortie : %TEMP%\gf-captures)."
+  exit 3
+}
 
 $marque = Join-Path $env:TEMP 'gf-capturer-jeu.derniere'
 if (Test-Path $marque) {
@@ -64,7 +80,7 @@ if (-not $Pleine) {
   $image.Dispose()
   $image = $reduite
 }
-$chemin = [System.IO.Path]::GetFullPath($Sortie)
+New-Item -ItemType Directory -Force -Path (Split-Path $chemin) | Out-Null
 $image.Save($chemin, [System.Drawing.Imaging.ImageFormat]::Png)
 $image.Dispose()
 Set-Content -Path $marque -Value '' -Encoding ascii

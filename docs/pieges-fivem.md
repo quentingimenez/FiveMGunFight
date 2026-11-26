@@ -17,7 +17,7 @@ essai**.
 |---|---|---|
 | Recharger une ressource | `python scripts/fivem_rcon.py restart gf_lobby` | 1 à 2 s |
 | Lire les erreurs du client | `python scripts/journal_client.py --ressource gf_lobby` | immédiat |
-| Voir l'écran | `powershell -File scripts\capturer-jeu.ps1 -Sortie capture.png` | 1 s |
+| Voir l'écran | `powershell -File scripts\capturer-jeu.ps1` (image dans `%TEMP%\gf-captures`) | 1 s |
 | Signature d'un natif | `python scripts/native.py CreateRuntimeTxd` | immédiat |
 
 - `fivem_rcon.py` ne marche qu'avec la surcouche `docker-compose.dev.yml` et
@@ -106,5 +106,8 @@ essai**.
 - **Pas de captures en rafale** : plusieurs `PrintWindow` par seconde font
   clignoter le jeu en noir chez le joueur. `capturer-jeu.ps1` refuse une
   capture moins de 5 s après la précédente.
+- **Aucun fichier de travail dans le dépôt** (AGENTS.md § 5) : captures,
+  journaux copiés et notes vont hors de l'arbre. `capturer-jeu.ps1` écrit par
+  défaut dans `%TEMP%\gf-captures` et refuse une sortie dans le dépôt.
 - **Le clavier n'est pas injectable** (voir [`debug-test.md`](debug-test.md)
   § 6) : un agent peut cliquer la NUI, pas conduire ni tirer.
