@@ -105,8 +105,10 @@ statistiques : uniquement des données réelles.
 3. Aucun personnage : le serveur envoie l'état avec `me.character = nil`.
 4. Le client bascule la caméra en gros plan, applique un aperçu par défaut,
    ouvre la NUI sur l'écran de création.
-5. Le joueur choisit nom, genre, carnation et style (4 variantes + aléatoire),
-   voit le personnage en 3D. Chaque changement envoie `previewCharacter`.
+5. Le joueur choisit nom et genre, puis compose son visage (deux parents,
+   ressemblance, teint), sa coupe, sa tenue, ses accessoires et ses tatouages,
+   avec une remise à zéro et un mode aléatoire. Chaque changement envoie
+   `previewCharacter`.
 6. `createCharacter` : validation serveur, sauvegarde JSON, envoi d'un état avec
    le personnage.
 7. Le client applique le personnage, recadre la caméra sur l'escouade et affiche
@@ -192,8 +194,9 @@ server-data/resources/[gunfight]/gf_lobby/
     ├── js/app.js              # état global, shell, profil, toasts, routage
     ├── js/modes.js            # barre de modes + bouton Jouer
     ├── js/squad.js            # panneau escouade + invitations
-    ├── js/creator.js          # création de personnage
-    └── js/customization.js    # onglets verrouillés (placeholders)
+    ├── js/creator.js          # éditeur de personnage (visage, tenue, tatouages)
+    ├── js/customization.js    # onglets Armes (placeholder) et Personnage (éditeur)
+    └── data/tattoos.json      # catalogue vanilla compact (généré par script)
 ```
 
 Ordre de démarrage : `gf_ui`, `gf_core`, `gf_lobby`, `gf_maps`, `gf_attack`,
@@ -214,8 +217,12 @@ Transport : `fetch('https://gf_lobby/<callback>', {method:'POST', body: JSON})`.
 | `ready` | — | page prête ; le client renvoie l'état en attente |
 | `heartbeat` | — | chien de garde NUI (toutes les 2 s) |
 | `requestState` | — | redemande l'état au serveur |
-| `previewCharacter` | `{gender, seed, skin}` | aperçu local, sans sauvegarde |
-| `createCharacter` | `{name, gender, seed, skin}` | création définitive |
+| `previewCharacter` | `{gender, seed, skin, appearance}` | aperçu local, sans sauvegarde ; `appearance` absent ou nil demande les défauts calculés |
+| `createCharacter` | `{name, gender, seed, skin, appearance}` | création définitive |
+| `editCharacter` | — | ouvre l'éditeur sur le personnage existant (onglet Personnage) |
+| `saveAppearance` | `{skin, appearance}` | enregistre l'apparence (visage, tenue, tatouages), sans toucher au nom ni au genre |
+| `cancelEdit` | — | quitte l'édition et revient au lobby |
+| `previewAngle` | `{angle}` | fait pivoter le ped de -180° à 180° pour voir le profil ou le dos |
 | `requestPlayers` | — | liste des joueurs invitables |
 | `invite` | `{id}` | invitation |
 | `respondInvite` | `{partyId, accept}` | accepter/refuser |
@@ -239,11 +246,15 @@ Enveloppe unique : `{type = "...", data = {...}}`.
   serverName = "GUNFIGHT",
   online = 3,
   modeCooldownMs = 1000,  -- délai minimal entre deux sélections/lancements
-  limits = { partyMax = 4, nameMin = 3, nameMax = 20, skins = 5 },
+  limits = { partyMax = 4, nameMin = 3, nameMax = 20, skins = 5,
+             maxTattoos = 24, maxTattoosPerZone = 4 },
   me = {
     id = 12,
     name = "Warden",              -- pseudo FiveM
-    character = { name = "Vex", gender = "male", seed = 123456, skin = 2 } | nil,
+    character = { name = "Vex", gender = "male", seed = 123456, skin = 2,
+                  appearance = { head = {...}, hair = {...}, components = {...},
+                                 props = {...}, overlays = {...},
+                                 tattoos = { {collection=..., overlay=..., zone=...} } } } | nil,
     isLeader = true,
     inLobby = true,
   },
@@ -283,6 +294,37 @@ Enveloppe unique : `{type = "...", data = {...}}`.
 `slot` est l'ordre dans la formation 3D, recalculé à chaque changement
 d'escouade. Une escouade est dissoute quand un membre quitte le lobby : tous les
 membres présents partagent le même lobby, donc `slot` est toujours présent.
+
+#### `creatorCatalog`
+
+Envoyé à l'ouverture du créateur et après un changement de genre. La NUI ne
+devine aucun maximum : elle reçoit les variations réellement installées sur le
+serveur.
+
+```lua
+{
+  components = { ["3"] = { count = 12, textures = {2, 1, 4, ...} }, ... },
+  props = { ["0"] = { count = 8, textures = {...} }, ... },
+  overlays = { ["1"] = 12, ... },   -- nombre de valeurs par overlay
+  hairColors = 64, makeupColors = 64, features = 20,
+}
+```
+
+#### `creator`
+
+```lua
+{ mode = "create" | "edit",
+  character = { name, gender, seed, skin, appearance } }
+```
+
+#### `createResult` et `appearanceResult`
+
+```lua
+{ ok = true } | { ok = false, error = "message" }
+```
+
+`appearanceResult` est aussi renvoyé par le serveur après
+`gf_lobby:updateAppearance` ; la NUI ferme l'éditeur et revient au lobby.
 
 #### `invite`
 
@@ -410,25 +452,61 @@ et les invitations sont le seul moyen de la rejoindre.
   2. applique l'apparence de son personnage si elle a changé ;
   3. se téléporte sur son emplacement, fait `SetEntityHeading` et gèle le ped ;
   4. applique l'apparence stockée aux peds des autres membres quand ils existent
-     (même seed = même rendu sur tous les clients) ;
+     (même seed et même apparence enregistrée = même rendu sur tous les clients) ;
   5. met à jour la caméra.
 - Le client réapplique le placement après `gf_core:spawned` (le spawn de
   `gf_core` peut se terminer après l'arrivée de l'état).
 
-## 7. Création de personnage
+## 7. Création et édition de personnage
 
-Minimale mais réelle, en attendant l'onglet de personnalisation avancée :
+L'éditeur remplace le formulaire minimal. Il s'ouvre à la première connexion
+(`#creator-root`, mode `create`) et depuis l'onglet **Personnage** du lobby
+(mode `edit`) :
 
-- nom affiché (3 à 20 caractères, accents autorisés, pas de caractère de
-  contrôle) ;
-- genre (`male` / `female`), modèle freemode correspondant ;
-- carnation (5 valeurs) ;
-- style : 4 boutons de tenue + bouton aléatoire. Le style est une **seed**
-  entière ; l'apparence est générée de façon déterministe à partir de la seed,
-  du genre et de la carnation, donc identique sur tous les clients ;
-- aperçu 3D immédiat (caméra de création, ped face caméra) ;
-- bouton `Entrer dans le lobby` verrouillé tant que le nom est invalide ou la
-  requête est en cours.
+- **Identité** : nom (3 à 20 caractères, accents autorisés, pas de caractère de
+  contrôle) et genre (`male` / `female`) ;
+- **Visage** : héritage façon GTA Online — 46 visages de base, choisis dans deux
+  listes déroulantes (Parent A et Parent B) où chaque visage porte un prénom,
+  avec ressemblance, teint de peau, couleur des yeux, 20 traits du visage et 13
+  overlays (barbe, sourcils, rougeurs, maquillage, taches de rousseur…), avec
+  opacité et couleur quand l'overlay le permet. Chaque parent porte aussi une
+  teinte de peau (indice modulo 5) : le choix des parents change donc à la fois
+  les traits et la carnation, et les curseurs règlent le mélange ;
+- **Cheveux** : coupe, texture, couleur et reflets, bornés par le catalogue du
+  serveur ;
+- **Tenue** : composants 3, 4, 6, 8 et 11 (torse, jambes, chaussures,
+  sous-vêtement, haut), plus masque, sac, gilet, décalques et accessoires
+  (composants 1, 5, 7, 9, 10) ;
+- **Accessoires** : chapeau, lunettes, boucles d'oreilles, montre et bracelet
+  (props 0, 1, 2, 6, 7) ;
+- **Tatouages** : catalogue vanilla filtré par genre et par zone (tête, torse,
+  bras gauche/droit, jambes gauche/droite), 24 au total et 4 par zone.
+
+Toutes les valeurs sont bornées deux fois : par le schéma partagé côté serveur,
+puis par les variations réellement présentes sur le ped côté client. La NUI
+reçoit les comptes de drawables/textures et ne propose donc rien d'invisible.
+
+### 7.1 Schéma et format
+
+`appearance_schema.lua` est chargé en `shared_script` (client et serveur) :
+
+```lua
+GFLobbyAppearanceSchema.normalize(raw, gender, seed, skin) -> appearance
+GFLobbyAppearanceSchema.compute(seed, female, skin) -> appearance  -- défauts v1
+GFLobbyAppearanceSchema.build(character) -> appearance | nil
+GFLobbyAppearanceSchema.key(appearance) -> string  -- empreinte de cache
+```
+
+Une apparence contient `head`, `features`, `hair`, `eyeColor`, `overlays`,
+`components`, `props` et `tattoos` (voir §9). Les clés numériques sont acceptées
+en nombre ou en chaîne (`"3"`), car `json.decode` et la NUI renvoient des
+chaînes.
+
+Un personnage v1 sans `appearance` garde son rendu : le schéma régénère les
+valeurs depuis `(seed, gender, skin)` et la forme complète est réécrite à la
+sauvegarde suivante. Le nom, le genre et la seed ne changent jamais en édition.
+
+### 7.2 Application
 
 `appearance.lua` expose :
 
@@ -438,17 +516,33 @@ GFLobbyAppearance.apply(ped, character) -> boolean
 
 L'application :
 
-- attend que le modèle soit chargé (le client s'en charge) ;
-- nettoie accessoires, masque, sac, gilet, décalques ;
-- choisit les composants (torse, jambes, chaussures, sous-vêtement, haut,
-  cheveux) dans les bornes réelles via `GetNumberOfPedDrawableVariations` ;
-- applique une tête cohérente (`SetPedHeadBlendData`), les cheveux, la couleur
-  des yeux et les sourcils ;
-- borne toutes les valeurs pour ne jamais transmettre un index invalide.
+- attend que le modèle freemode soit chargé (le client s'en charge) ;
+- nettoie les décorations, les props et les dégâts de sang ;
+- applique la tête (`SetPedHeadBlendData`), les 20 traits
+  (`SetPedFaceFeature`), les cheveux et leurs couleurs, les overlays
+  (`SetPedHeadOverlay` / `SetPedHeadOverlayColor`) ;
+- applique les composants et les props dans les bornes réelles
+  (`GetNumberOfPedDrawableVariations`, `GetNumberOfPedTextureVariations`,
+  `GetNumberOfPedProp*`) ;
+- pose les tatouages avec `AddPedDecorationFromHashes` après les vêtements.
 
-Les données sont cosmétiques : le serveur valide les types et les bornes, mais ne
-peut pas valider un drawable (pas de ped côté serveur). Un index invalide est
-ignoré côté client.
+Les données restent cosmétiques : le serveur valide les types, les bornes et les
+limites ; il ne peut pas valider un drawable (pas de ped côté serveur). Un index
+invalide est ignoré côté client.
+
+### 7.3 Assets add-on
+
+Le dossier `assets/` fourni avec les métadonnées `bpw_assets` ne contient **pas**
+de dossier `stream/` : les vêtements, peds et body paints custom n'ont ni modèle
+ni texture, donc ils ne peuvent pas être affichés en jeu. L'éditeur utilise donc
+les variations vanilla/DLC déjà installées sur le serveur. Pour ajouter une
+collection streamée plus tard :
+
+1. déposer les `.ytd` / `.ydd` / `.ydr` dans un dossier `stream/` de la ressource ;
+2. déclarer la collection de tatouages avec un fichier `PED_OVERLAY_FILE` ;
+3. ajouter ses entrées au format de `html/data/tattoos.json` (ou régénérer avec
+   `scripts/generer_tattoos.py`) ;
+4. redémarrer la ressource et vérifier que les comptes de variations augmentent.
 
 ## 8. Caméra et scène
 
@@ -507,11 +601,32 @@ le joueur prisonnier :
   "characters": {
     "license:xxxx": {
       "name": "Vex", "gender": "male", "seed": 123456,
-      "skin": 2, "createdAt": 1760000000
+      "skin": 2, "createdAt": 1760000000,
+      "appearance": {
+        "head": { "shapeFirst": 3, "shapeSecond": 7, "shapeMix": 0.4,
+                  "skinFirst": 0, "skinSecond": 1, "skinMix": 0, "thirdMix": 0 },
+        "features": { "1": 0.12, "2": -0.4 },
+        "hair": { "drawable": 2, "texture": 0, "color": 4, "highlight": 0 },
+        "eyeColor": 1,
+        "overlays": { "2": { "index": 5, "color": 4, "highlight": 0,
+                              "opacity": 1, "colorType": 1 } },
+        "components": { "3": { "drawable": 4, "texture": 0 },
+                        "11": { "drawable": 7, "texture": 1 } },
+        "props": { "0": { "drawable": -1, "texture": 0 } },
+        "tattoos": [
+          { "collection": "mpbusiness_overlays",
+            "overlay": "MP_Buis_M_Neck_000", "zone": "ZONE_HEAD" }
+        ]
+      }
     }
   }
 }
 ```
+
+`appearance` est facultatif : un personnage v1 sans ce champ est régénéré depuis
+`(seed, gender, skin)` au chargement. Les clés des tables indexées peuvent être
+des nombres ou des chaînes ; le schéma accepte les deux. `thirdMix` est toujours
+zéro et conservé pour la forme GTA.
 
 - clé : premier identifiant `license:`, sinon `license2:`, sinon `fivem:` ;
 - chargement au démarrage, sauvegarde après création et à l'arrêt de la
@@ -540,9 +655,14 @@ Lobby.icon(name, className) // SVG constant, noms: target, zone, weapon, team,
 Lobby.toast(message, level) // level: info|success|error
 Lobby.showTransition(title, subtitle)
 Lobby.hideTransition()
+Lobby.setScreen('creator'|'lobby') // force l'écran et bloque le routage automatique
+Lobby.releaseScreen()       // rend le routage à l'état serveur
 ```
 
 - `state` est mis à jour **avant** la diffusion du message `state` aux modules.
+- `setScreen` pose un `screenOverride` : les états suivants ne changent plus
+  l'écran tant que `releaseScreen` n'a pas rendu la main au routage automatique
+  (`creator` si `me.character` est nul, `lobby` sinon).
 - `app.js` applique `body.screen-creator` ou `body.screen-lobby`, affiche/masque
   `#lobby-chrome` et `#creator-root`, remplit le profil et l'état serveur.
 - Chaque module s'enregistre avec `Lobby.on(...)` et ne touche qu'à ses
@@ -561,7 +681,13 @@ sont ajoutés par `addEventListener`, pas par attribut HTML.
 
 ## 11. Contrat Lua client
 
-- `GFLobbyAppearance.apply(ped, character)` : voir §7.
+- `GFLobbyAppearanceSchema` (shared) : `normalize`, `compute`, `build`, `key` ;
+  le serveur et le client valident avec le même fichier.
+- `GFLobbyAppearance.apply(ped, character)` : voir §7.2 ; applique aussi les
+  tatouages.
+- `normalizeCharacter` côté client enrichit `{gender, seed, skin, appearance}` ;
+  l'empreinte `appearanceKey` inclut toute l'apparence pour que les autres
+  clients réappliquent un changement de tenue.
 - Le client ne fait jamais confiance à `state.character` pour autre chose que
   l'affichage ; le serveur reste l'autorité.
 - Tous les callbacks NUI sont protégés : validation de type, `pcall`, réponse
@@ -576,28 +702,33 @@ sont ajoutés par `addEventListener`, pas par attribut HTML.
 
 Statique (CI) :
 
-- `luac -p` sur `config.lua`, `appearance.lua`, `client.lua`, `server.lua` ;
-- `node --check` sur les six fichiers JS ;
+- `luac -p` sur `config.lua`, `appearance_schema.lua`, `appearance.lua`,
+  `client.lua`, `server.lua` ;
+- `node --check` sur les scripts JS de la NUI ;
 - tests `tests/test_depot.py` : `gf_lobby` dans la liste des ressources, chaque
   fichier du manifeste existe, ressource citée dans `server.cfg` et `README`,
   `data/characters.json` non suivi ;
+- `tests/test_tattoos.py` : JSON valide, collections et zones connues, doublons
+  et genres vérifiés ;
 - workflow Docker : 13 ressources trouvées, `gf_lobby` démarrée.
 
 Manuel en jeu :
 
 1. premier personnage (homme puis femme), aperçu, validation ;
 2. reconnection : le personnage revient, pas de création ;
-3. invitation, acceptation, refus, expiration, escouade pleine ;
-4. changement de chef, exclusion, départ, retour au lobby ;
-5. sélection de mode (chef/membre), lancement, fermeture de la NUI ;
-6. file Attaque : lancement par un chef solo, montée à 20 joueurs, annulation,
+3. onglet Personnage : modification du visage, de la tenue, d'un tatouage,
+   enregistrement, retour au lobby, puis reconnection ;
+4. invitation, acceptation, refus, expiration, escouade pleine ;
+5. changement de chef, exclusion, départ, retour au lobby ;
+6. sélection de mode (chef/membre), lancement, fermeture de la NUI ;
+7. file Attaque : lancement par un chef solo, montée à 20 joueurs, annulation,
    départ d'un joueur, arrivée d'un nouveau joueur, seuil atteint ;
-7. caméra/formation à 1, 2, 3 et 4 joueurs ;
-7. `/lobbyui`, redémarrage de `gf_lobby`, passage Attaque → lobby ;
-9. deux escouades : aucun joueur visible d'un groupe à l'autre (hors file
-   Attaque, où les joueurs de toutes les escouades sont lancés ensemble).
+8. caméra/formation à 1, 2, 3 et 4 joueurs ;
+9. `/lobbyui`, redémarrage de `gf_lobby`, passage Attaque → lobby ;
+10. deux escouades : aucun joueur visible d'un groupe à l'autre (hors file
+    Attaque, où les joueurs de toutes les escouades sont lancés ensemble).
 
-## 13. Limites de la v1 et extensions
+## 13. Limites et extensions
 
 - Escouade **propre au lobby** : elle est dissoute au lancement et lorsqu'un
   membre quitte le lobby. Attaque de zone utilise désormais une file serveur
@@ -606,12 +737,18 @@ Manuel en jeu :
 - Pas de liste d'amis Cfx.re ni de présence hors ligne : invitations des joueurs
   présents dans le lobby uniquement. Extension : `txAdmin`/base de données,
   amis persistants.
-- `ARMES` et `PERSONNAGE` sont des placeholders. Points d'extension :
-  - `customization.js` : ajouter un panneau et un callback serveur ;
-  - `appearance.lua` : lire les vêtements enregistrés dans le personnage ;
-  - `server.lua` : table `characters` étendue, validation de charges utiles.
-- Pas de personnalisation avancée du visage (parents, barbe, maquillage). La
-  seed donne une identité stable, l'onglet Personnage la remplacera.
+- `ARMES` reste un placeholder. Points d'extension : panneau de finitions,
+  accessoires d'arme et callbacks serveur dédiés.
+- L'onglet **Personnage** est fonctionnel mais le nom et le genre sont figés
+  après la création : les changer imposerait de remplacer le ped et de
+  recalculer les tatouages. Le visage, les cheveux, la tenue, les accessoires et
+  les tatouages se modifient librement.
+- Les tatouages sont ceux du catalogue vanilla (`html/data/tattoos.json`,
+  775 entrées, 24 collections) ; les body paints custom de `assets/` n'ont pas
+  de textures streamées et ne sont donc pas proposés. Voir §7.3 pour l'ajout
+  d'une collection streamée.
+- Les drawables proposés dépendent des DLC montés sur le serveur : la NUI reçoit
+  les comptes réels et ne propose pas d'index absent.
 - Escouade non prise en compte par les règles d'équipe de `gf_attack` / `gf_redzone`.
 - La scène est un point fixe de l'aéroport. Extension : plusieurs scènes,
   choisi par le chef, ou Studio (intérieur).

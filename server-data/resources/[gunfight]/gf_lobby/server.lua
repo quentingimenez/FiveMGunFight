@@ -95,13 +95,22 @@ local function normalizeCharacter(raw)
     if skin > Config.Character.skins - 1 then skin = Config.Character.skins - 1 end
 
     local createdAt = tonumber(raw.createdAt) or os.time()
-    return {
+    local character = {
         name = name,
         gender = gender,
         seed = seed,
         skin = skin,
         createdAt = math.floor(createdAt),
     }
+    -- Personnage v1 sans apparence : le schéma produit les valeurs par défaut
+    -- du seed. La forme normalisée est ensuite sauvegardée à l'arrêt.
+    if type(GFLobbyAppearanceSchema) == 'table'
+        and type(GFLobbyAppearanceSchema.normalize) == 'function' then
+        character.appearance = GFLobbyAppearanceSchema.normalize(
+            raw.appearance, gender, seed, skin
+        )
+    end
+    return character
 end
 
 local function loadCharacters()
@@ -168,6 +177,7 @@ local function ensurePlayer(src)
         lastPlayers = 0,
         lastState = 0,
         lastCreate = 0,
+        lastAppearance = 0,
     }
     Players[src] = player
     return player
@@ -290,6 +300,8 @@ local function buildState(src)
             nameMin = Config.Character.nameMin,
             nameMax = Config.Character.nameMax,
             skins = Config.Character.skins,
+            maxTattoos = Config.Character.maxTattoos or 24,
+            maxTattoosPerZone = Config.Character.maxTattoosPerZone or 4,
         },
         me = {
             id = src,
@@ -1029,6 +1041,61 @@ RegisterNetEvent('gf_lobby:createCharacter', function(payload)
         refreshQueue()
         broadcastQueueState()
     end
+end)
+
+-- Mise à jour de l'apparence depuis l'éditeur (onglet Personnage). Le nom, le
+-- genre et la seed ne bougent pas : seuls l'apparence et la carnation changent.
+RegisterNetEvent('gf_lobby:updateAppearance', function(payload)
+    local src = source
+    local player = ensurePlayer(src)
+    if not player or not player.character or not player.inLobby then return end
+
+    local now = GetGameTimer()
+    if now - player.lastAppearance < 1000 then
+        TriggerClientEvent('gf_lobby:appearanceResult', src, {
+            ok = false,
+            error = 'Patiente avant de réessayer.',
+        })
+        return
+    end
+    player.lastAppearance = now
+
+    if type(payload) ~= 'table'
+        or type(GFLobbyAppearanceSchema) ~= 'table'
+        or type(GFLobbyAppearanceSchema.normalize) ~= 'function' then
+        TriggerClientEvent('gf_lobby:appearanceResult', src, {
+            ok = false,
+            error = 'Apparence invalide.',
+        })
+        return
+    end
+
+    local skin = player.character.skin
+    local requestedSkin = tonumber(payload.skin)
+    if requestedSkin and requestedSkin == requestedSkin then
+        skin = math.floor(requestedSkin)
+        if skin < 0 then skin = 0 end
+        if skin > Config.Character.skins - 1 then skin = Config.Character.skins - 1 end
+    end
+
+    local appearance = GFLobbyAppearanceSchema.normalize(
+        payload.appearance,
+        player.character.gender,
+        player.character.seed,
+        skin
+    )
+
+    player.character.appearance = appearance
+    player.character.skin = skin
+    if player.persistent then
+        Store[player.identifier] = player.character
+        saveCharacters()
+    end
+
+    TriggerClientEvent('gf_lobby:appearanceResult', src, { ok = true })
+    notify(src, 'Apparence enregistrée.', 'success')
+    sendState(src)
+    if player.partyId then broadcastParty(player.partyId) end
 end)
 
 RegisterNetEvent('gf_lobby:requestState', function()
