@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Custom véhicule</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="menu" class="hidden">
+        <div class="head">
+            <div class="title">Véhicule de base</div>
+            <div class="sub">Custom appliquée à tous les joueurs (attaque et redzone)</div>
+        </div>
+        <div class="tabs">
+            <button data-tab="paint" class="on">Peinture</button>
+            <button data-tab="parts">Pièces</button>
+            <button data-tab="wheels">Jantes</button>
+            <button data-tab="lights">Lumières</button>
+            <button data-tab="plate">Plaque</button>
+        </div>
+        <div class="body">
+            <section data-tab="paint" class="on"></section>
+            <section data-tab="parts"></section>
+            <section data-tab="wheels"></section>
+            <section data-tab="lights"></section>
+            <section data-tab="plate"></section>
+        </div>
+        <div class="rotate">
+            <button data-rot="-20">⟲</button>
+            <span>Tourner</span>
+            <button data-rot="20">⟳</button>
+        </div>
+        <div class="foot">
+            <button class="reset">Réinitialiser</button>
+            <button class="close">Annuler</button>
+            <button class="save">Enregistrer</button>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

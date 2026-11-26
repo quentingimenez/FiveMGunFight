@@ -45,6 +45,10 @@ local function giveVehicle(model, x, y, z, heading)
     SetVehicleNumberPlateText(veh, 'GUNFIGHT')
     SetVehicleDirtLevel(veh, 0.0)
     SetVehRadioStation(veh, 'OFF')
+    -- Custom du véhicule de base réglée par un admin (/customveh, ressource gf_vehicles)
+    if GetResourceState('gf_vehicles') == 'started' then
+        exports.gf_vehicles:ApplyCustom(veh)
+    end
     SetVehicleEngineOn(veh, true, true, false)
     SetPedIntoVehicle(ped, veh, -1)
     modeVehicle = veh

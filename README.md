@@ -34,7 +34,9 @@ Deux modes de jeu :
 Les véhicules ne se percutent pas entre eux (pas de « pit »), seuls les piétons peuvent être renversés.
 
 Le véhicule de base (attaquants et point véhicule de la Redzone) est une **Dodge Ram TRX**
-(ressource `gf_vehicles`).
+(ressource `gf_vehicles`). Un admin peut la customiser avec **`/customveh`** (peinture, pièces,
+jantes, xénons, néons, vitres, plaque) : la custom enregistrée s'applique à tous les véhicules de mode
+suivants (fichier `gf_vehicles/custom/custom.json`).
 
 Sur tous les modes : en bas au centre, un gros chiffre de **vie** (« + VIE », barre blanche en
 segments) et de **kevlar** (bouclier, barre bleue) ; sous 25, la vie passe en rouge. En bas à
