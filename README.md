@@ -151,6 +151,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | `/endgame` | admin | termine la partie Redzone en cours (podium puis map suivante) |
 | `/nextmap` | admin | relance une partie Redzone sur la map suivante |
 | `/setmode [id] [lobby\|attack\|redzone]` | admin | déplace un joueur |
+| `/whoami` | tous | affiche si tu es admin et tes identifiants à mettre dans ADMIN_IDENTIFIERS |
 | `/editor` ou `/maps` | admin | éditeur et liste des maps (voir ci-dessous) |
 | `/resetchar [id]` | admin | efface le personnage d'un joueur pour retester la création |
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |

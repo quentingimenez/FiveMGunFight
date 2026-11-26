@@ -12,6 +12,8 @@
 
 local core = exports.gf_core
 
+local ADMIN_REQUIS = 'Réservé aux administrateurs. Tape /whoami pour voir ton identifiant.'
+
 -- SEUL point de conversion des secondes (Config) vers les millisecondes (règles).
 local CONFIG_MANCHES = {
     PlayersToStart = Config.PlayersToStart,
@@ -644,21 +646,30 @@ end
 exports('StartTestRound', startTestRound)
 
 RegisterCommand('startround', function(src)
-    if not core:IsAdmin(src) then return end
+    if not core:IsAdmin(src) then
+        core:Notify(src, ADMIN_REQUIS)
+        return
+    end
     local ok, err = startTestRound(src)
     if not ok then reply(src, err) end
 end, false)
 
 -- /endmatch : arrête le match et remet les scores à zéro
 RegisterCommand('endmatch', function(src)
-    if not core:IsAdmin(src) then return end
+    if not core:IsAdmin(src) then
+        core:Notify(src, ADMIN_REQUIS)
+        return
+    end
     -- Les effets font les remises à zéro, l'annonce et les apparitions.
     executer(AttackRules.finMatch(etat))
 end, false)
 
 -- /nextzone : passe à la zone suivante (en attente uniquement)
 RegisterCommand('nextzone', function(src)
-    if not core:IsAdmin(src) then return end
+    if not core:IsAdmin(src) then
+        core:Notify(src, ADMIN_REQUIS)
+        return
+    end
     if etat.phase ~= 'waiting' then return reply(src, 'Utilise /endmatch avant de changer de zone.') end
     loadMap(zoneIndex + 1)
     executer(AttackRules.allerEnAttente(etat))
@@ -667,7 +678,10 @@ end, false)
 
 -- /setteam [id] [A|B]
 RegisterCommand('setteam', function(src, args)
-    if not core:IsAdmin(src) then return end
+    if not core:IsAdmin(src) then
+        core:Notify(src, ADMIN_REQUIS)
+        return
+    end
     local target, t = tonumber(args[1]), (args[2] or ''):upper()
     if not target or (t ~= 'A' and t ~= 'B') or not etat.equipes[target] then
         return reply(src, 'Utilisation : /setteam [id] [A|B] (le joueur doit être dans le mode Attaque)')

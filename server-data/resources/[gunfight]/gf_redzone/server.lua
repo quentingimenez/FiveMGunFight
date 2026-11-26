@@ -7,6 +7,8 @@
 
 local core = exports.gf_core
 
+local ADMIN_REQUIS = 'Réservé aux administrateurs. Tape /whoami pour voir ton identifiant.'
+
 local S = {
     phase = 'idle',
     players = {},    -- [src] = { kills, deaths, streak, best }
@@ -355,12 +357,18 @@ end)
 -- ---------------------------------------------------------------- Commandes admin
 -- /endgame : termine la partie en cours (classement puis map suivante)
 RegisterCommand('endgame', function(src)
-    if not core:IsAdmin(src) then return end
+    if not core:IsAdmin(src) then
+        core:Notify(src, ADMIN_REQUIS)
+        return
+    end
     if S.phase == 'live' then endGame() end
 end, false)
 
 -- /nextmap : passe directement à la map suivante
 RegisterCommand('nextmap', function(src)
-    if not core:IsAdmin(src) then return end
+    if not core:IsAdmin(src) then
+        core:Notify(src, ADMIN_REQUIS)
+        return
+    end
     if next(S.players) then startGame() end
 end, false)
