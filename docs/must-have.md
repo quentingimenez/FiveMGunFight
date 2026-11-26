@@ -28,7 +28,9 @@ Légende : ✅ en place · 🟡 base prête dans le code · ⬜ à faire
 Tout ce qui suit doit être **enregistré par joueur et ne jamais être décidé par
 le client**. Avant toute nouvelle fonctionnalité :
 
-- Installer **oxmysql** et créer le schéma (scripts dans `docker/db/init/`).
+- Installer **oxmysql** et laisser `gf_db` créer le schéma par ses migrations au
+  démarrage du serveur (fichiers dans `gf_db/migrations/`, déclarés dans
+  `gf_db/migrations.lua`) : aucune création manuelle, y compris sur une base existante.
 - Une table `players` (identifiant = licence Rockstar, pseudo, dates).
 - Migrer l'apparence et les statistiques de `gf_lobby/data/*.json` vers la base.
 - Une ressource dédiée (ex. `gf_profile`) qui charge le profil à la connexion,

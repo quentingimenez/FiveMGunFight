@@ -22,7 +22,7 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[1]
 RESSOURCES = RACINE / "server-data" / "resources"
-RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone", "gf_lobby", "gf_stats", "gf_menu", "gf_vehicles", "gf_thumbs")
+RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone", "gf_lobby", "gf_stats", "gf_menu", "gf_vehicles", "gf_thumbs", "gf_db")
 MAPS_JSON = RESSOURCES / "[gunfight]" / "gf_maps" / "data" / "maps.json"
 
 MOTS_SCRIPTS = (
@@ -149,6 +149,12 @@ class ManifestesFiveM(unittest.TestCase):
             if manifeste.parent.parent.name == "[standalone]":
                 continue
             for chemin in chemins_declares(manifeste):
+                # Un chemin préfixé par '@' désigne un script d'une autre
+                # ressource FiveM (ex. '@oxmysql/lib/MySQL.lua') : il est résolu
+                # par FXServer au chargement et n'existe donc pas dans le dossier
+                # de cette ressource. On ne le vérifie pas comme un fichier local.
+                if chemin.startswith("@"):
+                    continue
                 with self.subTest(manifeste=str(manifeste.relative_to(RACINE)), chemin=chemin):
                     self.assertTrue(
                         (manifeste.parent / chemin).is_file(),
@@ -455,7 +461,9 @@ class StatistiquesPersistantes(unittest.TestCase):
         self.assertGreater(stats, ox, "gf_stats doit démarrer après oxmysql")
 
     def test_schema_cree_la_table_gf_stats_players(self) -> None:
-        texte = lire(RACINE / "docker" / "db" / "init" / "01-schema.sql")
+        texte = lire(
+            RESSOURCES / "[gunfight]" / "gf_db" / "migrations" / "0001_gf_stats_players.sql"
+        )
         self.assertIn("CREATE TABLE IF NOT EXISTS gf_stats_players", texte)
 
     def test_oxmysql_vendorise_present(self) -> None:
@@ -482,6 +490,66 @@ class StatistiquesPersistantes(unittest.TestCase):
             texte,
             "volume characters absent de la production",
         )
+
+
+class Migrations(unittest.TestCase):
+    """Les migrations de gf_db restent numérotées, déclarées et ordonnées.
+
+    Une migration non déclarée ne sera jamais appliquée ; une somme modifiée
+    empêche gf_db de démarrer. Ces contrôles gardent les fichiers SQL et leur
+    registre synchronisés, et garantissent que le schéma est prêt avant
+    gf_stats.
+    """
+
+    BASE = RESSOURCES / "[gunfight]" / "gf_db"
+    REGISTRE = BASE / "migrations.lua"
+    CONFIG = RACINE / "server-data" / "server.cfg"
+
+    def migrations_fichiers(self) -> list[Path]:
+        """Fichiers de migration présents, triés par nom."""
+        return sorted(self.BASE.glob("migrations/*.sql"))
+
+    def test_fichiers_numérotés_sans_trou_et_noms_valides(self) -> None:
+        fichiers = self.migrations_fichiers()
+        self.assertTrue(fichiers, "aucun fichier de migration trouvé")
+        versions: list[int] = []
+        for fichier in fichiers:
+            with self.subTest(fichier=fichier.name):
+                self.assertRegex(
+                    fichier.name,
+                    r"^\d{4}_[a-z0-9_]+\.sql$",
+                    "nom de migration invalide (attendu NNNN_nom.sql en minuscules)",
+                )
+                versions.append(int(fichier.name[:4]))
+        self.assertEqual(
+            versions, list(range(1, len(versions) + 1)),
+            "les migrations doivent être numérotées 0001, 0002… sans trou",
+        )
+
+    def test_chaque_migration_est_déclarée_dans_le_registre(self) -> None:
+        registre = lire(self.REGISTRE)
+        entrees = re.findall(r"\{[^{}]*\}", registre)
+        for fichier in self.migrations_fichiers():
+            version = int(fichier.name[:4])
+            chemin = f"migrations/{fichier.name}"
+            with self.subTest(fichier=fichier.name):
+                declaree = [
+                    entree for entree in entrees
+                    if chemin in entree
+                    and re.search(rf"\bversion\s*=\s*0*{version}\b", entree)
+                ]
+                self.assertTrue(
+                    declaree,
+                    "migration absente de migrations.lua ou version différente "
+                    f"(attendu : version {version:04d}, fichier {chemin})",
+                )
+
+    def test_gf_db_démarre_avant_gf_stats(self) -> None:
+        texte = lire(self.CONFIG)
+        db = texte.find("ensure gf_db")
+        stats = texte.find("ensure gf_stats")
+        self.assertGreaterEqual(db, 0, "ensure gf_db absent de server.cfg")
+        self.assertGreater(stats, db, "gf_db doit démarrer avant gf_stats")
 
 
 class VehiculesDeclares(unittest.TestCase):

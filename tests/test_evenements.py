@@ -78,7 +78,11 @@ def scripts_declares(manifeste: Path, mots: tuple[str, ...]) -> list[Path]:
         for trouve in re.finditer(motif, texte):
             for simple, double in re.findall(r"'([^']+)'|\"([^\"]+)\"", trouve.group(1)):
                 nom = simple or double
-                if nom:
+                # Un chemin préfixé par '@' désigne un script d'une autre
+                # ressource FiveM (ex. '@oxmysql/lib/MySQL.lua'), résolu par
+                # FXServer au chargement : ce n'est pas un fichier local du
+                # dossier du manifeste et il ne doit pas être lu ici.
+                if nom and not nom.startswith("@"):
                     chemins.append(manifeste.parent / nom)
     return chemins
 

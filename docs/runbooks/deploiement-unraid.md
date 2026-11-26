@@ -35,36 +35,34 @@ fonctionne que si le code qui lit la convar vient de l'image.
 
 ## Prérequis
 
-L'image déployée doit être au moins celle de la PR #27, c'est-à-dire contenir
-`[standalone]/oxmysql` et `gf_stats`. Une image plus ancienne démarre sans ces
-ressources : les statistiques ne sont pas enregistrées et les logs ne contiennent
-pas les lignes attendues. En cas de doute, tirer `:main` avec *Force Update*
-avant la migration.
+L'image déployée doit contenir `[standalone]/oxmysql`, `gf_db` et `gf_stats`.
+Une image plus ancienne démarre sans ces ressources : les statistiques ne sont
+pas enregistrées et les logs ne contiennent pas les lignes attendues. En cas de
+doute, tirer `:main` avec *Force Update* avant la migration.
 
-Sur une base MariaDB déjà initialisée, le script `docker/db/init/01-schema.sql`
-n'a pas été joué au premier démarrage : appliquer le schéma une seule fois. Depuis
-un poste qui a le dépôt, copier le fichier sur l'hôte Unraid :
+Aucun import SQL manuel n'est nécessaire, même sur une base MariaDB déjà
+initialisée : la ressource `gf_db` applique les migrations au démarrage de
+FXServer, via `oxmysql`. Elle crée les tables `gf_stats_players` et
+`gf_schema_version` (qui enregistre la version et la somme de chaque migration)
+puis logue `[gf_db] migration 0001 gf_stats_players appliquée` et
+`[gf_db] schéma à jour (version 1)`. Les migrations sont idempotentes : un
+redémarrage après une interruption les rejoue sans danger. Une migration déjà
+appliquée ne doit jamais être modifiée, sous peine d'erreur
+`migration-modifiee:<version>`.
 
-```bash
-scp docker/db/init/01-schema.sql root@100.90.110.83:/tmp/
-```
-
-Puis, dans un shell Unraid, importer le schéma dans la base `gunfight` :
-
-```bash
-docker exec -i Gunfight-MariaDB sh -c 'mariadb -ugunfight -p"$MARIADB_PASSWORD" gunfight' < /tmp/01-schema.sql
-```
-
-Le `$MARIADB_PASSWORD` est étendu à l'intérieur du conteneur MariaDB, pas dans
-l'historique du shell Unraid : le mot de passe n'apparaît pas en clair. Vérifier
-la table créée :
+Après le démarrage, vérifier les tables et les logs dans cet ordre :
 
 ```bash
-docker exec Gunfight-MariaDB sh -c 'mariadb -ugunfight -p"$MARIADB_PASSWORD" gunfight -e "SHOW TABLES"' | grep gf_stats_players
+docker exec Gunfight-MariaDB sh -c 'mariadb -ugunfight -p"$MARIADB_PASSWORD" gunfight -e "SHOW TABLES"' | grep -E 'gf_stats_players|gf_schema_version'
+docker logs Gunfight-FXServer 2>&1 | grep '\[gf_db\]'
 ```
 
-La commande doit renvoyer `gf_stats_players`. `CREATE TABLE IF NOT EXISTS`
-rend l'import sans danger si la table existe déjà.
+La première commande doit renvoyer `gf_stats_players` et `gf_schema_version`.
+La seconde doit afficher la migration appliquée puis le schéma à jour ; toute
+ligne `[gf_db] ERREUR ...` indique un problème de connexion ou de migration, à
+corriger avant de poursuivre. Le `$MARIADB_PASSWORD` est étendu à l'intérieur du
+conteneur MariaDB, pas dans l'historique du shell Unraid : le mot de passe
+n'apparaît pas en clair.
 
 ## Migration d'un conteneur existant
 
@@ -146,9 +144,11 @@ les crochets dans `resources/[gunfight]/...` exigent des guillemets doubles.
 
 5. Lis les logs du conteneur (`docker logs Gunfight-FXServer` ou bouton *Log*
    dans l'UI) et vérifie, dans cet ordre : la ligne d'entrypoint
-   `Build            : <sha court>`, `Started resource oxmysql`, `Started resource gf_stats`,
-   `[gf_stats] MariaDB connectée, statistiques persistantes actives`, puis les
-   lignes `Started resource gf_...` du jeu. Une ligne `maps.json amorcé depuis
+   `Build            : <sha court>`, `Started resource oxmysql`, `Started resource gf_db`,
+   `[gf_db] migration 0001 gf_stats_players appliquée`, `[gf_db] schéma à jour
+   (version 1)`, `Started resource gf_stats`, `[gf_stats] MariaDB connectée,
+   statistiques persistantes actives`, puis les lignes `Started resource gf_...`
+   du jeu. Une ligne `maps.json amorcé depuis
    le modèle de l'image` est normale si le dossier maps était vide.
 
 6. Compare le badge du lobby au sha courant de `origin/main`. `gh` n'est pas
@@ -195,13 +195,15 @@ docker logs Gunfight-FXServer 2>&1 | grep -E 'Build|Started resource gf_'
   `/opt/fivem/server-data/resources/[gunfight]/gf_maps/data`,
   `/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data` et
   `/opt/fivem/txData` ;
-- la table `gf_stats_players` existe dans la base `gunfight` (commande du
-  paragraphe Prérequis) ;
+- les tables `gf_stats_players` et `gf_schema_version` existent dans la base
+  `gunfight` (commandes du paragraphe Prérequis) ;
 - un personnage créé en jeu survit à un redémarrage du conteneur :
   `docker restart Gunfight-FXServer` puis reconnexion au lobby ;
 - les logs affichent `Build            : <sha court>`, `Started resource oxmysql`,
-  `Started resource gf_stats`, le message de connexion MariaDB de `gf_stats` et
-  `Started resource gf_...` pour les ressources du jeu ;
+  `Started resource gf_db`, les lignes `[gf_db] migration 0001 gf_stats_players
+  appliquée` et `[gf_db] schéma à jour (version 1)`, `Started resource gf_stats`,
+  le message de connexion MariaDB de `gf_stats` et `Started resource gf_...`
+  pour les ressources du jeu ;
 - en jeu, le lobby affiche `BUILD <sha> · OK` avec le même sha. Une connexion et
   une manche de test confirment que les maps jouées sont les bonnes.
 
@@ -230,7 +232,7 @@ il remet seulement le conteneur dans son état antérieur.
 | Badge `BUILD dev` | convar absente ou valeur filtrée | vérifie `gf_build_sha` dans `secrets.cfg` ; la valeur doit être hexadécimale (7 caractères), sinon `entrypoint.sh` la remplace par `dev` ; confirme que le code servi vient de l'image |
 | Badge figé sur `b8b4a5c · HOTFIX` | montage complet toujours actif | relis `docker inspect Gunfight-FXServer` : toute cible `/opt/fivem/server-data` exacte masque l'image ; refais l'étape 3 |
 | Maps vides ou éditeur repart de zéro | mauvais chemin de montage ou guillemets oubliés autour de `[gunfight]` | vérifie `ls -l /mnt/user/appdata/fivemgunfight/maps/maps.json` et la cible exacte du montage ; `GF_SEED_MAPS=true` ne remplace pas un fichier existant |
-| `[gf_stats] MariaDB sans réponse` | schéma absent, mot de passe différent ou `DB_HOST` erroné | applique `01-schema.sql` une fois (paragraphe Prérequis), vérifie que `MARIADB_PASSWORD` du conteneur jeu correspond à celui du conteneur MariaDB, et que `DB_HOST=mariadb` sur le réseau `fivem-net` |
+| `[gf_stats] MariaDB sans réponse` | migrations `gf_db` non appliquées, mot de passe différent ou `DB_HOST` erroné | cherche d'abord `[gf_db] ERREUR ...` dans les logs du conteneur jeu et corrige la connexion ou la migration signalée ; vérifie ensuite que `MARIADB_PASSWORD` du conteneur jeu correspond à celui du conteneur MariaDB, et que `DB_HOST=mariadb` sur le réseau `fivem-net`. Ne jamais importer un SQL à la main : `gf_db` applique le schéma au démarrage, même sur une base existante |
 | `Permission denied` sur `characters.json` | dossier `characters` appartient à un autre uid | `chown -R 10001:10001 /mnt/user/appdata/fivemgunfight/characters`, puis redémarre `Gunfight-FXServer` |
 | `server.cfg` personnalisé perdu après la migration | modifications faites à la main dans l'ancien `server-data` | porte-les dans `server-data/server.cfg` du dépôt par une pull request : un conteneur mis à jour ne lit plus l'ancien fichier |
 | Erreur de licence au démarrage | variable `LICENSE_KEY` retirée par erreur pendant l'édition | conserve toutes les variables existantes ; la valeur est à saisir dans l'UI Unraid, jamais dans un fichier versionné |
@@ -244,9 +246,10 @@ il remet seulement le conteneur dans son état antérieur.
 - Les ressources tierces ajoutées manuellement dans l'ancien dossier ne sont pas
   héritées. Installe-les dans une image dérivée ou dans le dépôt, avec une
   procédure dédiée.
-- `oxmysql` et `gf_stats` sont désormais dans l'image et embarqués par la PR
-  #27 : aucun montage supplémentaire n'est nécessaire pour eux. Seul le schéma
-  `01-schema.sql` doit être appliqué une fois sur une base déjà initialisée.
+- `oxmysql`, `gf_db` et `gf_stats` sont dans l'image : aucun montage
+  supplémentaire n'est nécessaire pour eux. `gf_db` crée ou met à jour le
+  schéma au démarrage via `oxmysql`, même sur une base déjà initialisée : aucun
+  import SQL manuel n'est à faire ni à prévoir.
 - La migration ne change pas MariaDB, txAdmin ni le réseau `fivem-net`. Elle ne
   modifie pas les sauvegardes, qui restent sous
   `/mnt/user/appdata/fivemgunfight/`.

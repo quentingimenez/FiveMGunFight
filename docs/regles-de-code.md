@@ -173,10 +173,12 @@ transaction SQL, idempotente (identifiant d'opération unique), inscrite dans
 une table d'historique : rejouer la même demande ne crédite pas deux fois.
 *Doit. Test d'intégration sur MariaDB.*
 
-**D4 — Le schéma évolue par migrations.** Fichiers numérotés, appliqués une
-fois sur une base existante, avec une table de version : `docker/db/init/` ne
-s'exécute que sur un volume vide (C12). *Doit avant la première table
-nouvelle. CI.*
+**D4 — Le schéma évolue par migrations.** Fichiers numérotés dans
+`gf_db/migrations/`, déclarés dans `gf_db/migrations.lua`, appliqués au
+démarrage par `gf_db` sur une base existante, avec `gf_schema_version` pour
+enregistrer version et somme : `docker/db/init/` ne s'exécute que sur un volume
+vide et ne contient plus le schéma (C12). Une migration appliquée n'est jamais
+modifiée et reste idempotente. *Doit avant la première table nouvelle. CI.*
 
 **D5 — Données personnelles.** Les identifiants de licence ne vont ni dans le
 dépôt, ni dans un journal public, ni dans un artefact de CI ; un joueur peut

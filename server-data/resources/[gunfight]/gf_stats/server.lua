@@ -7,8 +7,25 @@
 --                  n'est pas crédité (suicide, coéquipier, hors zone)
 --    gf:matchEnded { mode, map, participants = { { src, won }, ... } }
 --
---  Table : gf_stats_players (voir docker/db/init/01-schema.sql)
+--  Table : gf_stats_players (voir gf_db/migrations/0001_gf_stats_players.sql)
 -- =============================================================================
+
+-- Attend que gf_db ait appliqué les migrations avant la première requête.
+-- L'export peut manquer (ressource absente ou erreur) : on ne plante jamais.
+local function attendreSchema()
+    local limite = GetGameTimer() + 60000
+    while true do
+        local ok, pret = pcall(function()
+            return exports.gf_db:Pret()
+        end)
+        if ok and pret then return true end
+        if GetGameTimer() >= limite then
+            print('[gf_stats] schéma gf_db non prêt après 60 s : poursuite sans garantie')
+            return false
+        end
+        Wait(500)
+    end
+end
 
 local function execute(query, params)
     local ok, err = pcall(function()
@@ -85,6 +102,7 @@ end)
 
 -- Vérifie la connexion une fois au démarrage (visible dans les logs).
 CreateThread(function()
+    attendreSchema()
     Wait(2000)
     local ok, err = pcall(function()
         exports.oxmysql:execute('SELECT 1 AS ok', {}, function(result)
