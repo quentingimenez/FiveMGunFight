@@ -44,6 +44,10 @@ véhicule de base de tous les joueurs, avec sa custom (fichier `gf_vehicles/cust
 partir de son modèle 3D et enregistré dans `gf_thumbs/thumbs/<famille>/<id>.png`. Les menus (onglet
 **Véhicule**…) affichent ces photos ; le même mécanisme servira aux armes et aux tenues.
 
+**Ajouter un véhicule** : `py scripts/ajouter_vehicule.py <dossier du pack ou dlc.rpf> --nom "Nom"`
+copie, nettoie et déclare tout, puis `/thumbs vehicles <modèle>` fait sa photo. Guide complet
+(et ajout d'une nouvelle famille de photos) : [docs/ajouter-un-modele.md](docs/ajouter-un-modele.md).
+
 Sur tous les modes : en bas au centre, un gros chiffre de **vie** (« + VIE », barre blanche en
 segments) et de **kevlar** (bouclier, barre bleue) ; sous 25, la vie passe en rouge. En bas à
 droite, le **HUD des armes** : l'arme en main dans un grand cercle (image, chargeur « 30 / ∞ », nom),
