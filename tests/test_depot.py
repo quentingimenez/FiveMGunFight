@@ -577,6 +577,14 @@ class Documentation(unittest.TestCase):
         )
         self.assertNotIn("(privé)", texte, "le dépôt est public : contexte périmé")
 
+    def test_langues_du_projet_fixees_pour_tout_agent(self) -> None:
+        # Documentation et descriptions de PR en français, commits en anglais.
+        for document in ("AGENTS.md", "CONTRIBUTING.md"):
+            with self.subTest(document=document):
+                texte = " ".join(lire(RACINE / document).split())
+                self.assertRegex(texte, r"messages de commit sont \*\*en anglais\*\*")
+                self.assertRegex(texte, r"description de la PR sont rédigées \*\*en français\*\*")
+
     def test_readme_cite_chaque_ressource(self) -> None:
         texte = lire(RACINE / "README.md")
         for ressource in RESSOURCES_GUNFIGHT:

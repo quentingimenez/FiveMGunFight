@@ -135,9 +135,11 @@ c'est la preuve qui accompagne l'avant/après.
 
 ```bash
 git add <fichiers du sujet>
-git commit -m "type(scope): sujet à l'impératif" -m "Pourquoi ce changement (contexte, bug, contrainte)."
+git commit -m "type(scope): imperative subject" -m "Why this change (context, bug, constraint)."
 ```
 
+- Les messages de commit sont **en anglais** (en-tête et corps), comme le titre
+  de la PR, qui devient le message du commit de fusion en squash.
 - Un commit = un changement cohérent ; message utile dans six mois.
 - Vérifier qu'aucun secret n'entre dans l'index : `.env`,
   `server-data/secrets.cfg`, `server-data/cache/`, clé `CFX_LICENSE_KEY`.
@@ -171,6 +173,9 @@ Une fois l'accord obtenu (§ 4.5), pousser la branche et ouvrir la PR :
 git push -u origin "$(git branch --show-current)"
 gh pr create --base main --title "type(scope): sujet" --body-file "$env:TEMP\pr.md"   # PowerShell
 ```
+
+La documentation du dépôt et la description de la PR sont rédigées **en
+français** ; seul le titre de la PR reste en anglais (§ 4.4).
 
 Le corps de la PR reprend [`.github/pull_request_template.md`](.github/pull_request_template.md) :
 **Résumé**, **Pourquoi**, **Comment tester**, **Checklist** avec les cases
