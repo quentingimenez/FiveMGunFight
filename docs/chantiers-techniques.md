@@ -197,7 +197,7 @@ Le smoke de la CI vérifie aussi le démarrage de `gf_db`, `gf_journal` et
   - un seul camp gagne ;
   - aucun score ne dépasse 2 ;
   - un joueur n'est que dans une équipe ;
-  - l'écart d'effectif reste au plus de 1 après l'équilibrage ;
+  - l'écart d'effectif reste au plus de 1 après l'équilibrage sans escouade ; une escouade n'est jamais coupée ;
   - un départ, à n'importe quelle phase, ne bloque pas le match.
 - **Preuve** : un défaut posé exprès fait échouer un invariant (sabotage) ; en
   jeu, une manche avec un départ volontaire à chaque phase.

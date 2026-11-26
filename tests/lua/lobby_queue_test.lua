@@ -247,6 +247,10 @@ local function newServer()
     local timers = {}          -- liste de fonctions SetTimeout
     local threads = {}         -- liste de coroutines CreateThread
     local setModeCalls = {}    -- liste de { src, mode }
+    -- Journal commun : SetMode et RegisterSquads y sont consignés dans l'ordre
+    -- d'appel, ce qui permet de vérifier que l'enregistrement précède le
+    -- lancement des escouades.
+    local journal = {}         -- liste de { kind, ... }
     local clock = 0            -- horloge GetGameTimer
     local canJoin = true
     local modes = {}           -- mode simulé par joueur dans gf_core
@@ -311,13 +315,20 @@ local function newServer()
             GetMode = function(_self, src) return modes[tonumber(src)] end,
             SetMode = function(self, src, mode)
                 modes[tonumber(src)] = mode
-                setModeCalls[#setModeCalls + 1] = { src = tonumber(src), mode = mode }
+                local call = { src = tonumber(src), mode = mode }
+                setModeCalls[#setModeCalls + 1] = call
+                journal[#journal + 1] = { kind = 'SetMode', call = call }
                 return true
             end,
             GetPlayersInMode = function() return {} end,
         },
         gf_attack = {
             CanJoin = function() return canJoin end,
+            RegisterSquads = function(self, escouades)
+                local call = { escouades = escouades }
+                journal[#journal + 1] = { kind = 'RegisterSquads', call = call }
+                return true
+            end,
         },
     }
 
@@ -424,6 +435,22 @@ local function newServer()
         stateOf = stateOf, queueOf = queueOf, partyOf = partyOf,
         noticesOf = noticesOf, lastNotice = lastNotice,
         setModeCount = setModeCount, setModeFor = setModeFor,
+        journal = journal,
+        registerCalls = function()
+            local calls = {}
+            for _, entry in ipairs(journal) do
+                if entry.kind == 'RegisterSquads' then
+                    calls[#calls + 1] = entry.call
+                end
+            end
+            return calls
+        end,
+        firstSetModeIndex = function()
+            for i, entry in ipairs(journal) do
+                if entry.kind == 'SetMode' then return i end
+            end
+            return nil
+        end,
         launchingCount = launchingCount, logs = logs,
         advance = function(ms) clock = clock + ms end,
         setCanJoin = function(value) canJoin = value end,
@@ -627,6 +654,104 @@ check('h. pick ne coupe pas deux escouades de 2', function()
     equal(false, s.setModeFor(4, 'attack'), 'pas de SetMode pour 4')
     equal(true, s.queueOf(3).joined, 'escouade 2 toujours inscrite')
     equal(2, s.partyOf(3).size, 'escouade 2 intacte')
+end)
+
+-- ---------------------------------------------------------------------------
+--  Scénarios d'intégration : enregistrement auprès de gf_attack.
+-- ---------------------------------------------------------------------------
+
+-- Compare deux listes de membres sans tenir compte de leur ordre.
+local function memesMembres(attendu, obtenu)
+    if type(obtenu) ~= 'table' or #obtenu ~= #attendu then return false end
+    local restants = {}
+    for i = 1, #obtenu do restants[i] = obtenu[i] end
+    for _, src in ipairs(attendu) do
+        local trouve = false
+        for i, candidat in ipairs(restants) do
+            if candidat == src then
+                table.remove(restants, i)
+                trouve = true
+                break
+            end
+        end
+        if not trouve then return false end
+    end
+    return #restants == 0
+end
+
+-- Compare deux listes d'escouades sans tenir compte de l'ordre des listes ni
+-- de celui des membres (la spécification demande une égalité d'ensemble).
+local function memesEscouades(attendu, obtenu)
+    if type(obtenu) ~= 'table' or #obtenu ~= #attendu then return false end
+    local restants = {}
+    for i = 1, #obtenu do restants[i] = obtenu[i] end
+    for _, squad in ipairs(attendu) do
+        local trouve = false
+        for i, candidat in ipairs(restants) do
+            if memesMembres(squad, candidat) then
+                table.remove(restants, i)
+                trouve = true
+                break
+            end
+        end
+        if not trouve then return false end
+    end
+    return #restants == 0
+end
+
+check('i. RegisterSquads enregistre les deux escouades avant SetMode', function()
+    local s = newServer()
+    s.min(3)
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.makePlayer(3)
+    -- Escouade {1, 2}.
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local partyId = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+    -- Joueur 3 seul dans sa propre escouade.
+    s.play(1, 'attack')
+    s.play(3, 'attack')
+    equal(3, s.queueOf(1).size, 'trois joueurs dans la file')
+
+    s.threshold()
+
+    local registerCalls = s.registerCalls()
+    equal(1, #registerCalls, 'un seul appel à RegisterSquads')
+    local escouades = registerCalls[1].escouades
+    assert(memesEscouades({ { 1, 2 }, { 3 } }, escouades),
+        'RegisterSquads doit recevoir les escouades {1,2} et {3}')
+    local premierSetMode = s.firstSetModeIndex()
+    assert(premierSetMode, 'au moins un SetMode attendu')
+    -- RegisterSquads est consigné avant le premier SetMode dans le journal.
+    equal('RegisterSquads', s.journal[1].kind, 'RegisterSquads en tête du journal')
+    assert(1 < premierSetMode, 'RegisterSquads appelé avant le premier SetMode')
+    equal(true, s.setModeFor(1, 'attack'), 'SetMode pour 1')
+    equal(true, s.setModeFor(2, 'attack'), 'SetMode pour 2')
+    equal(true, s.setModeFor(3, 'attack'), 'SetMode pour 3')
+end)
+
+check('j. un RegisterSquads qui lève une erreur n empêche pas les SetMode', function()
+    local s = newServer()
+    s.min(2)
+    -- Remplacement de la méthode du faux export avant le seuil.
+    s.env.exports.gf_attack.RegisterSquads = function(_self, _escouades)
+        error('panne simulée de gf_attack')
+    end
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.makePlayer(3)
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local partyId = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+    s.play(1, 'attack')
+    s.play(3, 'attack')
+
+    s.threshold()
+
+    equal(true, s.setModeFor(1, 'attack'), 'SetMode pour 1 malgré l erreur')
+    equal(true, s.setModeFor(2, 'attack'), 'SetMode pour 2 malgré l erreur')
+    equal(true, s.setModeFor(3, 'attack'), 'SetMode pour 3 malgré l erreur')
 end)
 
 print(('%d passed, %d failed'):format(passed, failed))

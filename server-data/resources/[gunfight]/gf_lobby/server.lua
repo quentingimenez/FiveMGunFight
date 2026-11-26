@@ -702,6 +702,28 @@ local function launchQueuedSquads(picked, mode)
     ))
 
     SetTimeout(700, function()
+        if mode.id == 'attack' and GetResourceState('gf_attack') == 'started' then
+            local escouades = {}
+            for _, squad in ipairs(affected) do
+                if Parties[squad.partyId] then
+                    local membres = {}
+                    for _, member in ipairs(squad.members) do
+                        if isEligible(member) then
+                            membres[#membres + 1] = member
+                        end
+                    end
+                    escouades[#escouades + 1] = membres
+                end
+            end
+
+            local ok, result = pcall(function()
+                return exports.gf_attack:RegisterSquads(escouades)
+            end)
+            if not ok or result == false then
+                log('avertissement : enregistrement des escouades auprès de gf_attack impossible, lancement poursuivi')
+            end
+        end
+
         for _, squad in ipairs(affected) do
             local current = Parties[squad.partyId]
             if current then

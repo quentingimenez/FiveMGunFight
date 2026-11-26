@@ -439,7 +439,12 @@ executer = function(effets)
             if e.modele == 'rejoint' then
                 core:Notify(e.src, ("Tu rejoins l'%s. Tape /lobby pour quitter."):format(Config.Teams[e.equipe].label))
             elseif e.modele == 'equilibrage' then
-                core:Notify(e.src, ("Équilibrage : tu passes dans l'%s"):format(Config.Teams[e.equipe].label))
+                -- Une escouade entière est déplacée : le message s'adresse au groupe.
+                if e.escouade then
+                    core:Notify(e.src, ("Équilibrage : ton escouade passe dans l'%s"):format(Config.Teams[e.equipe].label))
+                else
+                    core:Notify(e.src, ("Équilibrage : tu passes dans l'%s"):format(Config.Teams[e.equipe].label))
+                end
             end
         elseif e.type == 'annonce' then
             if e.modele == 'debutManche' then
@@ -611,6 +616,13 @@ end)
 -- ---------------------------------------------------------------- Exports et commandes
 exports('CanJoin', function()
     return AttackRules.peutRejoindre(etat)
+end)
+
+-- Enregistre les escouades ([src] = clé de groupe) auprès des règles.
+exports('RegisterSquads', function(escouades)
+    if type(escouades) ~= 'table' then return false end
+    executer(AttackRules.definirGroupes(etat, escouades))
+    return true
 end)
 
 local function reply(src, msg)
