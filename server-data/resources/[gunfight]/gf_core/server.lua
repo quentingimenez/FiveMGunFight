@@ -33,6 +33,7 @@ local Vehicles = {}     -- [src] = netId du véhicule de mode (redzone)
 local lastDamager = {}  -- [victime] = { src = tireur, at, weapon } (dégât serveur autorisé)
 local Armes = {}        -- [src] = ensemble de hash d'armes autorisées (loadout)
 local etatTirs = {}     -- [src] = historique des tirs (cadence), géré par ShotValidation
+local ADMIN_REQUIS = 'Réservé aux administrateurs. Tape /whoami pour voir ton identifiant.'
 
 -- Règles statiques construites une seule fois au démarrage à partir de Config.
 -- Elles sont partagées par tous les tirs : aucun ensemble n'est reconstruit
@@ -818,9 +819,43 @@ RegisterCommand('redzone', function(src)
     if src > 0 then setMode(src, 'redzone') end
 end, false)
 
+-- /whoami : aide un joueur à trouver l'identifiant à mettre dans ADMIN_IDENTIFIERS.
+-- Aucune adresse IP n'est jamais affichée (filtre explicite des préfixes).
+RegisterCommand('whoami', function(src)
+    if src == 0 then
+        print("[gf_core] La commande /whoami s'utilise en jeu.")
+        return
+    end
+
+    local prefixes = { 'license:', 'license2:', 'fivem:', 'discord:', 'steam:', 'xbl:', 'live:' }
+    local ids = {}
+    for _, identifiant in ipairs(GetPlayerIdentifiers(src) or {}) do
+        for _, prefix in ipairs(prefixes) do
+            if identifiant:sub(1, #prefix) == prefix then
+                ids[#ids + 1] = identifiant
+                break
+            end
+        end
+    end
+
+    local admin = isAdmin(src)
+    notify(src, admin and 'Administrateur : oui' or 'Administrateur : non')
+    if #ids > 0 then
+        notify(src, 'Identifiants : ' .. table.concat(ids, ', '))
+    else
+        notify(src, 'Identifiants : aucun')
+    end
+    if not admin then
+        notify(src, 'Pour devenir admin, ajoute un de ces identifiants à la variable ADMIN_IDENTIFIERS du serveur (.env ou gabarit Unraid), puis redémarre-le.')
+    end
+end, false)
+
 -- Admin : /setmode [id] [lobby|attack|redzone]
 RegisterCommand('setmode', function(src, args)
-    if not isAdmin(src) then return end
+    if not isAdmin(src) then
+        notify(src, ADMIN_REQUIS)
+        return
+    end
     local target, mode = tonumber(args[1]), args[2]
     if not target or not GetPlayerName(target) or not Config.Modes[mode or ''] then
         if src > 0 then notify(src, 'Utilisation : /setmode [id] [lobby|attack|redzone]') else print('setmode [id] [lobby|attack|redzone]') end
