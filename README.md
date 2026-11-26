@@ -145,6 +145,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | touches **1** et **2** | tous | sortir l'arme choisie en 1re / 2e position (la roue des armes de GTA est désactivée) |
 | touche **Échap** | tous | ouvre le menu pause GUNFIGHT (profil, règlement, chat, Discord, quitter) à la place du menu natif |
 | `/startround` | admin | force le lancement d’un match avec les joueurs déjà dans le mode (possible en solo) |
+| `/testattaque [id]` | admin | démarre un test Attaque à deux, un joueur par équipe |
 | `/endmatch` | admin | arrête le match, scores à zéro |
 | `/nextzone` | admin | zone d'attaque suivante (hors match) |
 | `/setteam [id] [A\|B]` | admin | change l'équipe d'un joueur |

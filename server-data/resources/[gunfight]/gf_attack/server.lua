@@ -637,6 +637,50 @@ RegisterCommand('startround', function(src)
     if not ok then reply(src, err) end
 end, false)
 
+-- Test privé à deux : un administrateur et le joueur désigné.
+RegisterCommand('testattaque', function(src, args)
+    if src <= 0 or not core:IsAdmin(src) then return end
+    local target = tonumber(args[1])
+    if not target or target % 1 ~= 0 or target == src or not GetPlayerName(target) then
+        return reply(src, 'Utilisation : /testattaque [ID du deuxième joueur connecté]')
+    end
+    if not AttackRules.estOuvert(etat) then return reply(src, 'Un match est déjà en cours.') end
+    for player in pairs(etat.equipes) do
+        if player ~= src and player ~= target then
+            return reply(src, 'Le mode Attaque contient déjà d’autres joueurs.')
+        end
+    end
+    for _, player in ipairs({ src, target }) do
+        local mode = core:GetMode(player)
+        if mode ~= 'lobby' and mode ~= 'attack' then
+            return reply(src, 'Les deux joueurs doivent être au lobby ou en attente dans le mode Attaque.')
+        end
+    end
+
+    local moved = {}
+    for _, player in ipairs({ src, target }) do
+        if not etat.equipes[player] then
+            local ok, changed = pcall(function() return core:SetMode(player, 'attack') end)
+            if ok and changed then moved[#moved + 1] = player end
+            if not ok or not changed or not etat.equipes[player] then
+                for _, previous in ipairs(moved) do core:SetMode(previous, 'lobby') end
+                return reply(src, 'Impossible de faire entrer les deux joueurs dans le mode Attaque.')
+            end
+        end
+    end
+    if not GetPlayerName(target) or not etat.equipes[src] or not etat.equipes[target] then
+        for _, player in ipairs(moved) do
+            if GetPlayerName(player) then core:SetMode(player, 'lobby') end
+        end
+        return reply(src, 'Le deuxième joueur est parti avant le lancement.')
+    end
+    if etat.equipes[src] == etat.equipes[target] then
+        local other = etat.equipes[src] == 'A' and 'B' or 'A'
+        executer(AttackRules.changerEquipe(etat, target, other, GetGameTimer()))
+    end
+    executer(AttackRules.debutTest(etat, GetGameTimer()))
+end, false)
+
 -- /endmatch : arrête le match et remet les scores à zéro
 RegisterCommand('endmatch', function(src)
     if not core:IsAdmin(src) then return end

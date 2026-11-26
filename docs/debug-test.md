@@ -222,6 +222,13 @@ Valeurs par défaut : `GameDuration=600` (10 min), `RespawnDelay=3`, véhicule
 
 ### Attaque de zone (seul ou à plusieurs)
 
+Pour un test à deux, les deux joueurs doivent être au lobby ou en attente dans
+le mode Attaque. Un administrateur utilise `/testattaque [id]` avec l'ID de
+l'autre joueur : ils sont placés dans des équipes opposées et la partie démarre
+sans attendre le seuil de recherche. La commande refuse de perturber un match
+en cours ou d'autres joueurs déjà dans le mode.
+
+
 1. En admin, `/startround` force une manche avec les joueurs déjà dans le mode.
    En solo, la manche se termine au chrono : pour la laisser défiler, sors de
    la zone (le chrono se met en pause tant qu'un attaquant vivant est dedans).
