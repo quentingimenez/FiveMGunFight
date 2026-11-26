@@ -103,9 +103,15 @@ Désormais :
    enregistrée par `weaponDamageEvent` est utilisée.
 4. La victime doit être réellement morte côté serveur : `GetPlayerPed(victime)`
    existe et `GetEntityHealth(ped) <= 0`. La vérification est contrôlée par
-   `Config.ValidateDeathHealth` (activée par défaut). Si des morts légitimes
-   sont rejetées sur un serveur donné, passe-la à `false` et surveille les
-   logs de refus.
+   `Config.ValidateDeathHealth` (activée par défaut). Le client ne signale la
+   mort qu'une fois, parfois avant que la santé à 0 soit arrivée au serveur
+   (joueur écrasé par un véhicule) : tant que la santé lue est celle d'un
+   vivant, la vérification est refaite toutes les `Config.DeathConfirm.delayMs`
+   (250 ms), au plus `Config.DeathConfirm.tries` fois (8, soit 2 s). Si la
+   victime paraît encore vivante après le dernier essai, la mort est traitée
+   quand même (réapparition) mais **sans kill crédité**, avec la ligne
+   `kill refusé … : mort non confirmée` dans les logs : un joueur ne reste
+   jamais bloqué mort, et une fausse mort ne rapporte rien à personne.
 5. `lastDamager` est nettoyé à la déconnexion du joueur (`playerDropped`),
    y compris les entrées où il était le tireur.
 

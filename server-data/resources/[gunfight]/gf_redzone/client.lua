@@ -163,6 +163,27 @@ CreateThread(function()
                 end
             end
 
+            -- Pas d'écrasement : les dégâts d'un choc avec un véhicule sont
+            -- calculés par le jeu de la victime, le serveur ne peut pas les
+            -- annuler. Chaque joueur traverse donc les véhicules qui ne sont
+            -- pas le sien, et son véhicule traverse les autres joueurs.
+            local myVeh = GetVehiclePedIsIn(ped, false)
+            for _, veh in ipairs(GetGamePool('CVehicle')) do
+                if veh ~= myVeh and #(GetEntityCoords(veh) - pos) < 80.0 then
+                    SetEntityNoCollisionEntity(ped, veh, true)
+                    SetEntityNoCollisionEntity(veh, ped, true)
+                end
+            end
+            if myVeh ~= 0 then
+                for _, joueur in ipairs(GetActivePlayers()) do
+                    local other = GetPlayerPed(joueur)
+                    if joueur ~= pid and other ~= 0 and #(GetEntityCoords(other) - pos) < 80.0 then
+                        SetEntityNoCollisionEntity(myVeh, other, true)
+                        SetEntityNoCollisionEntity(other, myVeh, true)
+                    end
+                end
+            end
+
             -- Pas de tir depuis un véhicule, ni en dehors de la zone
             if IsPedInAnyVehicle(ped, false) then
                 DisableControlAction(0, 69, true)  -- tir en véhicule
