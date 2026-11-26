@@ -102,6 +102,7 @@ Config.Weapons = {
     pistol      = { name = 'WEAPON_PISTOL',         label = 'Pistolet',            category = 'Pistolet',        ammo = 96 },
     pistol50    = { name = 'WEAPON_PISTOL50',       label = 'Pistolet .50',        category = 'Pistolet',        ammo = 72 },
     heavypistol = { name = 'WEAPON_HEAVYPISTOL',    label = 'Pistolet lourd',      category = 'Pistolet',        ammo = 72 },
+    ghostfair = { name = 'WEAPON_GHOSTFAIR', label = 'Ghost Fair Honey Badger', category = 'Mitraillette', ammo = 360 },
 }
 
 -- Armes que tout le monde possède dès le départ (identifiants de Config.Weapons)
