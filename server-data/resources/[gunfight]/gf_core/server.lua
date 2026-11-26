@@ -204,6 +204,7 @@ local function spawn(src, opts)
     SetTimeout(3000, function()
         if Spawning[src] then Spawning[src] = nil end
     end)
+    TriggerEvent('gf:spawned', src, opts.armour)
     TriggerClientEvent('gf_core:spawn', src, opts)
 end
 
@@ -406,6 +407,7 @@ local function giveWeapons(src, ids, armour)
     end
     Armes[src] = ShotValidation.ensembleArmes(noms)
     TriggerClientEvent('gf_core:giveWeapons', src, liste, armour or Config.SelectionArmour)
+    TriggerEvent('gf:armourGranted', src)
 end
 
 exports('GetOwnedWeapons', ownedWeapons)
