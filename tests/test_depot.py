@@ -679,10 +679,10 @@ class ChaineCI(unittest.TestCase):
                         r"(?m)^    timeout-minutes:\s*\d+\s*$",
                         "chaque job doit borner sa durée",
                     )
-                    self.assertIn(
-                        "runs-on: [self-hosted, Linux, X64]",
+                    self.assertRegex(
                         bloc,
-                        "les jobs doivent tourner sur les runners auto-hébergés (Ubuntu 24.04)",
+                        r"(?m)^    runs-on: ubuntu-24\.04\s*$",
+                        "les jobs doivent tourner sur les runners GitHub Ubuntu 24.04",
                     )
                     self.assertRegex(
                         bloc,
@@ -800,6 +800,27 @@ class ChaineCI(unittest.TestCase):
             "exit 1",
             bloc,
             "hors PR de fork ou de Dependabot, un secret absent doit faire échouer le job",
+        )
+
+    def test_smoke_sans_annuler_les_autres_refs(self) -> None:
+        # GitHub ne garde qu'un run en attente par groupe de concurrence : un
+        # groupe global annulait le smoke des autres PR (et même de main). Le
+        # groupe ne regroupe donc que les runs d'une même référence.
+        bloc = bloc_service(lire(self.WORKFLOWS / "docker.yml"), "smoke")
+        if bloc is None:
+            self.fail("job smoke absent de docker.yml")
+        groupe = re.search(r"(?m)^      group:\s*(.+?)\s*$", bloc)
+        if groupe is None:
+            self.fail("concurrence absente du job smoke")
+        self.assertIn(
+            "github.ref",
+            groupe.group(1),
+            "un groupe partagé entre références annule les smoke en attente des autres PR",
+        )
+        self.assertIn(
+            "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+            bloc,
+            "seuls les runs obsolètes d'une même PR peuvent être annulés",
         )
 
     def test_nom_du_check_smoke_inchange(self) -> None:
