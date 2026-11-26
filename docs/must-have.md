@@ -141,6 +141,12 @@ le client**. Avant toute nouvelle fonctionnalité :
 - **Vote de map** : en fin de partie, vote entre 9 maps tirées parmi les maps
   cochées dans `/maps` (Redzone et Attaque de zone).
 - **Menu de lobby** : groupes et invitations (§ 8) à ajouter au menu existant.
+- **Interface des armes** : retravailler l'esthétique et la disposition du
+  HUD et du menu de sélection lors d'une prochaine étape.
+- **Modification de la tenue** : permettre de saisir directement le numéro
+  d'un vêtement. Faire boucler les flèches de sélection : depuis le premier
+  élément, la flèche gauche mène au dernier ; depuis le dernier, la flèche droite
+  revient au premier.
 
 ---
 
