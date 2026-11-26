@@ -9,9 +9,11 @@ Ce que fait le script :
   2. copie les modèles (.yft/.ytd/.ydr) dans gf_vehicles/stream/ ;
   3. copie les réglages (.meta) dans gf_vehicles/data/<modèle>/ ;
   4. copie le son du moteur s'il est fourni (audioconfig/ + sfx/) ;
-  5. nettoie les réglages : liens publicitaires dans les noms, entrées de
+  5. reprend les noms affichés du pack (AddTextEntry des .lua, lus comme du
+     texte, jamais exécutés) dans data/<modèle>/names.json ;
+  6. nettoie les réglages : liens publicitaires dans les noms, entrées de
      carvariations.meta pour des modèles absents du pack ;
-  6. déclare les fichiers dans fxmanifest.lua et ajoute le véhicule à
+  7. déclare les fichiers dans fxmanifest.lua et ajoute le véhicule à
      Config.Vehicles (onglet « Véhicule » de /customveh).
 
 Ensuite : redémarrer le serveur. La photo du menu est prise automatiquement à la
@@ -24,6 +26,7 @@ données. --essai affiche ce qui serait fait sans rien écrire.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import sys
@@ -166,6 +169,22 @@ def nettoyer_carvariations(texte: str, modeles: set[str], notes: list[str]) -> s
     return texte
 
 
+def noms_du_pack(fichiers: list[Path]) -> dict[str, str]:
+    """Noms affichés (pièces, livrées, modèle) déclarés par AddTextEntry dans les .lua du pack.
+
+    Le .lua est lu comme du texte : seules les paires littérales sont reprises.
+    """
+    noms: dict[str, str] = {}
+    motif = re.compile(r"""AddTextEntry\(\s*["']([^"']{1,64})["']\s*,\s*["']([^"']{0,120})["']\s*\)""")
+    for f in fichiers:
+        if f.suffix.lower() != ".lua":
+            continue
+        for cle, texte in motif.findall(f.read_text(encoding="utf-8", errors="replace")):
+            if re.fullmatch(r"[A-Za-z0-9_]+", cle) and not re.search(r"https?://|discord", texte, re.I):
+                noms[cle] = texte
+    return noms
+
+
 # ---------------------------------------------------------------- Déclarations
 def ajouter_lignes_files(manifeste: str, chemins: list[str]) -> str:
     debut = manifeste.index("files {")
@@ -245,7 +264,9 @@ def main() -> int:
             print("vehicles.meta ne contient aucun <modelName>.", file=sys.stderr)
             return 1
         modele = modeles[0]
-        nom = args.nom or modele
+        noms = noms_du_pack(fichiers)
+        nom_du_pack = next((noms[g] for g in balises(vehicles_meta, "gameName") if g in noms), None)
+        nom = args.nom or nom_du_pack or modele
         if not re.fullmatch(r"[a-z0-9_]+", modele):
             print(f"Nom de modèle inattendu : {modele}", file=sys.stderr)
             return 1
@@ -298,6 +319,17 @@ def main() -> int:
             if not args.essai:
                 dossier_data.mkdir(parents=True, exist_ok=True)
                 (dossier_data / nom_meta).write_text(texte, encoding="utf-8", newline="\n")
+
+        # Noms affichés (pièces, livrées) : chargés par gf_vehicles/client.lua
+        if noms:
+            chemin = f"data/{modele}/names.json"
+            declarer.append(chemin)
+            actions.append(chemin)
+            notes.append(f"{len(noms)} nom(s) affiché(s) repris du pack (pièces, livrées)")
+            if not args.essai:
+                dossier_data.mkdir(parents=True, exist_ok=True)
+                (dossier_data / "names.json").write_text(
+                    json.dumps(noms, ensure_ascii=False, indent=2, sort_keys=True) + NL, encoding="utf-8", newline=NL)
 
         # Son du moteur
         for f in rels:
