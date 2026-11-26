@@ -1,40 +1,37 @@
 -- =============================================================================
---  gf_attack - SERVEUR
---  Toute la logique de la partie est ici (le client ne fait qu'afficher).
+--  gf_attack - SERVEUR (exécution des effets rendus par rules.lua)
 --
---  Phases :  waiting  → en attente de joueurs
---            prep     → préparation, joueurs gelés et protégés
---            live     → combat, pas de réapparition
---            ended    → pause entre deux manches
+--  Ce fichier ne prend AUCUNE décision de jeu : phases, équipes, états vivant,
+--  scores, manches, échéances, matchOver, départs, morts et équilibrage
+--  viennent exclusivement de AttackRules. On ne garde ici que les natives
+--  FiveM, les événements/commandes réseau, les annonces et l'affichage.
+--
+--  Les durées de Config sont exprimées en secondes ; CONFIG_MANCHES est le
+--  seul point de conversion vers les millisecondes attendues par les règles.
 -- =============================================================================
 
 local core = exports.gf_core
 
-local S = {}
--- Dernier choix d'armes de chaque joueur (gardé d'une manche à l'autre)
-S.choice = {}
+-- SEUL point de conversion des secondes (Config) vers les millisecondes (règles).
+local CONFIG_MANCHES = {
+    PlayersToStart = Config.PlayersToStart,
+    MaxPlayers = Config.MaxPlayers,
+    WinRounds = Config.WinRounds,
+    SwapSidesEveryRound = Config.SwapSidesEveryRound,
+    SelectTimeMs = Config.SelectTime * 1000,
+    PlacementTimeMs = Config.PlacementTime * 1000,
+    RoundTimeMs = Config.RoundTime * 1000,
+    EndDelayMs = Config.EndDelay * 1000,
+    MatchEndDelayMs = Config.MatchEndDelay * 1000,
+}
 
-local function resetState()
-    S.phase = 'waiting'
-    S.team = {}           -- [src] = 'A' | 'B'
-    S.alive = {}          -- [src] = true | false
-    S.stats = {}          -- [src] = { kills, deaths }
-    S.departed = {}       -- joueurs partis pendant le match
-    S.score = { A = 0, B = 0 }
-    S.attackers = 'A'
-    S.round = 0
-    S.zoneIndex = S.zoneIndex or 1
-    S.endsAt = 0
-    S.solo = false        -- manche de test : une équipe vide, seul le chrono termine la manche
-    S.matchOver = false
-    S.scoreboardDirty = true
-end
-resetState()
+local etat = AttackRules.nouveau(CONFIG_MANCHES, math.random)
+
+local Choix = {}          -- [src] = choix d'armes (gardé d'une manche à l'autre)
+local Noms = {}           -- [src] = nom à l'arrivée (conservé pour les joueurs partis)
+local classementSale = false
 
 -- ---------------------------------------------------------------- Utilitaires
-local function now() return os.time() end
-local function other(t) return t == 'A' and 'B' or 'A' end
-
 -- Cap (heading GTA) pour regarder du point (x,y) vers (tx,ty)
 local function headingTo(x, y, tx, ty)
     return (math.deg(math.atan(-(tx - x), ty - y)) + 360.0) % 360.0
@@ -85,21 +82,23 @@ local function mapList()
 end
 
 local currentMap = nil
+local zoneIndex = 1
+
 local function loadMap(index)
     local list = mapList()
-    S.zoneIndex = ((index - 1) % #list) + 1
-    currentMap = finalizeMap(list[S.zoneIndex])
+    zoneIndex = ((index - 1) % #list) + 1
+    currentMap = finalizeMap(list[zoneIndex])
 end
 
-loadMap(S.zoneIndex)
+loadMap(zoneIndex)
 
 local function zone() return currentMap end
 
 -- Même contour que celui utilisé par le client pour les limites de la zone.
 local function attackerInZone()
     local points = zone().points
-    for src, team in pairs(S.team) do
-        if team == S.attackers and S.alive[src] then
+    for src, team in pairs(etat.equipes) do
+        if team == etat.attaquants and etat.vivants[src] then
             local ped = GetPlayerPed(src)
             if ped ~= 0 then
                 local pos = GetEntityCoords(ped)
@@ -118,29 +117,14 @@ local function attackerInZone()
     end
     return false
 end
-local function defenders() return other(S.attackers) end
-local function roleOf(t) return t == S.attackers and 'attack' or 'defense' end
 
-local function count(t)
-    local n = 0
-    for _, tm in pairs(S.team) do if tm == t then n = n + 1 end end
-    return n
-end
-
-local function aliveCount(t)
-    local n = 0
-    for src, tm in pairs(S.team) do if tm == t and S.alive[src] then n = n + 1 end end
-    return n
+-- Affichage du camp adverse : purement dérivé de etat.attaquants.
+local function defenders()
+    return etat.attaquants == 'A' and 'B' or 'A'
 end
 
 local function eachPlayer(fn)
-    for src in pairs(S.team) do fn(src) end
-end
-
-local function setTeam(src, t)
-    S.team[src] = t
-    Player(src).state:set('gf_team', t, true)
-    S.scoreboardDirty = true
+    for src in pairs(etat.equipes) do fn(src) end
 end
 
 local function announce(src, title, sub, ms)
@@ -151,23 +135,15 @@ local function announceAll(title, sub, ms)
     eachPlayer(function(src) announce(src, title, sub, ms) end)
 end
 
--- En vie / mort : partagé avec les clients (state bag) pour le mode spectateur
-local function setAlive(src, alive)
-    S.alive[src] = alive
-    if GetPlayerName(src) then Player(src).state:set('gf_alive', alive and true or false, true) end
-end
-
 -- Rang du joueur dans son équipe (1, 2, 3...) pour ranger les voitures
 local function slotOf(src)
-    local t, list = S.team[src], {}
-    for s, tm in pairs(S.team) do if tm == t then list[#list + 1] = s end end
+    local t, list = etat.equipes[src], {}
+    for s, tm in pairs(etat.equipes) do if tm == t then list[#list + 1] = s end end
     table.sort(list)
     for i, s in ipairs(list) do if s == src then return i end end
     return 1
 end
 
--- Position d'apparition : les voitures sont rangées en rangées de 4 derrière
--- le point de départ de l'équipe, toutes tournées vers la zone.
 -- Position d'apparition de l'équipe, en formation, tournée vers la zone.
 --  - en voiture : rangées de Config.VehicleColumns voitures côte à côte,
 --    serrées mais sans se chevaucher, les rangées suivantes derrière ;
@@ -175,7 +151,7 @@ end
 --    12, 18... joueurs autour), chacun à sa place.
 local function spawnPos(src, inVehicle)
     local z = zone()
-    local sp = roleOf(S.team[src]) == 'defense' and z.defenseSpawn or z.attackSpawn
+    local sp = AttackRules.roleEquipe(etat, etat.equipes[src]) == 'defense' and z.defenseSpawn or z.attackSpawn
     local h = math.rad(headingTo(sp.x, sp.y, z.center.x, z.center.y))
     local fx, fy = -math.sin(h), math.cos(h)   -- vers l'avant (la zone)
     local rx, ry = math.cos(h), math.sin(h)    -- vers le côté
@@ -205,11 +181,11 @@ end
 
 -- opts : vehicle (bool), freeze, protected, weapons (bool : armes choisies)
 local function spawnRole(src, opts)
-    local inVehicle = opts.vehicle and roleOf(S.team[src]) == 'attack'
+    local inVehicle = opts.vehicle and AttackRules.roleDe(etat, src) == 'attack'
     local x, y, z, h = spawnPos(src, inVehicle)
     local weapons = nil
     if opts.weapons then
-        weapons = core:BuildWeaponList(core:ResolveSelection(src, S.choice[src]))
+        weapons = core:BuildWeaponList(core:ResolveSelection(src, Choix[src]))
     end
     core:Spawn(src, {
         x = x, y = y, z = z, heading = h,
@@ -221,7 +197,7 @@ local function spawnRole(src, opts)
 end
 
 local function toSpectator(src)
-    if not S.team[src] then return end
+    if not etat.equipes[src] then return end
     local c = zone().center
     -- keepVehicle : la voiture du joueur mort reste dans la manche
     core:Spawn(src, { x = c.x, y = c.y, z = c.z + 45.0, heading = 0.0, spectator = true, keepVehicle = true })
@@ -230,14 +206,14 @@ end
 
 -- Menu de choix des 2 armes (pendant la phase de choix)
 local function openLoadout(src)
-    local remaining = math.max(S.endsAt - now(), 1)
+    local restant = math.max(math.ceil((etat.echeance - GetGameTimer()) / 1000), 1)
     local settings = core:GetSelectionSettings()
     TriggerClientEvent('gf_ui:loadout_open', src, {
         title = 'Choisis tes 2 armes',
         weapons = core:GetOwnedWeapons(src),
-        selected = core:ResolveSelection(src, S.choice[src]),
+        selected = core:ResolveSelection(src, Choix[src]),
         count = settings.count,
-        seconds = remaining,
+        seconds = restant,
     })
 end
 
@@ -249,7 +225,7 @@ local function sendZone(src)
         center = z.center,
         radius = z.radius,
         defenders = defenders(),
-        phase = S.phase,
+        phase = etat.phase,
         damage = Config.OutOfZoneDamage,
         colors = { A = Config.Teams.A.color, B = Config.Teams.B.color },
     })
@@ -257,7 +233,6 @@ end
 
 local function sendZoneAll() eachPlayer(sendZone) end
 
--- Place un joueur selon la phase actuelle (arrivée en cours de partie, etc.)
 -- ---------------------------------------------------------------- Soins
 -- Bandages et kevlars : le nombre est tenu par le serveur, le client ne fait
 -- que jouer l'animation puis appliquer le soin que le serveur a autorisé.
@@ -282,8 +257,8 @@ end
 RegisterNetEvent('gf_attack:useItem', function(item)
     local src = source
     local def = type(item) == 'string' and Config.Items[item] or nil
-    if not def or not S.team[src] or not S.alive[src] then return end
-    if S.phase ~= 'place' and S.phase ~= 'live' then return end
+    if not def or not etat.equipes[src] or not etat.vivants[src] then return end
+    if etat.phase ~= 'place' and etat.phase ~= 'live' then return end
     local t = GetGameTimer()
     if Using[src] and t < Using[src] then return end   -- une seule utilisation à la fois
     local inv = Items[src]
@@ -294,225 +269,42 @@ RegisterNetEvent('gf_attack:useItem', function(item)
     sendItems(src)
 end)
 
-AddEventHandler('playerDropped', function() Items[source], Using[source] = nil, nil end)
-
-local function placeForPhase(src)
-    if S.phase == 'select' then
-        setAlive(src, true)
-        spawnRole(src, { vehicle = true, freeze = true, protected = true })
-        openLoadout(src)
-        resetItems(src)
-    elseif S.phase == 'place' then
-        setAlive(src, true)
-        spawnRole(src, { vehicle = true, weapons = true, protected = true })
-        resetItems(src)
-    elseif S.phase == 'live' then
-        setAlive(src, false)
-        toSpectator(src)
-        announce(src, 'Manche en cours', 'Tu joueras dès la prochaine manche', 4000)
-    else
-        setAlive(src, false)
-        spawnRole(src, { protected = true })
-    end
-    sendZone(src)
-end
-
--- Équilibre les équipes (différence max de 1 joueur)
-local function autobalance()
-    for _ = 1, 64 do
-        local a, b = count('A'), count('B')
-        if math.abs(a - b) <= 1 then return end
-        local from = a > b and 'A' or 'B'
-        local pool = {}
-        for src, t in pairs(S.team) do if t == from then pool[#pool + 1] = src end end
-        local moved = pool[math.random(#pool)]
-        setTeam(moved, other(from))
-        core:Notify(moved, ('Équilibrage : tu passes dans l\'%s'):format(Config.Teams[other(from)].label))
-    end
-end
-
-local function canStart()
-    local a, b = count('A'), count('B')
-    return a >= 1 and b >= 1 and a + b >= Config.PlayersToStart
-end
-
--- ---------------------------------------------------------------- Déroulement
--- 1) Choix des armes : tout le monde dans sa voiture, gelé, menu ouvert
-local function startSelect()
-    -- Début de match : on recharge la map (prend en compte les modifications de /editor)
-    if S.round == 0 then loadMap(S.zoneIndex) end
-    if S.round == 0 then autobalance() end
-    S.round = S.round + 1
-    S.phase = 'select'
-    S.endsAt = now() + Config.SelectTime
-    S.solo = count('A') == 0 or count('B') == 0
-
-    eachPlayer(function(src)
-        setAlive(src, true)
-        spawnRole(src, { vehicle = true, freeze = true, protected = true })
-        openLoadout(src)
-        resetItems(src)   -- 2 bandages + 2 kevlars à chaque manche
-        local role = roleOf(S.team[src])
-        local roleText = role == 'attack' and ('Tu ATTAQUES : ' .. zone().name) or ('Tu DÉFENDS : ' .. zone().name)
-        if S.swapped then
-            announce(src, 'CHANGEMENT DE CAMP', ('Manche %d  ·  %s'):format(S.round, roleText), 4500)
-        else
-            announce(src, ('Manche %d'):format(S.round), roleText, 4000)
-        end
-    end)
-    S.swapped = false
-    if S.solo then
-        announceAll(('Manche %d (test)'):format(S.round), 'Une équipe est vide : la manche se termine au chrono', 5000)
-    end
-    sendZoneAll()
-    S.scoreboardDirty = true
-end
-
--- 2) Placement : on peut rouler, les défenseurs s'installent,
---    les attaquants ne peuvent pas encore entrer dans la zone
-local function startPlacement()
-    S.phase = 'place'
-    S.endsAt = now() + Config.PlacementTime
-    eachPlayer(function(src)
-        TriggerClientEvent('gf_ui:loadout_close', src)
-        if S.alive[src] then
-            core:GiveWeapons(src, core:ResolveSelection(src, S.choice[src]))
-            core:Freeze(src, false)
-            local attack = roleOf(S.team[src]) == 'attack'
-            announce(src, 'Placement',
-                attack and ('Zone fermée pendant %d s : prépare ton attaque'):format(Config.PlacementTime)
-                    or ('%d s pour te placer dans la zone'):format(Config.PlacementTime), 3000)
-        end
-    end)
-    sendZoneAll()
-end
-
--- 3) Combat : les attaquants peuvent entrer, pas de réapparition
-local function startLive()
-    S.phase = 'live'
-    S.endsAt = now() + Config.RoundTime
-    S.clockUpdatedAt = now()
-    S.clockPaused = false
-    eachPlayer(function(src)
-        if S.alive[src] then core:SetProtected(src, false) end
-    end)
-    announceAll('GO !', 'La zone est ouverte : à l\'attaque !', 2500)
-    sendZoneAll()
-end
-
-local sendMatchResults
-
-local function endRound(winner, reason)
-    if S.phase ~= 'live' then return end
-    S.phase = 'ended'
-    S.score[winner] = S.score[winner] + 1
-    S.endsAt = now() + Config.EndDelay
-
-    eachPlayer(function(src) core:SetProtected(src, true) end)
-
-    -- Message personnel : gagné ou perdu, selon l'équipe du joueur
-    local matchOver = S.score[winner] >= Config.WinRounds
-    if matchOver then
-        S.matchOver = true
-        S.endsAt = now() + Config.MatchEndDelay
-        -- Statistiques persistantes (gf_stats) : participants du match terminé.
-        local participants = {}
-        for src, t in pairs(S.team) do
-            participants[#participants + 1] = { src = src, won = t == winner }
-        end
-        TriggerEvent('gf:matchEnded', {
-            mode = 'attack',
-            map = zone().name,
-            participants = participants,
-            score = { A = S.score.A, B = S.score.B },
-        })
-    end
-    local scoreText = ('%s %d - %d %s'):format(Config.Teams.A.label, S.score.A, S.score.B, Config.Teams.B.label)
-    eachPlayer(function(src)
-        local won = S.team[src] == winner
-        if not matchOver then
-            announce(src, won and 'MANCHE GAGNÉE' or 'MANCHE PERDUE', reason .. '  ·  ' .. scoreText,
-                Config.EndDelay * 1000 - 1000)
-        end
-    end)
-    if matchOver then sendMatchResults(winner) end
-    sendZoneAll()
-    S.scoreboardDirty = true
-end
-
-local function goWaiting()
-    S.phase = 'waiting'
-    S.endsAt = 0
-    eachPlayer(function(src)
-        setAlive(src, false)
-        spawnRole(src, { protected = true })
-    end)
-    sendZoneAll()
-end
-
-local function nextRound()
-    if S.matchOver then
-        local players = {}
-        eachPlayer(function(src) players[#players + 1] = src end)
-        local nextZone = S.zoneIndex + 1
-        for _, src in ipairs(players) do core:SetMode(src, 'lobby') end
-        resetState()
-        loadMap(nextZone)
-        return
-    end
-
-    if Config.SwapSidesEveryRound then
-        S.attackers = other(S.attackers)
-        S.swapped = true
-    end
-    startSelect()
-end
-
-local function checkWin()
-    if S.phase ~= 'live' or S.solo then return end
-    local att, def = S.attackers, defenders()
-    local a, d = aliveCount(att), aliveCount(def)
-    if a == 0 then
-        endRound(def, 'Tous les attaquants ont été éliminés')
-    elseif d == 0 then
-        endRound(att, 'Tous les défenseurs ont été éliminés')
-    end
-end
-
 -- ---------------------------------------------------------------- HUD & classement
 local function phaseLabel()
-    return ({ waiting = 'En attente de joueurs', select = 'Choix des armes', place = 'Placement', live = 'Combat', ended = 'Fin de manche' })[S.phase]
+    return ({ waiting = 'En attente de joueurs', select = 'Choix des armes', place = 'Placement', live = 'Combat', ended = 'Fin de manche' })[etat.phase]
 end
 
 local function sendHud()
-    local remaining = S.endsAt > 0 and math.max(S.endsAt - now(), 0) or nil
+    local remaining = etat.echeance > 0 and math.max(math.ceil((etat.echeance - GetGameTimer()) / 1000), 0) or nil
     local function side(t)
-        local role = roleOf(t) == 'attack' and 'Attaque' or 'Défense'
+        local role = AttackRules.roleEquipe(etat, t) == 'attack' and 'Attaque' or 'Défense'
         return {
             label = ('%s · %s'):format(Config.Teams[t].label, role),
-            value = S.score[t],
-            sub = ('%d / %d en vie'):format(aliveCount(t), count(t)),
+            value = etat.score[t],
+            sub = ('%d / %d en vie'):format(AttackRules.compterVivants(etat, t), AttackRules.compter(etat, t)),
             color = Config.Teams[t].color,
         }
     end
     local left, right = side('A'), side('B')
     local subtitle = ('%s  •  %s  •  Premier à %d'):format(zone().name, phaseLabel(), Config.WinRounds)
-    if S.phase == 'live' and S.clockPaused then
+    if etat.phase == 'live' and etat.chronoEnPause then
         subtitle = subtitle .. '  •  Chrono en pause'
     end
-    if S.phase == 'waiting' then
-        subtitle = ('%s  •  En attente : %d / %d joueurs'):format(zone().name, count('A') + count('B'), Config.PlayersToStart)
+    if etat.phase == 'waiting' then
+        subtitle = ('%s  •  En attente : %d / %d joueurs'):format(
+            zone().name, AttackRules.nombreJoueurs(etat), Config.PlayersToStart)
     end
 
     eachPlayer(function(src)
-        local t = S.team[src]
-        local attack = roleOf(t) == 'attack'
+        local t = etat.equipes[src]
+        local attack = AttackRules.roleEquipe(etat, t) == 'attack'
         TriggerClientEvent('gf_ui:hud', src, {
-            title = S.round > 0 and ('Attaque de zone · Manche %d'):format(S.round) or 'Attaque de zone',
+            title = etat.manche > 0 and ('Attaque de zone · Manche %d'):format(etat.manche) or 'Attaque de zone',
             subtitle = subtitle,
             timer = remaining,
             badge = {
-                text = (attack and 'TU ATTAQUES' or 'TU DÉFENDS') .. (S.alive[src] == false and S.phase == 'live' and ' · ÉLIMINÉ' or ''),
+                text = (attack and 'TU ATTAQUES' or 'TU DÉFENDS')
+                    .. (etat.vivants[src] == false and etat.phase == 'live' and ' · ÉLIMINÉ' or ''),
                 color = Config.Teams[t].color,
             },
             left = left, right = right,
@@ -522,31 +314,37 @@ end
 
 local function sendScoreboard()
     local rows = {}
-    for src, t in pairs(S.team) do
-        local st = S.stats[src] or { kills = 0, deaths = 0 }
+    for src, t in pairs(etat.equipes) do
+        local st = etat.stats[src] or { kills = 0, deaths = 0 }
         rows[#rows + 1] = {
             cells = { GetPlayerName(src) or '?', Config.Teams[t].label, st.kills, st.deaths,
-                S.alive[src] and 'En vie' or '—' },
+                etat.vivants[src] and 'En vie' or '—' },
             color = Config.Teams[t].color,
         }
     end
     table.sort(rows, function(a, b) return a.cells[3] > b.cells[3] end)
     local data = {
-        title = ('Attaque de zone · %d - %d'):format(S.score.A, S.score.B),
+        title = ('Attaque de zone · %d - %d'):format(etat.score.A, etat.score.B),
         columns = { 'Joueur', 'Équipe', 'Kills', 'Morts', 'État' },
         rows = rows,
     }
     eachPlayer(function(src) TriggerClientEvent('gf_ui:scoreboard', src, data) end)
 end
 
-sendMatchResults = function(winner)
+-- participants : joueurs encore présents (avec id) ; partis : joueurs sortis
+-- pendant le match (sans id, le nom vient du cache Noms).
+local function sendMatchResults(winner, participants, partis, score)
     local players = {}
-    for _, entry in ipairs(S.departed) do players[#players + 1] = entry end
-    for src, team in pairs(S.team) do
-        local stats = S.stats[src]
+    for _, p in ipairs(partis) do
         players[#players + 1] = {
-            id = src, name = GetPlayerName(src) or '?', team = team,
-            kills = stats.kills, deaths = stats.deaths,
+            name = Noms[p.src] or '?', team = p.equipe,
+            kills = p.kills, deaths = p.deaths,
+        }
+    end
+    for _, p in ipairs(participants) do
+        players[#players + 1] = {
+            id = p.src, name = GetPlayerName(p.src) or Noms[p.src] or '?', team = p.equipe,
+            kills = p.kills, deaths = p.deaths,
         }
     end
     table.sort(players, function(a, b)
@@ -555,6 +353,8 @@ sendMatchResults = function(winner)
         return a.name < b.name
     end)
     local best = players[1] and players[1].kills or 0
+    local scoreText = ('%s %d - %d %s'):format(
+        Config.Teams.A.label, score.A, score.B, Config.Teams.B.label)
     eachPlayer(function(src)
         local rows = {}
         for _, player in ipairs(players) do
@@ -566,60 +366,169 @@ sendMatchResults = function(winner)
             }
         end
         TriggerClientEvent('gf_ui:match_results', src, {
-            won = S.team[src] == winner, score = ('%s %d - %d %s'):format(
-                Config.Teams.A.label, S.score.A, S.score.B, Config.Teams.B.label),
-            rows = rows,
+            won = etat.equipes[src] == winner, score = scoreText, rows = rows,
         })
     end)
 end
 
--- ---------------------------------------------------------------- Entrée dans le mode
--- La recherche de partie est gérée par gf_lobby (file serveur globale, voir
--- docs/lobby.md) : elle fait entrer les joueurs via gf_core:SetMode quand le
--- seuil est atteint. Ici on dit seulement si un match accepte encore du monde.
--- On ne rejoint jamais un match en cours.
-local function inMatchCount() return count('A') + count('B') end
-
--- Un match est « ouvert » aux nouveaux joueurs s'il n'a pas encore commencé
-local function matchOpen()
-    return S.phase == 'waiting'
+-- ---------------------------------------------------------------- Effets
+-- Le serveur interprète les effets rendus par AttackRules, dans leur ordre.
+local executer
+executer = function(effets)
+    for _, e in ipairs(effets) do
+        if e.type == 'phase' then
+            -- L'état a déjà été muté par les règles : on diffuse la zone complète.
+            sendZoneAll()
+        elseif e.type == 'equipe' then
+            Player(e.src).state:set('gf_team', e.equipe, true)
+        elseif e.type == 'vivant' then
+            if GetPlayerName(e.src) then
+                Player(e.src).state:set('gf_alive', e.vivant and true or false, true)
+            end
+        elseif e.type == 'apparition' then
+            if e.mode == 'select' then
+                spawnRole(e.src, { vehicle = true, freeze = true, protected = true })
+            elseif e.mode == 'place' then
+                spawnRole(e.src, { vehicle = true, weapons = true, protected = true })
+            elseif e.mode == 'attente' then
+                spawnRole(e.src, { protected = true })
+            end
+            -- Aucun autre mode d'apparition.
+        elseif e.type == 'spectateur' then
+            toSpectator(e.src)
+        elseif e.type == 'menuArmes' then
+            openLoadout(e.src)
+        elseif e.type == 'fermerMenuArmes' then
+            TriggerClientEvent('gf_ui:loadout_close', e.src)
+        elseif e.type == 'objets' then
+            if e.action == 'reset' then
+                resetItems(e.src)
+            elseif e.action == 'clear' then
+                clearItems(e.src)
+            end
+        elseif e.type == 'armes' then
+            core:GiveWeapons(e.src, core:ResolveSelection(e.src, Choix[e.src]))
+        elseif e.type == 'degeler' then
+            core:Freeze(e.src, false)
+        elseif e.type == 'protection' then
+            core:SetProtected(e.src, e.protege)
+        elseif e.type == 'notifier' then
+            if e.modele == 'rejoint' then
+                core:Notify(e.src, ("Tu rejoins l'%s. Tape /lobby pour quitter."):format(Config.Teams[e.equipe].label))
+            elseif e.modele == 'equilibrage' then
+                core:Notify(e.src, ("Équilibrage : tu passes dans l'%s"):format(Config.Teams[e.equipe].label))
+            end
+        elseif e.type == 'annonce' then
+            if e.modele == 'debutManche' then
+                local roleText = e.role == 'attack'
+                    and ('Tu ATTAQUES : ' .. zone().name) or ('Tu DÉFENDS : ' .. zone().name)
+                if e.changementDeCamp then
+                    announce(e.src, 'CHANGEMENT DE CAMP', ('Manche %d  ·  %s'):format(e.manche, roleText), e.dureeMs)
+                else
+                    announce(e.src, ('Manche %d'):format(e.manche), roleText, e.dureeMs)
+                end
+            elseif e.modele == 'debutMancheTest' then
+                announceAll(('Manche %d (test)'):format(e.manche),
+                    'Une équipe est vide : la manche se termine au chrono', e.dureeMs)
+            elseif e.modele == 'placement' then
+                announce(e.src, 'Placement', e.role == 'attack'
+                    and ('Zone fermée pendant %d s : prépare ton attaque'):format(e.secondes)
+                    or ('%d s pour te placer dans la zone'):format(e.secondes), e.dureeMs)
+            elseif e.modele == 'go' then
+                announceAll('GO !', 'La zone est ouverte : à l\'attaque !', e.dureeMs)
+            elseif e.modele == 'elimine' then
+                announce(e.src, 'Éliminé', 'Tu regardes tes alliés (clic gauche / droit pour changer)', e.dureeMs)
+            elseif e.modele == 'mancheEnCours' then
+                announce(e.src, 'Manche en cours', 'Tu joueras dès la prochaine manche', e.dureeMs)
+            end
+            -- Pas de modèle 'matchArrete' : c'est l'effet matchArrete qui parle.
+        elseif e.type == 'finManche' then
+            if not e.matchOver then
+                local scoreText = ('%s %d - %d %s'):format(
+                    Config.Teams.A.label, e.score.A, e.score.B, Config.Teams.B.label)
+                eachPlayer(function(src)
+                    local won = etat.equipes[src] == e.gagnant
+                    announce(src, won and 'MANCHE GAGNÉE' or 'MANCHE PERDUE',
+                        e.raison .. '  ·  ' .. scoreText, e.dureeMs)
+                end)
+            end
+        elseif e.type == 'finMatch' then
+            local participants = {}
+            for _, p in ipairs(e.participants) do
+                participants[#participants + 1] = { src = p.src, won = p.equipe == e.gagnant }
+            end
+            TriggerEvent('gf:matchEnded', {
+                mode = 'attack',
+                map = zone().name,
+                participants = participants,
+                score = { A = e.score.A, B = e.score.B },
+            })
+            sendMatchResults(e.gagnant, e.participants, e.partis, e.score)
+        elseif e.type == 'retourLobby' then
+            -- L'état a déjà été réinitialisé par les règles : on reproduit
+            -- l'ancien gf:modeLeft avant de renvoyer le joueur au lobby.
+            clearItems(e.src)
+            TriggerClientEvent('gf_ui:match_results', e.src, nil)
+            if GetPlayerName(e.src) then
+                Player(e.src).state:set('gf_team', nil, true)
+                Player(e.src).state:set('gf_alive', nil, true)
+                TriggerClientEvent('gf_ui:loadout_close', e.src)
+                TriggerClientEvent('gf_attack:clear', e.src)
+            end
+            core:SetMode(e.src, 'lobby')
+        elseif e.type == 'chargerCarte' then
+            if e.mode == 'recharger' then
+                loadMap(zoneIndex)
+            elseif e.mode == 'suivante' then
+                loadMap(zoneIndex + 1)
+            end
+        elseif e.type == 'effacerResultats' then
+            TriggerClientEvent('gf_ui:match_results', e.src, nil)
+        elseif e.type == 'nettoyerJoueur' then
+            if GetPlayerName(e.src) then
+                Player(e.src).state:set('gf_team', nil, true)
+                Player(e.src).state:set('gf_alive', nil, true)
+                TriggerClientEvent('gf_ui:loadout_close', e.src)
+                TriggerClientEvent('gf_attack:clear', e.src)
+            end
+        elseif e.type == 'recompenseKevlar' then
+            local inv = Items[e.src]
+            if inv and etat.vivants[e.src] and inv.kevlar < Config.MaxKevlars then
+                inv.kevlar = math.min(Config.MaxKevlars, inv.kevlar + Config.KevlarPerKill)
+                sendItems(e.src)
+            end
+        elseif e.type == 'statistiquesKill' then
+            TriggerEvent('gf:modeKill', { mode = 'attack', victim = e.victime, killer = e.tueur or false })
+        elseif e.type == 'spectateurDiffere' then
+            local src, delai = e.src, e.delaiMs
+            SetTimeout(delai, function()
+                if etat.equipes[src] and not etat.vivants[src] then toSpectator(src) end
+            end)
+        elseif e.type == 'placementDiffere' then
+            local src, delai = e.src, e.delaiMs
+            SetTimeout(delai, function()
+                if etat.equipes[src] then executer(AttackRules.placer(etat, src)) end
+            end)
+        elseif e.type == 'zone' then
+            sendZone(e.src)
+        elseif e.type == 'classement' then
+            classementSale = true
+        elseif e.type == 'matchArrete' then
+            announceAll('Match arrêté', 'Par un administrateur', 4000)
+        end
+    end
 end
 
-exports('CanJoin', function()
-    return matchOpen() and inMatchCount() < Config.MaxPlayers
-end)
-
--- Boucle principale (1 fois par seconde)
+-- ---------------------------------------------------------------- Boucle principale
 CreateThread(function()
     while true do
         Wait(1000)
-        local t = now()
-        if S.phase == 'waiting' then
-            if canStart() then startSelect() end
-        elseif S.phase == 'select' then
-            if t >= S.endsAt then startPlacement() end
-        elseif S.phase == 'place' then
-            if t >= S.endsAt then startLive() end
-        elseif S.phase == 'live' then
-            S.clockPaused = attackerInZone()
-            if S.clockPaused then
-                S.endsAt = S.endsAt + (t - S.clockUpdatedAt)
-            end
-            S.clockUpdatedAt = t
-            if t >= S.endsAt then
-                if S.solo and count(S.attackers) > 0 then
-                    endRound(S.attackers, 'Temps écoulé : manche de test terminée')
-                else
-                    endRound(defenders(), 'Temps écoulé : la défense a tenu la zone')
-                end
-            end
-        elseif S.phase == 'ended' then
-            if t >= S.endsAt then nextRound() end
-        end
-
+        local t = GetGameTimer()
+        local dansZone = etat.phase == 'live' and attackerInZone() or false
+        executer(AttackRules.tic(etat, t, dansZone))
         sendHud()
-        if S.scoreboardDirty then
-            S.scoreboardDirty = false
+        if classementSale then
+            classementSale = false
             sendScoreboard()
         end
     end
@@ -629,94 +538,36 @@ end)
 -- Le menu d'armes (gf_ui) envoie le choix ; gf_core le valide (armes possédées)
 RegisterNetEvent('gf:loadoutChosen', function(ids)
     local src = source
-    if not S.team[src] or S.phase ~= 'select' then return end
-    S.choice[src] = core:ResolveSelection(src, ids)
+    if not etat.equipes[src] or etat.phase ~= 'select' then return end
+    Choix[src] = core:ResolveSelection(src, ids)
 end)
 
 AddEventHandler('playerDropped', function()
-    S.choice[source] = nil
+    local src = source
+    Choix[src] = nil
+    Items[src], Using[src] = nil, nil
+    -- Noms est volontairement conservé pour le classement final.
 end)
 
 AddEventHandler('gf:modeJoined', function(src, mode)
     if mode ~= 'attack' then return end
-    local a, b = count('A'), count('B')
-    local t = a < b and 'A' or (b < a and 'B' or (math.random(2) == 1 and 'A' or 'B'))
-    setTeam(src, t)
-    S.stats[src] = { name = GetPlayerName(src) or '?', kills = 0, deaths = 0 }
-    core:Notify(src, ('Tu rejoins l\'%s. Tape /lobby pour quitter.'):format(Config.Teams[t].label))
-    placeForPhase(src)
+    Noms[src] = GetPlayerName(src) or '?'
+    executer(AttackRules.arrivee(etat, src))
 end)
 
 AddEventHandler('gf:modeLeft', function(src, mode)
-    if mode ~= 'attack' or not S.team[src] then return end
-    clearItems(src)
-    if S.round > 0 and not S.matchOver then
-        local stats = S.stats[src]
-        S.departed[#S.departed + 1] = {
-            name = stats.name, team = S.team[src], kills = stats.kills, deaths = stats.deaths,
-        }
-    end
-    TriggerClientEvent('gf_ui:match_results', src, nil)
-    S.team[src], S.alive[src], S.stats[src] = nil, nil, nil
-    if GetPlayerName(src) then
-        Player(src).state:set('gf_team', nil, true)
-        Player(src).state:set('gf_alive', nil, true)
-        TriggerClientEvent('gf_ui:loadout_close', src)
-        TriggerClientEvent('gf_attack:clear', src)
-    end
-    S.scoreboardDirty = true
-
-    if next(S.team) == nil and S.phase ~= 'waiting' then
-        local zi = S.zoneIndex
-        resetState()
-        S.zoneIndex = zi
-        return
-    end
-    checkWin()
+    if mode ~= 'attack' or not etat.equipes[src] then return end
+    executer(AttackRules.depart(etat, src, GetGameTimer()))
 end)
 
 AddEventHandler('gf:playerKilled', function(victim, killer, weapon, mode)
-    if mode ~= 'attack' or not S.team[victim] then return end
-
-    local vs = S.stats[victim]
-    if vs then vs.deaths = vs.deaths + 1 end
-    local credited = false
-    if killer and S.team[killer] and S.team[killer] ~= S.team[victim] and S.stats[killer] then
-        credited = true
-        S.stats[killer].kills = S.stats[killer].kills + 1
-        -- Récompense : 1 kevlar par kill (dans la limite de Config.MaxKevlars)
-        local inv = Items[killer]
-        if inv and S.alive[killer] and inv.kevlar < Config.MaxKevlars then
-            inv.kevlar = math.min(Config.MaxKevlars, inv.kevlar + Config.KevlarPerKill)
-            sendItems(killer)
-        end
-    end
-    -- Statistiques persistantes (gf_stats) : killer vaut false si le kill n'est pas crédité.
-    TriggerEvent('gf:modeKill', { mode = 'attack', victim = victim, killer = credited and killer or false })
-    S.scoreboardDirty = true
-
-    if S.phase == 'live' and S.alive[victim] then
-        setAlive(victim, false)
-        announce(victim, 'Éliminé', 'Tu regardes tes alliés (clic gauche / droit pour changer)', 3000)
-        SetTimeout(3000, function()
-            if S.team[victim] and not S.alive[victim] then toSpectator(victim) end
-        end)
-        checkWin()
-    else
-        -- Mort hors combat (chute, etc.) : on le replace
-        SetTimeout(2000, function()
-            if S.team[victim] then placeForPhase(victim) end
-        end)
-    end
+    if mode ~= 'attack' or not etat.equipes[victim] then return end
+    executer(AttackRules.mort(etat, victim, killer, GetGameTimer()))
 end)
 
 -- Si gf_core redémarre, ses joueurs repartent au lobby : on repart de zéro
 AddEventHandler('onResourceStop', function(res)
-    if res == 'gf_core' then
-        local zi = S.zoneIndex
-        resetState()
-        S.zoneIndex = zi
-    end
+    if res == 'gf_core' then AttackRules.reinitialiser(etat) end
 end)
 
 -- Si gf_attack (re)démarre alors que des joueurs étaient dans le mode, on les renvoie au lobby
@@ -728,7 +579,11 @@ AddEventHandler('onResourceStart', function(res)
     end
 end)
 
--- ---------------------------------------------------------------- Commandes admin
+-- ---------------------------------------------------------------- Exports et commandes
+exports('CanJoin', function()
+    return AttackRules.peutRejoindre(etat)
+end)
+
 local function reply(src, msg)
     if src == 0 then print('[gf_attack] ' .. msg) else core:Notify(src, msg) end
 end
@@ -737,13 +592,12 @@ end
 -- Lance une manche tout de suite. Si src est donné et que ce joueur n'est pas
 -- dans le mode, il y entre d'abord (partie de test en solo).
 local function startTestRound(src)
-    if not matchOpen() then return false, 'Un match est déjà en cours.' end
-
-    if inMatchCount() < Config.MaxPlayers and src and src > 0 and not S.team[src] then
+    if not AttackRules.estOuvert(etat) then return false, 'Un match est déjà en cours.' end
+    if AttackRules.nombreJoueurs(etat) < Config.MaxPlayers and src and src > 0 and not etat.equipes[src] then
         core:SetMode(src, 'attack')
     end
-    if next(S.team) == nil then return false, 'Aucun joueur dans le mode Attaque.' end
-    startSelect()
+    if next(etat.equipes) == nil then return false, 'Aucun joueur dans le mode Attaque.' end
+    executer(AttackRules.debutTest(etat, GetGameTimer()))
     return true
 end
 exports('StartTestRound', startTestRound)
@@ -757,25 +611,16 @@ end, false)
 -- /endmatch : arrête le match et remet les scores à zéro
 RegisterCommand('endmatch', function(src)
     if not core:IsAdmin(src) then return end
-    S.score = { A = 0, B = 0 }
-    S.departed = {}
-    eachPlayer(function(p)
-        TriggerClientEvent('gf_ui:match_results', p, nil)
-        S.stats[p].kills, S.stats[p].deaths = 0, 0
-    end)
-    S.round = 0
-    S.matchOver = false
-    S.attackers = 'A'
-    goWaiting()
-    announceAll('Match arrêté', 'Par un administrateur', 4000)
+    -- Les effets font les remises à zéro, l'annonce et les apparitions.
+    executer(AttackRules.finMatch(etat))
 end, false)
 
 -- /nextzone : passe à la zone suivante (en attente uniquement)
 RegisterCommand('nextzone', function(src)
     if not core:IsAdmin(src) then return end
-    if S.phase ~= 'waiting' then return reply(src, 'Utilise /endmatch avant de changer de zone.') end
-    loadMap(S.zoneIndex + 1)
-    goWaiting()
+    if etat.phase ~= 'waiting' then return reply(src, 'Utilise /endmatch avant de changer de zone.') end
+    loadMap(zoneIndex + 1)
+    executer(AttackRules.allerEnAttente(etat))
     reply(src, 'Zone : ' .. zone().name)
 end, false)
 
@@ -783,19 +628,17 @@ end, false)
 RegisterCommand('setteam', function(src, args)
     if not core:IsAdmin(src) then return end
     local target, t = tonumber(args[1]), (args[2] or ''):upper()
-    if not target or not S.team[target] or (t ~= 'A' and t ~= 'B') then
+    if not target or (t ~= 'A' and t ~= 'B') or not etat.equipes[target] then
         return reply(src, 'Utilisation : /setteam [id] [A|B] (le joueur doit être dans le mode Attaque)')
     end
-    setTeam(target, t)
-    placeForPhase(target)
-    checkWin()
+    executer(AttackRules.changerEquipe(etat, target, t, GetGameTimer()))
 end, false)
 
 -- Une map a été créée / modifiée / supprimée avec /editor
 AddEventHandler('gf_maps:updated', function(kind)
     if kind ~= 'attack' then return end
-    if S.phase == 'waiting' then
-        loadMap(S.zoneIndex)
-        goWaiting()
+    if etat.phase == 'waiting' then
+        loadMap(zoneIndex)
+        executer(AttackRules.allerEnAttente(etat))
     end
 end)

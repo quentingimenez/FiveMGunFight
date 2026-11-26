@@ -24,6 +24,7 @@ globals = {
   "Config",
   -- Modules chargés par fxmanifest.lua et exposés volontairement en globales
   -- (pas de `return` : FiveM les partage entre fichiers de la ressource).
+  "AttackRules",
   "Base64",
   "GFLobbyAppearance",
   "GFLobbyAppearanceSchema",
