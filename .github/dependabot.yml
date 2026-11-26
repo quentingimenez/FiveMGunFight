@@ -81,3 +81,9 @@ updates:
       verifier:
         patterns:
           - "*"
+    ignore:
+      # L'image de vérification reste sur Ubuntu 24.04, le même système que le
+      # runner CI ubuntu-24.04. Seul le digest de 24.04 continue d'être mis à
+      # jour, pour recevoir les correctifs sans changer de version.
+      - dependency-name: "ubuntu"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

@@ -77,6 +77,7 @@ gh auth status                # doit être connecté au compte propriétaire du 
 git switch main
 git pull --ff-only
 git status --short --branch
+python scripts/suivre_dependabot.py   # PR Dependabot à traiter
 git config core.hooksPath .githooks   # filet local : refuse tout push direct sur main
 ```
 
@@ -85,6 +86,9 @@ git config core.hooksPath .githooks   # filet local : refuse tout push direct su
   session. Ne pas les commiter par défaut ; ne les intégrer que si l'utilisateur
   confirme qu'ils relèvent du même sujet. Ne jamais `git add -A` à l'aveugle :
   ajouter fichier par fichier et relire `git diff --cached`.
+- **PR Dependabot en attente** : si `python scripts/suivre_dependabot.py` sort
+  en code 1, le signaler à l'utilisateur dès le premier message et proposer de
+  traiter ces PR, sans changer le sujet de la session sans son accord (§ 10).
 
 ## 4. Boucle obligatoire
 
@@ -145,6 +149,8 @@ le composant concerné et observer le résultat :
   (géométrie, caméra) dans un module pur testé par `tests/lua/` ;
 - script / outillage : l'exécuter sur un cas nominal **et** sur le cas d'erreur
   qu'il doit traiter ;
+- PR Dependabot : `python scripts/suivre_dependabot.py` liste et classe les PR
+  ouvertes, sans rien modifier ; la marche à suivre est au § 10 ;
 - documentation seule : le déclarer explicitement (« sans exécution :
   documentation »), vérifier les liens et lancer
   `bash scripts/verifier-docker.sh`.
@@ -447,3 +453,26 @@ nouvelles photos de l'image dans le volume `thumbs` sans écraser celles prises
 en jeu, et le véhicule arrive avec l'image. Un véhicule ajouté demande un
 redémarrage complet du serveur (pas de `restart gf_vehicles` à chaud avec des
 joueurs connectés).
+
+## 10. PR Dependabot
+
+- `python scripts/suivre_dependabot.py` liste et classe les PR Dependabot
+  ouvertes ; il ne commente, ne fusionne et ne ferme rien.
+- Une PR Dependabot suit la même porte que les autres : exécution locale
+  (`gh pr checkout <n>` dans un worktree, `bash scripts/verifier-docker.sh` ;
+  si elle touche `Dockerfile`, `docker-compose*.yml` ou l'image du serveur,
+  construire et démarrer le serveur comme au § 4.2), avant/après, accord
+  explicite de l'utilisateur, puis `bash scripts/fusionner-pr.sh <n>`.
+- Jamais `@dependabot merge`, jamais d'auto-merge.
+- Montée majeure ou groupée « inconnue » : lire le corps de la PR (notes de
+  version) et demander une décision explicite à l'utilisateur. S'il refuse,
+  exclure la dépendance dans `.github/dependabot.yml` par une PR dédiée, puis
+  fermer la PR Dependabot avec son accord.
+- CI rouge : diagnostiquer avec `gh run view <id> --log-failed`. Ne jamais
+  pousser sur la branche Dependabot (il cesserait de la rebaser) : la
+  correction passe par une PR normale sur `main`, puis « @dependabot rebase ».
+- Conflit : commenter « @dependabot rebase ». Commenter une PR, c'est écrire
+  au nom de l'utilisateur : avec son accord.
+- Application Claude Code (desktop) : Auto-fix ne s'active que sur une PR
+  ouverte par le compte de l'utilisateur ; une PR Dependabot se suit avec
+  l'outil et `gh pr checks <n> --watch`.

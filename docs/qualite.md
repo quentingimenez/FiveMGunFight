@@ -216,6 +216,13 @@ MariaDB est exclue à partir de **11.5** dans les blocs `docker` et
 version se décide et se teste à part. Une PR Dependabot passe par la même CI que
 les autres ; elle ne se fusionne que verte.
 
+La montée d'Ubuntu de l'image de vérification est exclue : elle reste sur
+24.04, le même système que le runner `ubuntu-24.04`, et seul son digest
+continue d'être mis à jour. Le suivi d'une PR Dependabot (exécution locale,
+accord de l'utilisateur, fusion) est décrit dans
+[`../AGENTS.md`](../AGENTS.md) § 10 ; `python scripts/suivre_dependabot.py`
+liste et classe les PR ouvertes sans rien modifier.
+
 ## Épingler FXServer (`.fxserver-version`)
 
 La CI ne dépend plus d'un artefact « recommended » qui change sous elle : la
