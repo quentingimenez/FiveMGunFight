@@ -24,6 +24,7 @@ décrivent le fonctionnement interne et l'exploitation.
 | [`runbooks/incident.md`](runbooks/incident.md) | la production est indisponible ou dégradée |
 | [`runbooks/restauration.md`](runbooks/restauration.md) | tu dois restaurer une sauvegarde (RPO 24 h, RTO 1 h) |
 | [`runbooks/mise-a-jour.md`](runbooks/mise-a-jour.md) | tu déploies une nouvelle image par digest |
+| [`runbooks/deploiement-unraid.md`](runbooks/deploiement-unraid.md) | tu déploies ou migres le conteneur Unraid sans figer le badge de build |
 | [`runbooks/rotation-secrets.md`](runbooks/rotation-secrets.md) | un secret doit être remplacé ou a fuité |
 
 Outils associés : `scripts/verifier-sante.sh` (santé), `scripts/deployer.sh`

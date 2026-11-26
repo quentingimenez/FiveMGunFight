@@ -20,6 +20,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[1]
@@ -38,6 +39,7 @@ RUNBOOKS = (
     "restauration",
     "mise-a-jour",
     "rotation-secrets",
+    "deploiement-unraid",
 )
 
 ADR = (
@@ -368,6 +370,90 @@ class Preproduction(unittest.TestCase):
         self.assertIn("cap_drop: [ALL]", texte)
         self.assertIn("no-new-privileges:true", texte)
         self.assertNotIn("MARIADB_ROOT_PASSWORD: ${", texte)
+
+
+class GabaritUnraid(unittest.TestCase):
+    """Le gabarit Unraid ne doit pas réintroduire le montage complet."""
+
+    FICHIER = RACINE / "deploy" / "unraid" / "Gunfight-FXServer.xml"
+
+    def racine(self) -> ET.Element:
+        return ET.parse(self.FICHIER).getroot()
+
+    def configs(self) -> dict[str, ET.Element]:
+        return {
+            config.get("Target", ""): config
+            for config in self.racine().findall("Config")
+        }
+
+    def test_gabarit_present_et_valide(self) -> None:
+        self.assertTrue(self.FICHIER.is_file(), "gabarit Unraid manquant")
+        racine = self.racine()
+        self.assertEqual(racine.tag, "Container")
+        self.assertEqual(racine.findtext("Name"), "Gunfight-FXServer")
+        self.assertEqual(
+            racine.findtext("Repository"),
+            "ghcr.io/quentingimenez/fivemgunfight:main",
+        )
+
+    def test_aucun_montage_de_server_data_complet(self) -> None:
+        cibles = {
+            config.get("Target", "")
+            for config in self.racine().findall("Config")
+            if config.get("Type") == "Path"
+        }
+        self.assertNotIn("/opt/fivem/server-data", cibles)
+        self.assertEqual(
+            cibles,
+            {
+                "/opt/fivem/server-data/resources/[gunfight]/gf_maps/data",
+                "/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data",
+                "/opt/fivem/txData",
+            },
+        )
+
+    def test_personnages_et_schema_sur_base_existante(self) -> None:
+        personnages = [
+            config
+            for config in self.racine().findall("Config")
+            if config.get("Target")
+            == "/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data"
+        ]
+        self.assertEqual(len(personnages), 1)
+        self.assertEqual(
+            personnages[0].text,
+            "/mnt/user/appdata/fivemgunfight/characters",
+        )
+        self.assertEqual(personnages[0].get("Mode"), "rw")
+        self.assertEqual(personnages[0].get("Required"), "true")
+        runbook = lire(RACINE / "docs" / "runbooks" / "deploiement-unraid.md")
+        self.assertIn("01-schema.sql", runbook)
+        self.assertIn("gf_stats_players", runbook)
+
+    def test_amorcage_des_maps_et_heritage(self) -> None:
+        racine = self.racine()
+        configs = self.configs()
+        self.assertEqual(configs["GF_SEED_MAPS"].text, "true")
+        self.assertEqual(configs["TXADMIN"].text, "false")
+        self.assertEqual(racine.findtext("Network"), "fivem-net")
+        self.assertIsNone(racine.find("DateInstalled"))
+        ports = {
+            (config.get("Target"), config.get("Mode"))
+            for config in racine.findall("Config")
+            if config.get("Type") == "Port"
+        }
+        self.assertEqual(
+            ports,
+            {("30120", "tcp"), ("30120", "udp"), ("40120", "tcp")},
+        )
+
+    def test_secrets_vides_et_masques(self) -> None:
+        configs = self.configs()
+        for nom in ("LICENSE_KEY", "STEAM_WEB_API_KEY", "MARIADB_PASSWORD"):
+            with self.subTest(variable=nom):
+                config = configs[nom]
+                self.assertEqual((config.text or "").strip(), "")
+                self.assertEqual(config.get("Mask"), "true")
 
 
 class DocumentationExploitation(unittest.TestCase):
