@@ -9,6 +9,7 @@
 --  Événements client -> serveur :
 --    gf_thumbs:save    (admin) une photo prise par le studio
 --    gf_thumbs:request (tous)  demande les photos d'une famille
+--    gf_thumbs:lobbyReady (tous) arrivée au lobby ; si admin -> photos manquantes
 -- =============================================================================
 
 local RES = GetCurrentResourceName()
@@ -73,6 +74,17 @@ RegisterNetEvent('gf_thumbs:save', function(kind, id, url)
     print(('[gf_thumbs] Photo %s/%s enregistrée (%d Ko)'):format(kind, id, math.ceil(#raw / 1024)))
 end)
 
+-- Arrivée d'un joueur au lobby : si c'est un admin, son jeu prend les photos
+-- manquantes (une fois par session et par joueur)
+local autoDone = {}
+RegisterNetEvent('gf_thumbs:lobbyReady', function()
+    local src = source
+    if not Config.AutoCapture or autoDone[src] then return end
+    autoDone[src] = true
+    if not core:IsAdmin(src) then return end
+    TriggerClientEvent('gf_thumbs:autoCapture', src)
+end)
+
 -- ---------------------------------------------------------------- Distribution
 RegisterNetEvent('gf_thumbs:request', function(reqId, kind, ids)
     local src = source
@@ -94,4 +106,5 @@ end)
 
 AddEventHandler('playerDropped', function()
     lastRequest[source] = nil
+    autoDone[source] = nil
 end)

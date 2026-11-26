@@ -3,10 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <title>gf_thumbs</title>
-    <style>html, body { margin: 0; background: transparent; overflow: hidden; }</style>
+    <style>
+        html, body { margin: 0; background: transparent; overflow: hidden; }
+        /* Message pendant les photos : page NUI, donc jamais sur l'image capturée */
+        #progress {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(8, 10, 16, 0.92);
+            color: #f1f4f9; font: 700 20px "Segoe UI", Arial, sans-serif; letter-spacing: .5px;
+        }
+        #progress.hidden { display: none; }
+    </style>
 </head>
 <body>
-    <!-- Page invisible : sert seulement à capturer l'image du jeu (studio photo) -->
+    <!-- Page de capture (studio photo) ; le message ci-dessous couvre l'écran
+         pendant les photos automatiques, il n'apparaît pas sur les photos -->
+    <div id="progress" class="hidden"></div>
     <script src="capture.js"></script>
 </body>
 </html>

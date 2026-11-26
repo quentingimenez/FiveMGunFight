@@ -39,13 +39,15 @@ customise avec **`/customveh`** : onglet **Véhicule** (photo et nom de chaque v
 peinture, pièces, jantes, xénons, néons, vitres, plaque. **Enregistrer** fait du véhicule affiché le
 véhicule de base de tous les joueurs, avec sa custom (fichier `gf_vehicles/custom/custom.json`).
 
-**Photos des menus** : un admin tape **`/thumbs vehicles`** (ou `/thumbs weapons`, ou `/thumbs vehicles
-<modèle>` pour un seul) : chaque objet est posé dans un studio (fond vert détouré), photographié à
-partir de son modèle 3D et enregistré dans `gf_thumbs/thumbs/<famille>/<id>.png`. Les menus (onglet
+**Photos des menus** : **automatiques**. Quand un admin arrive au lobby, son jeu photographie les
+modèles qui n'ont pas encore de photo (écran « Préparation des photos des menus… » quelques
+secondes, jamais pendant une partie) : chaque objet est posé dans un studio (fond vert détouré),
+photographié à partir de son modèle 3D et enregistré dans `gf_thumbs/thumbs/<famille>/<id>.png`.
+Pour refaire une photo à la main : **`/thumbs vehicles [modèle]`** (ou `/thumbs weapons`). Les menus (onglet
 **Véhicule**…) affichent ces photos ; le même mécanisme servira aux armes et aux tenues.
 
 **Ajouter un véhicule** : `py scripts/ajouter_vehicule.py <dossier du pack ou dlc.rpf> --nom "Nom"`
-copie, nettoie et déclare tout, puis `/thumbs vehicles <modèle>` fait sa photo. Guide complet
+copie, nettoie et déclare tout ; sa photo se prend toute seule quand un admin arrive au lobby. Guide complet
 (et ajout d'une nouvelle famille de photos) : [docs/ajouter-un-modele.md](docs/ajouter-un-modele.md).
 
 Sur tous les modes : en bas au centre, un gros chiffre de **vie** (« + VIE », barre blanche en

@@ -14,8 +14,8 @@ Ce que fait le script :
   6. déclare les fichiers dans fxmanifest.lua et ajoute le véhicule à
      Config.Vehicles (onglet « Véhicule » de /customveh).
 
-Ensuite : redémarrer le serveur, puis en jeu (admin) `/thumbs vehicles <modèle>`
-pour générer sa photo. Guide complet : docs/ajouter-un-modele.md.
+Ensuite : redémarrer le serveur. La photo du menu est prise automatiquement à la
+prochaine arrivée d'un admin au lobby. Guide complet : docs/ajouter-un-modele.md.
 
 Le script n'exécute rien du pack : il ne lit et ne copie que des fichiers de
 données. --essai affiche ce qui serait fait sans rien écrire.
@@ -342,10 +342,9 @@ def main() -> int:
         print(f"  ! {n}")
     print("\nÉtapes suivantes :")
     print("  1. redémarrer le serveur (un véhicule ajouté ne se charge pas à chaud) ;")
-    print("  2. quitter complètement FiveM, se reconnecter ;")
-    print(f"  3. en admin : /thumbs vehicles {modele}  (photo du menu) ;")
-    print("  4. vérifier dans /customveh, onglet Véhicule ;")
-    print("  5. commit : gf_vehicles + la photo gf_thumbs/thumbs/vehicles/" + modele + ".png.")
+    print("  2. commit de gf_vehicles, puis pull request ;")
+    print("  3. rien d'autre : la photo du menu se prend toute seule à la prochaine")
+    print("     arrivée d'un admin au lobby (refaire à la main : /thumbs vehicles " + modele + ").")
     return 0
 
 

@@ -170,4 +170,9 @@ function capture(req) {
 window.addEventListener('message', e => {
     const msg = e.data || {};
     if (msg.type === 'capture') capture(msg);
+    if (msg.type === 'progress') {
+        const box = document.getElementById('progress');
+        box.textContent = msg.text || '';
+        box.classList.toggle('hidden', !msg.text);
+    }
 });
