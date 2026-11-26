@@ -33,8 +33,8 @@ Deux modes de jeu :
 
 Les véhicules ne se percutent pas entre eux (pas de « pit »), seuls les piétons peuvent être renversés.
 
-Le véhicule de base (attaquants et point véhicule de la Redzone) est une **Dodge Ram TRX**
-(ressource `gf_vehicles`). Un admin peut la customiser avec **`/customveh`** (peinture, pièces,
+Le véhicule de base (attaquants et point véhicule de la Redzone) est un **Bison XL Hellfire**
+(ressource `gf_vehicles`). Un admin peut le customiser avec **`/customveh`** (peinture, pièces,
 jantes, xénons, néons, vitres, plaque) : la custom enregistrée s'applique à tous les véhicules de mode
 suivants (fichier `gf_vehicles/custom/custom.json`).
 
@@ -242,7 +242,7 @@ server-data/
     gf_redzone  mode Redzone
     gf_maps     éditeur de maps en jeu (/editor) + sauvegarde data/maps.json
     gf_ui       interface : HUD, kill feed, dégâts, multi-kills, sons, classement
-    gf_vehicles véhicules ajoutés (stream/ + data/*.meta) : Dodge Ram TRX « theramtrx21 »
+    gf_vehicles véhicules ajoutés (stream/, data/*.meta, son) : Bison XL Hellfire « gstbisxl3 »
     gf_stats    statistiques persistantes (MariaDB via oxmysql)
 ```
 

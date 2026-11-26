@@ -5,6 +5,9 @@
 --  - Menu /customveh (admin) : aperçu local du véhicule, caméra, réglages en direct.
 -- =============================================================================
 
+-- Nom affiché du véhicule (au lieu de « NULL »)
+AddTextEntry('gstbisxl3', 'Bison XL Hellfire')
+
 -- ---------------------------------------------------------------- Application
 local function applyCustom(veh, p)
     p = p or GlobalState.gf_vehicle_custom

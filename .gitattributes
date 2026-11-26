@@ -15,3 +15,5 @@
 *.ytd binary
 *.ydr binary
 *.meta text eol=lf
+*.awc binary
+*.rel binary

@@ -1,7 +1,7 @@
 Config = {}
 
 -- Véhicule montré dans le menu de customisation (/customveh, admin)
-Config.CustomModel = 'theramtrx21'
+Config.CustomModel = 'gstbisxl3'
 
 -- Fichier où la custom est enregistrée (dans la ressource)
 -- Format : { default = { ...propriétés... } } ; plus tard : une custom par joueur et par mode.
