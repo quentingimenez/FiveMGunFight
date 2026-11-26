@@ -12,7 +12,7 @@ mises à jour de la production.
 | Réglages (`vehicles.meta`, `handling.meta`…) | `gf_vehicles/data/<modèle>/` | `scripts/ajouter_vehicule.py` |
 | Son du moteur (`.rel`, `.awc`) | `gf_vehicles/audioconfig/`, `gf_vehicles/sfx/` | `scripts/ajouter_vehicule.py` |
 | Liste du menu | `Config.Vehicles` dans `gf_vehicles/config.lua` | `scripts/ajouter_vehicule.py` |
-| Photo du menu | `gf_thumbs/thumbs/<famille>/<id>.png` | `/thumbs` en jeu (admin) |
+| Photo du menu | `gf_thumbs/thumbs/<famille>/<id>.png` | **automatique** : prise par le jeu d'un admin à son arrivée au lobby |
 | Véhicule de base et customs | `gf_vehicles/custom/custom.json` | `/customveh` en jeu (admin) |
 
 En production, `gf_thumbs/thumbs` et `gf_vehicles/custom` sont des **volumes**
@@ -56,31 +56,37 @@ Le script :
 
 Il ne lance rien du pack : il ne lit et ne copie que des fichiers de données.
 
-### 2. Tester en local
+### 2. Redémarrer le serveur
 
-1. Redémarre le serveur (un véhicule ajouté ne se charge pas à chaud) :
-   `docker compose restart fxserver` avec la surcouche dev.
-2. Quitte **complètement** FiveM, puis reconnecte-toi (`connect localhost`).
-3. En admin : `/customveh`, onglet **Véhicule** : le véhicule apparaît (avec une
-   silhouette tant qu'il n'a pas de photo).
+Un véhicule ajouté ne se charge pas à chaud : `docker compose restart fxserver`
+(avec la surcouche dev en local). Vérifier « Started resource gf_vehicles » sans
+erreur dans les logs.
 
-### 3. Prendre sa photo
+### 3. Photo : automatique
 
-En admin : `/thumbs vehicles <modèle>`. Le véhicule est posé dans un studio
+**Aucune action** : à la prochaine connexion d'un admin, une fois au lobby
+(`Config.AutoCaptureDelay`, 8 s), son jeu prend les photos manquantes des
+familles marquées `auto` (véhicules). L'écran affiche « Préparation des photos
+des menus… » quelques secondes, puis le lobby revient. Jamais pendant une
+partie. Ça marche aussi en production : la photo est écrite dans le volume
+`thumbs`.
+
+Pour **refaire** une photo à la main (après un changement de custom, par
+exemple) : `/thumbs vehicles <modèle>` (ou `/thumbs vehicles` pour toutes).
+
+Le véhicule est posé dans un studio
 (boîte verte au-dessus de l'océan, midi), photographié de trois quarts avant à
 partir de son modèle 3D, détouré (fond transparent) et recadré. La photo est
 enregistrée dans `gf_thumbs/thumbs/vehicles/<modèle>.png` et s'affiche aussitôt
-dans le menu. Elle reprend la custom du véhicule s'il en a une : refais la photo
-après avoir changé la custom si tu veux qu'elle corresponde.
-
-`/thumbs vehicles` (sans modèle) refait toutes les photos.
+dans le menu. Elle reprend la custom du véhicule s'il en a une.
 
 ### 4. Livrer
 
 Commite dans une branche, puis pull request (voir `CONTRIBUTING.md`) :
-
-- `server-data/resources/[gunfight]/gf_vehicles/` (stream, data, config, manifeste) ;
-- la photo `server-data/resources/[gunfight]/gf_thumbs/thumbs/vehicles/<modèle>.png`.
+`server-data/resources/[gunfight]/gf_vehicles/` (stream, data, config, manifeste).
+La photo n'est pas obligatoire dans la PR : chaque serveur la prend tout seul.
+Si elle a déjà été prise en local (`gf_thumbs/thumbs/vehicles/<modèle>.png`),
+la commiter évite seulement de la reprendre ailleurs.
 
 La CI vérifie (`tests/test_depot.py`, classe `VehiculesDeclares`) que chaque
 véhicule de `Config.Vehicles` a son `.yft`/`.ytd`, son `vehicles.meta` avec le
@@ -105,10 +111,15 @@ La ressource `gf_thumbs` est commune à tous les menus :
 
 Familles existantes (`gf_thumbs/config.lua`, `Config.Kinds`) :
 
-| Famille | Liste fournie par | Pose |
-|---|---|---|
-| `vehicles` | `exports.gf_vehicles:GetThumbList()` | véhicule de trois quarts avant |
-| `weapons` | `exports.gf_core:GetWeaponThumbList()` (catalogue `Config.Weapons`) | arme de profil |
+| Famille | Liste fournie par | Pose | Auto |
+|---|---|---|---|
+| `vehicles` | `exports.gf_vehicles:GetThumbList()` | véhicule de trois quarts avant | oui |
+| `weapons` | `exports.gf_core:GetWeaponThumbList()` (catalogue `Config.Weapons`) | arme de profil | non (aucun menu ne les affiche encore) |
+
+Photos automatiques : à l'arrivée au lobby, le client envoie
+`gf_thumbs:lobbyReady` ; si c'est un admin, le serveur répond
+`gf_thumbs:autoCapture` et son jeu photographie ce qui manque (familles `auto`).
+`Config.AutoCapture = false` désactive le mécanisme.
 
 ## Ajouter une nouvelle famille (ex. tenues)
 
@@ -122,6 +133,7 @@ Familles existantes (`gf_thumbs/config.lua`, `Config.Kinds`) :
        provider = { resource = 'gf_lobby', export = 'GetOutfitThumbList' },
        subject = 'outfit',
        width = 256, height = 384,
+       auto = true, -- photos prises toutes seules dès qu'un menu les affiche
    },
    ```
 
@@ -132,7 +144,8 @@ Familles existantes (`gf_thumbs/config.lua`, `Config.Kinds`) :
 4. **Dossier** : `gf_thumbs/thumbs/outfits/.gitkeep` (le serveur ne crée pas de
    dossier tout seul).
 5. **Menu** : `exports.gf_thumbs:Get('outfits', ids)` pour récupérer les photos.
-6. `/thumbs outfits` en jeu, puis commit des photos.
+6. Rien d'autre : avec `auto = true`, les photos se prennent à la prochaine
+   arrivée d'un admin au lobby.
 
 Rien à changer pour la production : le volume `thumbs` contient toutes les
 familles.
@@ -146,6 +159,6 @@ familles.
 | Véhicule silencieux | le son du pack est absent : relance le script avec `--son lg247hemi57` |
 | `Modèle 3D … absent du pack` | le pack ne contient que les `.meta` : il faut le dossier `stream/` ou le `dlc.rpf` complet |
 | `archive chiffrée` | le `dlc.rpf` est chiffré : extrais-le avec OpenIV ou CodeWalker, puis donne le dossier au script |
-| Photo absente dans le menu | `/thumbs vehicles <modèle>` en admin ; regarde la console F8 (`[gf_thumbs] …`) |
+| Photo absente dans le menu | elle se prend à la prochaine arrivée d'un admin au lobby ; sinon `/thumbs vehicles <modèle>` et regarde la console F8 (`[gf_thumbs] …`) |
 | Bord vert autour de la photo | véhicule peint en vert vif : prends la photo avec une autre custom |
 | `Photo … non enregistrée` | dossier `thumbs/<famille>/` manquant ou volume en lecture seule (`chown -R 10001:10001` sur Unraid) |
