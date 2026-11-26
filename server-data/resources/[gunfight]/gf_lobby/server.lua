@@ -13,15 +13,13 @@ local Invites = {}   -- [src] = { partyId, from, expiresAt }
 local Store = {}     -- [identifier] = character
 local nextPartyId = 1
 
--- File de recherche serveur globale. Une seule recherche active à la fois :
--- tous les joueurs du lobby avec un personnage sont éligibles/auto-inscrits.
-local Queue = {
-  active = false,
-  mode = nil,
-  owner = nil,     -- src du chef qui a lancé la recherche (annulation)
-  members = {},    -- [src] = true
-}
+-- File de recherche par escouade, fournie par queue.lua (chargé avant ce fichier).
+-- Les inscriptions survivent au lancement d'un match et sont visibles de tous.
+local Queue = LobbyQueue.new()
 
+-- True pendant le lancement d'un match issu de la file : le thread ne reprend
+-- pas de nouvelle sélection tant que le SetTimeout n'est pas terminé.
+local launchPending = false
 
 local function log(message)
     print(('[gf_lobby] %s'):format(tostring(message)))
@@ -330,7 +328,7 @@ local function buildState(src)
             members = members,
         },
         modes = modesForState(),
-        queue = queueState and queueState() or nil,
+        queue = queueState and queueState(src) or nil,
     }
 end
 
@@ -352,7 +350,7 @@ local function broadcastParty(partyId)
 end
 
 -- ---------------------------------------------------------------------------
---  File de recherche serveur (Attaque de zone)
+--  File de recherche par escouade (Attaque de zone)
 -- ---------------------------------------------------------------------------
 
 local function queueMin()
@@ -363,51 +361,29 @@ local function queueMax()
     return (Config.Matchmaking and Config.Matchmaking.attackMax) or 30
 end
 
-local function queueSize()
-    local n = 0
-    for _ in pairs(Queue.members) do n = n + 1 end
-    return n
-end
-
-local function eligibleForQueue(src)
+-- Un joueur est éligible s'il est présent, dans le lobby et a un personnage.
+local function isEligible(src)
     local player = Players[src]
     return player ~= nil and player.inLobby == true and type(player.character) == 'table'
 end
 
--- Recalcule l'éligibilité de tous les joueurs présents dans le lobby.
--- Un joueur sans personnage ou hors lobby est retiré ; un nouvel arrivant
--- avec personnage est ajouté automatiquement pendant une recherche active.
-local function refreshQueue()
-    if not Queue.active then return false end
-    for src in pairs(Queue.members) do
-        if not eligibleForQueue(src) then
-            Queue.members[src] = nil
-        end
-    end
-    for src in pairs(Players) do
-        if eligibleForQueue(src) then
-            Queue.members[src] = true
-        end
-    end
-    if Queue.owner ~= nil and not eligibleForQueue(Queue.owner) then
-        -- Chef parti : la recherche reste serveur, plus personne ne peut
-        -- l'annuler. Elle se remplit jusqu'au seuil puis lance la partie.
-        Queue.owner = nil
-    end
-    return true
-end
-
-queueState = function()
-    if not Queue.active then return nil end
+-- État de la file envoyé au client : visible par tout le lobby, inscrit ou non.
+queueState = function(src)
+    local mode = findMode('attack')
+    if not isModeAvailable(mode) then return nil end
+    local player = Players[src]
+    local party = player and findParty(src)
     return {
-        mode = Queue.mode or 'attack',
-        size = queueSize(),
+        mode = 'attack',
+        size = LobbyQueue.count(Queue, Parties, isEligible),
         min = queueMin(),
         max = queueMax(),
-        ownerId = Queue.owner,
+        joined = party ~= nil and LobbyQueue.has(Queue, party.id) == true,
+        parties = #LobbyQueue.ready(Queue, Parties, isEligible),
     }
 end
 
+-- Diffuse l'état à tous les joueurs du lobby (compteur et bouton QUITTER LA FILE).
 local function broadcastQueueState()
     for _, rawId in ipairs(GetPlayers()) do
         local src = tonumber(rawId)
@@ -416,16 +392,6 @@ local function broadcastQueueState()
             sendState(src)
         end
     end
-end
-
-local function stopQueue(reason)
-    if not Queue.active then return end
-    Queue.active = false
-    Queue.mode = nil
-    Queue.owner = nil
-    Queue.members = {}
-    broadcastQueueState()
-    if reason then log(('recherche attack arrêtée : %s'):format(reason)) end
 end
 
 local function createParty(src)
@@ -474,7 +440,11 @@ local function removeFromParty(src)
     player.partyId = nil
 
     if #party.members == 0 then
-        Parties[party.id] = nil
+        -- Escouade dissoute : on garde son id local pour purger la file.
+        local partyId = party.id
+        Parties[partyId] = nil
+        LobbyQueue.leave(Queue, partyId)
+        broadcastQueueState()
         return
     end
 
@@ -496,27 +466,17 @@ local function joinLobby(src)
     end
     setBucket(src, player.partyId)
     broadcastParty(player.partyId)
-    if Queue.active then
-        refreshQueue()
-        broadcastQueueState()
-    end
+    broadcastQueueState()
 end
 
 local function leaveLobby(src)
     local player = Players[src]
     if not player or not player.inLobby then return end
 
+    -- L'escouade est conservée pendant le match : seul inLobby change, la
+    -- partyId reste pour retrouver l'escouade au retour dans le lobby.
     player.inLobby = false
-    removeFromParty(src)
-    player.partyId = nil
-    if Queue.active then
-        refreshQueue()
-        if queueSize() == 0 then
-            stopQueue('file vide')
-        else
-            broadcastQueueState()
-        end
-    end
+    broadcastQueueState()
     TriggerClientEvent('gf_lobby:close', src)
 end
 
@@ -589,6 +549,7 @@ local function acceptInvite(src, invite)
     setBucket(src, party.id)
     notify(src, "Tu as rejoint l'escouade.", 'success')
     broadcastParty(party.id)
+    broadcastQueueState()
 end
 
 local function leaveParty(src)
@@ -606,6 +567,7 @@ local function leaveParty(src)
     removeFromParty(src)
     createParty(src)
     sendState(src)
+    broadcastQueueState()
 end
 
 local function kickMember(src, target)
@@ -635,6 +597,7 @@ local function kickMember(src, target)
     end
     notify(target, "Tu as été exclu de l'escouade.", 'info')
     notify(src, "Membre exclu de l'escouade.", 'success')
+    broadcastQueueState()
 end
 
 local function selectMode(src, modeId)
@@ -662,150 +625,120 @@ local function selectMode(src, modeId)
     broadcastParty(party.id)
 end
 
--- Lance une recherche serveur globale pour Attaque de zone. Aucune condition
--- sur la taille de l'escouade : le chef d'une escouade solo peut lancer.
-local function startQueue(src, mode, party)
-    local now = GetGameTimer()
-    local player = Players[src]
-
-    if Queue.active then
-        notify(src, ('Recherche %s en cours : %d/%d joueurs.'):format(mode.label, queueSize(), queueMin()), 'info')
+-- Inscrit l'escouade du chef dans la file d'Attaque de zone. Tous les membres
+-- doivent être présents et avoir créé leur personnage.
+local function joinQueue(src, mode, party)
+    if LobbyQueue.has(Queue, party.id) then
+        notify(src, ('Ton escouade est déjà dans la file (%d/%d joueurs).'):format(
+            LobbyQueue.count(Queue, Parties, isEligible), queueMin()
+        ), 'info')
         return
     end
 
-    refreshQueue()
-    if queueSize() == 0 then
-        notify(src, 'Aucun joueur éligible dans le lobby.', 'error')
-        return
+    for _, member in ipairs(party.members) do
+        local memberPlayer = Players[member]
+        if not memberPlayer or not memberPlayer.inLobby then
+            notify(src, 'Tous les membres doivent être dans le lobby.', 'error')
+            return
+        end
+        if type(memberPlayer.character) ~= 'table' then
+            notify(src, 'Tous les membres doivent avoir créé leur personnage.', 'error')
+            return
+        end
     end
 
-    player.lastMode = now
-    Queue.active = true
-    Queue.mode = mode.id
-    Queue.owner = src
-    Queue.members = {}
-    refreshQueue()
-
-    log(('startQueue %s -> %s, %d joueur(s), seuil=%d'):format(src, mode.id, queueSize(), queueMin()))
-    notify(src, ('Recherche lancée : %d/%d joueurs.'):format(queueSize(), queueMin()), 'success')
+    LobbyQueue.join(Queue, party.id, mode.id)
+    Players[src].lastMode = GetGameTimer()
+    notify(src, ('Escouade inscrite dans la file : %d/%d joueurs.'):format(
+        LobbyQueue.count(Queue, Parties, isEligible), queueMin()
+    ), 'success')
     broadcastQueueState()
 end
 
--- Annulation par le chef : vider la file, arrêter la recherche, restaurer
--- l'état NUI. Aucun close explicite : la NUI reste ouverte pendant l'attente.
+-- Retrait volontaire par le chef via le bouton QUITTER LA FILE.
 local function cancelQueue(src)
-    if not Queue.active then return false end
     local party = findParty(src)
     if not party or party.leader ~= src then
-        notify(src, 'Seul le chef peut annuler la recherche.', 'error')
+        notify(src, "Seul le chef peut retirer l'escouade de la file.", 'error')
         return false
     end
-    if Queue.owner and Queue.owner ~= src then
-        notify(src, 'La recherche a été lancée par un autre chef.', 'error')
+    if not LobbyQueue.has(Queue, party.id) then
+        notify(src, "Ton escouade n'est pas dans la file.", 'info')
         return false
     end
-    stopQueue('annulée par le chef')
-    notify(src, 'Recherche annulée.', 'info')
+    LobbyQueue.leave(Queue, party.id)
+    notify(src, 'Escouade retirée de la file.', 'info')
+    broadcastQueueState()
     return true
 end
 
--- Lancement effectif quand le seuil est atteint. `members` est une copie de
--- la file au moment du seuil : les joueurs qui quittent le lobby entre le
--- seuil et le SetTimeout sont ignorés par les contrôles ci-dessous.
-local function launchQueuedMatch(src, mode, members)
-    local party = findParty(src)
-    if not party then return end
-    local player = Players[src]
-    local now = GetGameTimer()
+-- Lancement effectif des escouades retenues au seuil. `picked` est une copie
+-- de la file au moment du seuil : les escouades disparues avant le SetTimeout
+-- sont ignorées sans bloquer le retour au lobby.
+local function launchQueuedSquads(picked, mode)
+    if launchPending then return end
+    launchPending = true
 
-    player.lastMode = now
-    local affectedParties = {}
-    local function markLaunching(targetParty)
-        if not targetParty then return end
-        targetParty.selectedMode = mode.id
-        targetParty.launching = true
-        affectedParties[targetParty.id] = targetParty
-    end
-
-    markLaunching(party)
-    for _, member in ipairs(members) do
-        markLaunching(findParty(member))
-        TriggerClientEvent('gf_lobby:launching', member, {
-            mode = mode.id,
-            label = mode.label,
-        })
-    end
-
-    local partyId = party.id
-    log(('launchQueuedMatch %s -> %s, %d joueur(s), seuil=%d'):format(src, mode.id, #members, queueMin()))
-
-    local function resetLaunching()
-        local changed = false
-        for id, affected in pairs(affectedParties) do
-            if Parties[id] == affected and affected.launching then
-                affected.launching = false
-                broadcastParty(id)
-                changed = true
-            end
+    local total = 0
+    local affected = {}
+    for _, squad in ipairs(picked) do
+        total = total + #squad.members
+        affected[#affected + 1] = squad
+        local party = Parties[squad.partyId]
+        if party then
+            party.selectedMode = mode.id
+            party.launching = true
         end
-        return changed
+        for _, member in ipairs(squad.members) do
+            TriggerClientEvent('gf_lobby:launching', member, {
+                mode = mode.id,
+                label = mode.label,
+            })
+        end
     end
+
+    log(('lancement file %s : %d joueur(s), %d escouade(s), seuil=%d'):format(
+        mode.id, total, #affected, queueMin()
+    ))
 
     SetTimeout(700, function()
-        local current = Parties[partyId]
-        if not current then
-            resetLaunching()
-            for _, member in ipairs(members) do
-                local memberPlayer = Players[member]
-                if memberPlayer and memberPlayer.inLobby then sendState(member) end
-            end
-            log('launchQueuedMatch : parti du chef disparue, lancement annulé')
-            return
-        end
-        if not current.launching then return end
+        for _, squad in ipairs(affected) do
+            local current = Parties[squad.partyId]
+            if current then
+                local expected = #squad.members
+                local launched = 0
+                for _, member in ipairs(squad.members) do
+                    if isEligible(member) then
+                        local okMode, currentMode = pcall(function()
+                            return exports.gf_core:GetMode(member)
+                        end)
+                        local already = okMode and currentMode == mode.id
+                        local ok, result = false, false
+                        if not already then
+                            ok, result = pcall(function()
+                                return exports.gf_core:SetMode(member, mode.id)
+                            end)
+                        end
+                        if already or (ok and result ~= false) then
+                            launched = launched + 1
+                        end
+                    end
+                end
 
-        local launched = 0
-        for _, member in ipairs(members) do
-            if eligibleForQueue(member) then
-                local okMode, currentMode = pcall(function()
-                    return exports.gf_core:GetMode(member)
-                end)
-                local already = okMode and currentMode == mode.id
-                local ok, result = false, false
-                if not already then
-                    ok, result = pcall(function()
-                        return exports.gf_core:SetMode(member, mode.id)
-                    end)
-                end
-                if already or (ok and result ~= false) then
-                    launched = launched + 1
-                    -- gf_core:modeChanged ferme déjà l'UI côté client ; ne pas
-                    -- envoyer de close explicite ici (le state doit rester
-                    -- cohérent jusqu'à la replication de gf_core).
+                -- L'escouade reste inscrite : elle est de nouveau comptée au
+                -- retour au lobby. On libère seulement son drapeau de lancement.
+                current.launching = false
+                if launched < expected and GetPlayerName(current.leader) then
+                    if launched == 0 then
+                        notify(current.leader, 'Impossible de lancer la partie.', 'error')
+                    else
+                        notify(current.leader, ('Partie lancée pour %d/%d joueurs.'):format(launched, expected), 'error')
+                    end
                 end
             end
         end
-
-        log(('launchQueuedMatch %s : %d/%d lancé(s)'):format(src, launched, #members))
-        if launched < #members then
-            -- Échec total ou partiel : restore launching et state AVANT toute
-            -- notification pour que le chef voit un bouton JOUER utilisable.
-            resetLaunching()
-            for _, member in ipairs(members) do
-                local memberPlayer = Players[member]
-                if memberPlayer and memberPlayer.inLobby then
-                    sendState(member)
-                end
-            end
-            local leader = current.leader
-            if GetPlayerName(leader) then
-                if launched == 0 then
-                    notify(leader, 'Impossible de lancer la partie.', 'error')
-                else
-                    notify(leader, ('Partie lancée pour %d/%d joueurs.'):format(launched, #members), 'error')
-                end
-            end
-        end
+        launchPending = false
+        broadcastQueueState()
     end)
 end
 
@@ -833,13 +766,18 @@ local function launchParty(src, modeId)
         return
     end
 
-    -- Attaque de zone : recherche serveur globale, pas de condition d'escouade.
+    -- Attaque de zone : inscription de l'escouade dans la file persistante.
     if mode.id == 'attack' then
-        startQueue(src, mode, party)
+        joinQueue(src, mode, party)
         return
     end
 
-    -- Autres modes (Redzone) : comportement d'escouade inchangé.
+    -- Autres modes (Redzone) : on retire d'abord l'escouade de la file.
+    if LobbyQueue.leave(Queue, party.id) then
+        broadcastQueueState()
+    end
+
+    -- Comportement d'escouade inchangé.
     local members = {}
     for _, member in ipairs(party.members) do members[#members + 1] = member end
     if #members == 0 then
@@ -916,6 +854,12 @@ local function launchParty(src, modeId)
         end
 
         log(('launchParty %s : %d/%d lancé(s)'):format(src, launched, #members))
+        if launched == #members then
+            -- L'escouade est conservée : libérer le drapeau et rafraîchir l'UI.
+            current.launching = false
+            broadcastParty(partyId)
+            return
+        end
         if launched < #members then
             -- Échec total ou partiel : restore launching et state AVANT toute
             -- notification pour que le chef voit un bouton JOUER utilisable.
@@ -938,61 +882,26 @@ local function launchParty(src, modeId)
     end)
 end
 
--- Seuil atteint : on fige la file, on l'arrête (plus d'inscription pendant
--- le lancement) et on lance tous les joueurs via gf_core:SetMode.
-local function checkQueueThreshold()
-    if not Queue.active then return end
-    if queueSize() < queueMin() then return end
-    -- Un match d'Attaque est déjà en cours ou complet : la file attend la fin.
-    if Queue.mode == 'attack' and GetResourceState('gf_attack') == 'started' then
-        local ok, canJoin = pcall(function() return exports.gf_attack:CanJoin() end)
-        if ok and canJoin == false then return end
-    end
-
-    local members = {}
-    for src in pairs(Queue.members) do
-        if eligibleForQueue(src) then members[#members + 1] = src end
-    end
-    local modeId = Queue.mode
-    local owner = Queue.owner
-    Queue.active = false
-    Queue.mode = nil
-    Queue.owner = nil
-    Queue.members = {}
-    broadcastQueueState()
-
-    if #members < queueMin() then
-        log(('checkQueueThreshold : seulement %d joueur(s) éligible(s), recherche annulée'):format(#members))
-        return
-    end
-    local max = queueMax()
-    if #members > max then
-        table.sort(members)
-        for i = #members, max + 1, -1 do members[i] = nil end
-        log(('checkQueueThreshold : file plafonnée à %d joueur(s)'):format(max))
-    end
-
-    -- Le chef peut avoir quitté le lobby pendant l'attente : on prend le
-    -- premier membre encore présent comme référence pour party.launching.
-    if not owner or not findParty(owner) then
-        owner = nil
-        for _, src in ipairs(members) do
-            if findParty(src) then owner = src break end
-        end
-    end
-    if not owner then
-        log('checkQueueThreshold : aucun chef disponible, recherche abandonnée')
-        return
-    end
-    local mode = findMode(modeId)
-    if not mode then return end
-    launchQueuedMatch(owner, mode, members)
-end
-
+-- Vérification périodique du seuil : les escouades inscrites restent dans la
+-- file après le lancement et sont de nouveau prêtes au retour au lobby.
 CreateThread(function()
     while true do
         Wait(500)
-        if Queue.active then checkQueueThreshold() end
+        if not launchPending then
+            local blocked = false
+            if GetResourceState('gf_attack') == 'started' then
+                local ok, canJoin = pcall(function() return exports.gf_attack:CanJoin() end)
+                blocked = ok and canJoin == false
+            end
+            if not blocked then
+                local mode = findMode('attack')
+                if mode and isModeAvailable(mode) then
+                    local ready = LobbyQueue.ready(Queue, Parties, isEligible)
+                    local picked = LobbyQueue.pick(ready, queueMin(), queueMax())
+                    if picked then launchQueuedSquads(picked, mode) end
+                end
+            end
+        end
     end
 end)
 
@@ -1037,10 +946,7 @@ RegisterNetEvent('gf_lobby:createCharacter', function(payload)
     notify(src, 'Personnage créé. Bienvenue dans le lobby.', 'success')
     sendState(src)
     if player.partyId then broadcastParty(player.partyId) end
-    if Queue.active then
-        refreshQueue()
-        broadcastQueueState()
-    end
+    broadcastQueueState()
 end)
 
 -- Mise à jour de l'apparence depuis l'éditeur (onglet Personnage). Le nom, le
@@ -1309,14 +1215,7 @@ AddEventHandler('playerDropped', function(_reason)
 
     player.inLobby = false
     removeFromParty(src)
-    if Queue.active then
-        refreshQueue()
-        if queueSize() == 0 then
-            stopQueue('file vide')
-        else
-            broadcastQueueState()
-        end
-    end
+    broadcastQueueState()
     Invites[src] = nil
     for target, invite in pairs(Invites) do
         if invite.from == src then Invites[target] = nil end
