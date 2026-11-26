@@ -35,6 +35,8 @@ services:
       TXHOST_INTERFACE: 0.0.0.0
       # Volume maps vide au premier démarrage : amorcé depuis l'image.
       GF_SEED_MAPS: "true"
+      # Photos et customs de véhicules : complétés depuis l'image.
+      GF_SEED_DATA: "true"
       MARIADB_DATABASE: ${MARIADB_DATABASE:-gunfight}
       MARIADB_USER: ${MARIADB_USER:-gunfight}
       # Neutralisation : les valeurs utiles viennent de /run/secrets, jamais de
@@ -67,6 +69,8 @@ services:
       - txdata:/opt/fivem/txData
       - maps:/opt/fivem/server-data/resources/[gunfight]/gf_maps/data
       - characters:/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data
+      - thumbs:/opt/fivem/server-data/resources/[gunfight]/gf_thumbs/thumbs
+      - vehicles:/opt/fivem/server-data/resources/[gunfight]/gf_vehicles/custom
     depends_on:
       mariadb:
         condition: service_healthy
@@ -133,6 +137,10 @@ volumes:
     name: gunfight-staging-maps
   characters:
     name: gunfight-staging-characters
+  thumbs:
+    name: gunfight-staging-thumbs
+  vehicles:
+    name: gunfight-staging-vehicles
 
 secrets:
   # Mêmes noms et mêmes chemins que la production : la préproduction vérifie

@@ -282,6 +282,14 @@ class InfraDocker(unittest.TestCase):
             with self.subTest(nom=nom):
                 self.assertIn(nom, texte, "amorçage de maps.json incomplet")
 
+    def test_entrypoint_complete_les_donnees_sans_ecraser(self) -> None:
+        texte = lire(self.ENTRYPOINT)
+        self.assertIn("GF_SEED_DATA", texte)
+        self.assertIn("cp -Rn", texte, "le complément depuis l'image ne doit pas écraser")
+        for dossier in ("gf_thumbs/thumbs", "gf_vehicles/custom"):
+            with self.subTest(dossier=dossier):
+                self.assertIn(dossier, texte)
+
 
 class EnvironnementsCompose(unittest.TestCase):
     """Le découpage socle / dev / prod reste utilisable sans ambiguïté.
@@ -360,11 +368,25 @@ class EnvironnementsCompose(unittest.TestCase):
             ("dbdata", "gunfight-prod-dbdata"),
             ("maps", "gunfight-prod-maps"),
             ("characters", "gunfight-prod-characters"),
+            ("thumbs", "gunfight-prod-thumbs"),
+            ("vehicles", "gunfight-prod-vehicles"),
         ):
             with self.subTest(volume=volume):
                 self.assertEqual(prod.get(volume), nom, "volume de production mal nommé")
                 self.assertNotIn(nom, dev, "volume de production présent dans le dev")
                 self.assertNotIn(nom, socle, "volume de production présent dans le socle")
+
+    def test_prod_persiste_les_donnees_creees_en_jeu(self) -> None:
+        # Photos des menus (/thumbs) et véhicule de base + customs (/customveh) :
+        # sans volume, une mise à jour de l'image les effacerait.
+        bloc = self.bloc(self.PROD, "fxserver")
+        for montage in (
+            "thumbs:/opt/fivem/server-data/resources/[gunfight]/gf_thumbs/thumbs",
+            "vehicles:/opt/fivem/server-data/resources/[gunfight]/gf_vehicles/custom",
+        ):
+            with self.subTest(montage=montage):
+                self.assertIn(montage, bloc, "donnée de jeu non persistée en production")
+        self.assertRegex(bloc, r'GF_SEED_DATA: *"?true"?', "GF_SEED_DATA doit valoir true")
 
     def test_socle_n_a_pas_de_build_ni_d_image_pour_fxserver(self) -> None:
         bloc = self.bloc(self.SOCLE, "fxserver")
