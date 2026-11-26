@@ -49,6 +49,7 @@ for _, composant in ipairs(Config.ShotValidation.headComponents) do
 end
 local REGLES_TIRS = {
     toujoursAutorisees = ShotValidation.ensembleArmes(Config.ShotValidation.alwaysAllowed),
+    interdites = ShotValidation.ensembleArmes(Config.ShotValidation.forbidden),
     plafonds = plafondsTirs,
     cadences = cadencesTirs,
     composantsTete = composantsTete,
@@ -695,6 +696,16 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
         end
     end
 
+    -- Explosions et chocs de véhicule : jamais de dégât entre joueurs, même
+    -- avec une arme du loadout (ex. arme explosive donnée par un tricheur).
+    local typeArme = ShotValidation.normaliserHash(data.weaponType)
+    if typeArme and REGLES_TIRS.interdites[typeArme] and sender ~= victim then
+        journaliserHit(sender, victim, data, false, 'arme-interdite') -- refus : explosion ou véhicule
+        CancelEvent()
+        journaliserRefus(sender, 'weaponDamageEvent', 'arme-interdite')
+        return
+    end
+
     -- Validation des tirs : arme du loadout, plafonds de dégâts et cadence.
     -- Inséré après les contrôles existants et avant la preuve de dégât.
     if Config.ShotValidation.enabled and sender ~= victim then
@@ -732,6 +743,18 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
             damage = math.floor(tonumber(data.weaponDamage) or 0),
             fatal = data.willKill and true or false,
         })
+    end
+end)
+
+-- ---------------------------------------------------------------- Explosions
+-- Aucune explosion n'a sa place dans le jeu (pas d'arme explosive, véhicules
+-- indestructibles) : toute explosion envoyée par un client est annulée, donc
+-- jamais diffusée aux autres joueurs. `sender` arrive en chaîne (voir plus haut).
+AddEventHandler('explosionEvent', function(sender, ev)
+    CancelEvent()
+    local src = tonumber(sender)
+    if src then
+        journaliserRefus(src, 'explosionEvent', ('type %s'):format(tostring(type(ev) == 'table' and ev.explosionType or '?')))
     end
 end)
 

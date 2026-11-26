@@ -80,6 +80,14 @@ local function giveVehicle(model, x, y, z, heading)
     SetVehicleNumberPlateText(veh, 'GUNFIGHT')
     SetVehicleDirtLevel(veh, 0.0)
     SetVehRadioStation(veh, 'OFF')
+    -- Véhicule de mode indestructible : il ne prend aucun dégât et ne peut pas
+    -- exploser, dans la zone comme en dehors. Pas de « bulletProof » : les
+    -- balles traversent toujours les vitres et touchent les occupants.
+    SetEntityInvincible(veh, true)
+    SetEntityProofs(veh, false, true, true, true, false, false, false, false)
+    SetVehicleExplodesOnHighExplosionDamage(veh, false)
+    SetDisableVehiclePetrolTankFires(veh, true)
+    SetVehicleCanBreak(veh, false)
     -- Custom du véhicule de base réglée par un admin (/customveh, ressource gf_vehicles)
     if GetResourceState('gf_vehicles') == 'started' then
         exports.gf_vehicles:ApplyCustom(veh)
@@ -441,6 +449,11 @@ CreateThread(function()
             local p = GetPlayerPed(joueur)
             if p ~= 0 then SetPedSuffersCriticalHits(p, false) end
         end
+
+        -- Aucun dégât d'explosion, et aucun dégât de choc tant que le joueur est
+        -- dans un véhicule (accident, percussion). À pied, le choc reste actif
+        -- pour garder les dégâts de chute.
+        SetEntityProofs(ped, false, false, true, IsPedInAnyVehicle(ped, false), false, false, false, false)
 
         Wait(0)
     end
