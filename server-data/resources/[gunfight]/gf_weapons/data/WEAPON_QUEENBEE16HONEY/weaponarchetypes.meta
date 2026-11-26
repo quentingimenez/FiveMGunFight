@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponModelInfo__InitDataList>
+	<InitDatas>
+		<Item>
+			<modelName>w_at_queenbee16honey_supp</modelName>
+			<txdName>w_at_queenbee16honey_supp</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>w_ar_queenbee16honey_mag1</modelName>
+			<txdName>w_ar_queenbee16honey_mag1</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>w_ar_queenbee16honey</modelName>
+			<txdName>w_ar_queenbee16honey</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+	</InitDatas>
+</CWeaponModelInfo__InitDataList>
+

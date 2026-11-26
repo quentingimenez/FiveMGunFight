@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<CWeaponComponentInfoBlob>
+	<Infos>
+		<Item type="CWeaponComponentClipInfo">
+			<Name>COMPONENT_AKFEMVVSPURPLE_CLIP_01</Name>
+			<Model>w_ar_AKFEMVVSPURPLE_mag1</Model>
+			<LocName>WCT_CLIP1</LocName>
+			<LocDesc>WCD_AR_CLIP1</LocDesc>
+			<AttachBone>AAPClip</AttachBone>
+			<WeaponAttachBone>WAPClip</WeaponAttachBone>
+			<AccuracyModifier type="NULL"></AccuracyModifier>
+			<DamageModifier type="NULL"></DamageModifier>
+			<bShownOnWheel value="false"></bShownOnWheel>
+			<CreateObject value="true"></CreateObject>
+			<HudDamage value="0"></HudDamage>
+			<HudSpeed value="0"></HudSpeed>
+			<HudCapacity value="0"></HudCapacity>
+			<HudAccuracy value="0"></HudAccuracy>
+			<HudRange value="0"></HudRange>
+			<ClipSize value="100"></ClipSize>
+			
+			<ReloadData ref="RELOAD_DEFAULT"></ReloadData>
+		</Item>
+	</Infos>
+	
+</CWeaponComponentInfoBlob>
+

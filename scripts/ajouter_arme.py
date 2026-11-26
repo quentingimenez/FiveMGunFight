@@ -13,10 +13,11 @@ Ce que fait le script :
   5. déclare les fichiers dans fxmanifest.lua et l'arme dans data/index.json ;
   6. ajoute l'arme au catalogue Config.Weapons de gf_core (catégorie et munitions
      déduites du groupe GTA de l'arme).
+  7. copie l'image PNG portant le nom de l'arme si le pack en fournit une.
 
 L'arme n'est donnée à personne : un admin se la donne avec /armes, puis l'équipe
-dans le Casier (menu Échap). Sa photo se prend toute seule à la prochaine arrivée
-d'un admin au lobby. Guide : docs/ajouter-un-modele.md.
+dans le Casier (menu Échap). Sans image fournie, sa photo se prend à la prochaine
+arrivée d'un admin au lobby. Guide : docs/ajouter-un-modele.md.
 
 Les dossiers « Replace » (remplacement d'armes du jeu) sont ignorés.
 """
@@ -36,6 +37,7 @@ RESSOURCE = GUNFIGHT / "gf_weapons"
 MANIFESTE = RESSOURCE / "fxmanifest.lua"
 INDEX = RESSOURCE / "data" / "index.json"
 CONFIG_CORE = GUNFIGHT / "gf_core" / "config.lua"
+PHOTOS = GUNFIGHT / "gf_thumbs" / "thumbs" / "weapons"
 NL = "\n"
 
 MODELES = {".ydr", ".ytd", ".yft"}
@@ -116,6 +118,17 @@ def main() -> int:
     noms = noms_du_pack(fichiers)
     nom = args.nom or joli(noms.get(arme, "")) or ident
     notes: list[str] = []
+    photo = next((f for f in fichiers if f.suffix.lower() == ".png" and f.stem.upper() == arme), None)
+    photo_cible = PHOTOS / f"{arme}.png"
+    if photo:
+        if photo.stat().st_size > 1024 * 1024 or photo.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+            notes.append(f"{photo.name} ignorée : PNG invalide ou supérieur à 1 Mo")
+            photo = None
+        elif photo_cible.exists():
+            notes.append("photo existante conservée")
+            photo = None
+        else:
+            notes.append(f"photo fournie : {photo.name}")
 
     dossier = RESSOURCE / "data" / arme
     declarer: list[str] = []
@@ -189,6 +202,9 @@ def main() -> int:
         MANIFESTE.write_text(manifeste, encoding="utf-8", newline=NL)
         INDEX.write_text(json.dumps(index, indent=2) + NL, encoding="utf-8", newline=NL)
         CONFIG_CORE.write_text(config, encoding="utf-8", newline=NL)
+        if photo:
+            PHOTOS.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(photo, photo_cible)
 
     titre = "ESSAI (rien n'est écrit)" if args.essai else "Arme ajoutée"
     print(f"{titre} : {nom} ({arme}, id « {ident} », {categorie}, {munitions} munitions)")
@@ -198,7 +214,7 @@ def main() -> int:
     print(NL + "Étapes suivantes :")
     print("  1. redémarrer le serveur (une arme ajoutée ne se charge pas à chaud) ;")
     print("  2. commit (gf_weapons + gf_core/config.lua), puis pull request ;")
-    print("  3. rien d'autre : la photo se prend toute seule à la prochaine arrivée d'un admin au lobby ;")
+    print("  3. sans image fournie, la photo se prend à la prochaine arrivée d'un admin au lobby ;")
     print("     un admin se donne l'arme avec /armes, puis l'équipe dans le Casier (Échap).")
     return 0
 
