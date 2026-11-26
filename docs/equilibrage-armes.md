@@ -89,6 +89,12 @@ attenuation(...) * BulletsInBatch` (toutes les billes touchent), multiplié par
 **À VÉRIFIER EN JEU.** La multiplication de ces modificateurs et le fait que
 toutes les billes touchent sont des hypothèses sur le traitement réel des
 dégâts réseau et du tir en jeu.
+Mesure en jeu : GTA ajoute aussi un bonus de tir à la tête sur un joueur
+proche (champs `HeadShotDamageModifierPlayer` et
+`MaxHeadShotDistancePlayer`, absents de ce modèle) : une G36 faisait 396 à la
+tête à 10 m, 29 de loin. Le serveur coupe ce bonus
+(`SetPedSuffersCriticalHits(ped, false)` sur tous les joueurs,
+`gf_core/client.lua`) ; les colonnes « tête » restent à confirmer en jeu.
 
 **H3 — Points à retirer.** 200 = 100 PV + 100 de kevlar ; le kevlar absorbe les
 dégâts à 100 %, tête comprise.
