@@ -156,6 +156,7 @@ Le chat est retiré : les commandes se tapent dans la console F8, sans barre obl
 | `whoami` | tous | affiche si tu es admin et tes identifiants à mettre dans ADMIN_IDENTIFIERS |
 | `editor` ou `maps` | admin | éditeur et liste des maps (voir ci-dessous) |
 | `resetchar [id]` | admin | efface le personnage d'un joueur pour retester la création |
+| `give [id] [arme]` | admin | ajoute une arme du catalogue (ex. `carbine`) au Casier d'un joueur ; aussi depuis la console serveur |
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
 
