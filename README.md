@@ -241,6 +241,7 @@ server-data/
     gf_maps     éditeur de maps en jeu (/editor) + sauvegarde data/maps.json
     gf_ui       interface : HUD, kill feed, dégâts, multi-kills, sons, classement
     gf_vehicles véhicules ajoutés (stream/ + data/*.meta) : Dodge Ram TRX « theramtrx21 »
+    gf_stats    statistiques persistantes (MariaDB via oxmysql)
 ```
 
 Chaque mode a son propre « monde » (routing bucket) : les joueurs du lobby, de
@@ -250,8 +251,9 @@ côté serveur.
 
 ## 8. Base de données MariaDB
 
-Le serveur FiveM n'en a pas besoin pour tourner : elle est prête pour la phase 2
-(statistiques permanentes via `oxmysql`). Ce qui est déjà en place :
+Le serveur démarre sans base, mais les statistiques persistantes (`gf_stats` via
+`oxmysql`) en dépendent. Le schéma est créé au premier démarrage sur base vide.
+Ce qui est déjà en place :
 
 - Base `gunfight`, utilisateur `gunfight` et mot de passe root créés au premier démarrage
   à partir des valeurs `MARIADB_*` de `.env`.
@@ -621,7 +623,4 @@ et [ADR 0002 — FXServer épinglé](docs/adr/0002-fxserver-epingle.md).
   L'onglet Personnage remplacera la génération actuelle (nom, genre, carnation, style) par
   un vrai éditeur de vêtements et de visage ; l'onglet Armes ajoutera les finitions et
   accessoires. Les points d'extension sont décrits dans [docs/lobby.md](docs/lobby.md).
-- `gf_stats` : statistiques permanentes (kills, victoires) dans MariaDB avec **oxmysql**
-  — la base est déjà prête dans `docker-compose.yml`, la chaîne de connexion
-  (`mysql_connection_string`) est déjà générée par `docker/entrypoint.sh`.
 - Un anti-cheat dédié est conseillé avant d'ouvrir au grand public.

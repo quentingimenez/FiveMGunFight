@@ -15,7 +15,14 @@ conteneur MariaDB (volume `dbdata` vide).
 - Les variables `MARIADB_*` du fichier `.env` ne changent plus rien une fois le
   volume initialisé (l'image ne recrée pas l'utilisateur).
 
-## Phase 2
+## Schéma des statistiques
 
-C'est ici que viendra le schéma `gf_stats` (kills, manches, victoires) utilisé
-par la ressource `oxmysql`.
+`01-schema.sql` crée la table `gf_stats_players` (kills, morts, parties, victoires)
+utilisée par la ressource `gf_stats` via `oxmysql`. Les scripts sont ignorés sur un
+volume déjà initialisé : pour les rejouer sur la base existante, applique le SQL
+depuis la racine du dépôt, sans client MariaDB sur l'hôte :
+
+```
+docker compose exec -T mariadb sh -c 'mariadb -ugunfight -p"$MARIADB_PASSWORD" gunfight' \
+  < docker/db/init/01-schema.sql
+```

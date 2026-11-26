@@ -159,6 +159,17 @@ local function endGame()
     end
     local winner = r[1] and GetPlayerName(r[1].src) or '—'
 
+    -- Statistiques persistantes (gf_stats) : vainqueur = premier du classement.
+    local participants, topSrc = {}, r[1] and r[1].src
+    for src in pairs(S.players) do
+        participants[#participants + 1] = { src = src, won = src == topSrc }
+    end
+    TriggerEvent('gf:matchEnded', {
+        mode = 'redzone',
+        map = S.map and S.map.name or nil,
+        participants = participants,
+    })
+
     eachPlayer(function(src)
         core:SetProtected(src, true)
         announce(src, ('Victoire de %s !'):format(winner), table.concat(podium, '   '), 8000)
@@ -253,7 +264,9 @@ AddEventHandler('gf:playerKilled', function(victim, killer, weapon, mode)
     v.streak = 0
 
     local k = killer and S.players[killer]
+    local credited = false
     if k and S.phase == 'live' and insideZone(killer, Config.KillZoneMargin) then
+        credited = true
         k.kills = k.kills + 1
         k.streak = k.streak + 1
         if k.streak > k.best then k.best = k.streak end
@@ -266,6 +279,7 @@ AddEventHandler('gf:playerKilled', function(victim, killer, weapon, mode)
             end
         end
     end
+    TriggerEvent('gf:modeKill', { mode = 'redzone', victim = victim, killer = credited and killer or false })
     S.dirty = true
 
     SetTimeout(Config.RespawnDelay * 1000, function()

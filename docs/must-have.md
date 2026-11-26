@@ -17,9 +17,9 @@ Légende : ✅ en place · 🟡 base prête dans le code · ⬜ à faire
 | Choix de 2 armes parmi les armes possédées, validé côté serveur | 🟡 branche `feat/attaque-vehicules-armes-spectateur` | `gf_core` (`ownedWeapons`, `resolveSelection`) |
 | Catalogue d'armes avec accessoires et couleur | 🟡 | `gf_core/config.lua` (`Config.Weapons`) |
 | Liste des caisses (affichage seulement) | 🟡 | `gf_lobby/config.lua` (`Config.Crates`) |
-| Statistiques kills / morts persistantes | 🟡 fichier JSON | `gf_lobby/data/stats.json` |
+| Statistiques kills / morts persistantes | ✅ | `gf_stats` (`gf_stats_players`) |
 | Maps cochables (base du vote) | ✅ | `gf_maps` (`GetActiveMaps`) |
-| Base de données MariaDB | 🟡 prête, pas encore utilisée | `docker-compose.yml`, `mysql_connection_string` |
+| Base de données MariaDB | ✅ utilisée par `gf_stats` | `docker-compose.yml`, `mysql_connection_string` |
 
 ---
 
