@@ -70,6 +70,14 @@ versions : Ubuntu 24.04 épinglé par digest, outils épinglés par version et
 SHA256 (Lua 5.4, luacheck, shellcheck, Node.js 20, Python 3, actionlint,
 hadolint, gitleaks, ruff, Docker CLI et Compose).
 
+En CI, l'image est construite par Buildx avec ses couches dans le cache GitHub
+Actions (`scope=verifier`) : elle n'est reconstruite que si
+`docker/verifier/` change, puis réutilisée via `GF_VERIFIER_IMAGE`. Quand le
+cache manque, les arguments `APT_MIRROR` et `APT_SECURITY_MIRROR` font passer
+`apt-get` par le miroir Azure des runners GitHub au lieu d'`archive.ubuntu.com`
+et de `security.ubuntu.com`, dont le débit varie trop et qui renvoient parfois
+un index en cours de synchronisation.
+
 | Étape | Outil | Ce qu'elle attrape |
 |---|---|---|
 | Syntaxe Lua | `luac -p` | erreur de syntaxe, `end` manquant, chaîne non fermée — la ressource refuserait de démarrer |

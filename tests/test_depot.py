@@ -851,6 +851,27 @@ class ChaineCI(unittest.TestCase):
         self.assertIn("fetch-depth: 0", texte)
         self.assertIn("run: gitleaks git", texte)
 
+    def test_qualite_met_l_image_en_cache(self) -> None:
+        # Sans cache, l'apt-get de l'image dépend du débit d'archive.ubuntu.com
+        # (jusqu'à 10 minutes) ; le scope distinct protège le cache de docker.yml.
+        bloc = bloc_service(lire(self.WORKFLOWS / "qualite.yml"), "qualite")
+        if bloc is None:
+            self.fail("job qualite absent de qualite.yml")
+        self.assertIn("cache-from: type=gha,scope=verifier", bloc)
+        self.assertIn("cache-to: type=gha,scope=verifier,mode=max", bloc)
+        self.assertIn("APT_MIRROR=http://azure.archive.ubuntu.com/ubuntu", bloc)
+        self.assertIn(
+            "APT_SECURITY_MIRROR=http://azure.archive.ubuntu.com/ubuntu", bloc
+        )
+        self.assertIn("GF_VERIFIER_IMAGE: gunfight-verifier:ci", bloc)
+        self.assertIn("tags: gunfight-verifier:ci", bloc)
+        image = lire(RACINE / "docker" / "verifier" / "Dockerfile")
+        self.assertIn("ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu", image)
+        self.assertIn(
+            "ARG APT_SECURITY_MIRROR=http://security.ubuntu.com/ubuntu", image
+        )
+        self.assertIn('Acquire::Retries "3"', image)
+
     def test_image_de_verification_est_epinglee(self) -> None:
         chemin = RACINE / "docker" / "verifier" / "Dockerfile"
         self.assertTrue(chemin.is_file(), "docker/verifier/Dockerfile manquant")

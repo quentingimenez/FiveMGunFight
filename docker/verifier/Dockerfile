@@ -42,7 +42,22 @@ ARG DOCKER_COMPOSE_SHA256=b8840f5008c447f41fce0a57ae3adeab42c89b1eb6e6012524bcab
 # curl/xz-utils pour les téléchargements vérifiés.
 # DL3008 est ignoré par .hadolint.yaml : les paquets suivent les correctifs de
 # sécurité d'Ubuntu plutôt que d'être figés à une version qui disparaîtrait.
-RUN apt-get update \
+#
+# APT_MIRROR et APT_SECURITY_MIRROR remplacent archive.ubuntu.com et
+# security.ubuntu.com, dont le débit varie de 150 ko/s à 30 Mo/s selon les runs
+# CI et qui renvoient parfois un index en cours de synchronisation. La CI passe
+# le miroir Azure des runners GitHub pour les deux ; en local, les miroirs
+# officiels restent la valeur par défaut. Les paquets restent vérifiés par la
+# clé d'archive Ubuntu (Signed-By), quel que soit le miroir. Acquire::Retries
+# absorbe une coupure passagère.
+ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu
+ARG APT_SECURITY_MIRROR=http://security.ubuntu.com/ubuntu
+RUN sed -i \
+      -e "s|http://archive.ubuntu.com/ubuntu|${APT_MIRROR}|" \
+      -e "s|http://security.ubuntu.com/ubuntu|${APT_SECURITY_MIRROR}|" \
+      /etc/apt/sources.list.d/ubuntu.sources \
+ && printf 'Acquire::Retries "3";\n' > /etc/apt/apt.conf.d/80-retries \
+ && apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
