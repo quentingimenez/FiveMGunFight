@@ -51,6 +51,8 @@ end)
 -- ---------------------------------------------------------------- Choix des armes
 -- data = { title, weapons = { {id,label,category} }, selected = {id,id}, count, seconds }
 local loadoutFocus = false
+local requestWeaponPhotos
+local currentLoadout
 
 local function releaseLoadoutFocus()
     if loadoutFocus then
@@ -63,11 +65,14 @@ RegisterNetEvent('gf_ui:loadout_open', function(d)
     loadoutFocus = true
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
+    currentLoadout = type(d) == 'table' and d.weapons or nil
     SendNUIMessage({ type = 'loadout_open', data = d })
+    requestWeaponPhotos(currentLoadout)
 end)
 
 RegisterNetEvent('gf_ui:loadout_close', function()
     releaseLoadoutFocus()
+    currentLoadout = nil
     SendNUIMessage({ type = 'loadout_close' })
 end)
 
@@ -133,7 +138,7 @@ end)
 local weaponPhotoRequests = {}
 local currentWeapons = nil
 
-local function requestWeaponPhotos(list)
+requestWeaponPhotos = function(list)
     if type(list) ~= 'table' or GetResourceState('gf_thumbs') ~= 'started' then return end
     local names = {}
     for _, weapon in ipairs(list) do
@@ -164,7 +169,10 @@ RegisterNetEvent('gf_thumbs:updated', function(kind, name)
     if kind ~= 'weapons' or type(name) ~= 'string' then return end
     weaponPhotoRequests[name] = nil
     -- L'autre ressource vide son cache pour ce même événement.
-    SetTimeout(50, function() requestWeaponPhotos(currentWeapons) end)
+    SetTimeout(50, function()
+        requestWeaponPhotos(currentWeapons)
+        requestWeaponPhotos(currentLoadout)
+    end)
 end)
 
 -- ---------------------------------------------------------------- Minimap sans barres GTA

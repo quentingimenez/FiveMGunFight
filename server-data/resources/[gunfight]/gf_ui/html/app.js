@@ -270,32 +270,31 @@ function renderLoadout() {
     const slots = $('.lo-slots');
     slots.replaceChildren();
     for (let i = 0; i < LO.count; i++) {
-        const w = weaponById(LO.selected[i]);
-        const s = el('div', 'lo-slot' + (w ? ' filled' : ''));
-        s.appendChild(el('small', null, `Arme ${i + 1}`));
-        s.appendChild(document.createTextNode(w ? w.label : '—'));
-        slots.appendChild(s);
+        const weapon = weaponById(LO.selected[i]);
+        const slot = el('div', 'lo-slot' + (weapon ? ' filled' : ''));
+        const caption = el('div', 'lo-slot-caption');
+        caption.appendChild(el('small', null, `Arme ${i + 1}`));
+        caption.appendChild(el('span', null, weapon ? weapon.label : 'À choisir'));
+        if (weapon) slot.appendChild(weaponIcon(weapon.name));
+        slot.appendChild(caption);
+        slots.appendChild(slot);
     }
 
     const grid = $('.lo-grid');
+    const scrollTop = grid.scrollTop;
     grid.replaceChildren();
-    const cats = [];
-    LO.weapons.forEach(w => { if (!cats.includes(w.category)) cats.push(w.category); });
-    cats.forEach(cat => {
-        const block = el('div');
-        block.appendChild(el('div', 'lo-cat', cat));
-        const row = el('div', 'lo-row');
-        LO.weapons.filter(w => w.category === cat).forEach(w => {
-            const idx = LO.selected.indexOf(w.id);
-            const card = el('button', 'lo-card' + (idx >= 0 ? ' on' : ''));
-            if (idx >= 0) card.appendChild(el('span', 'n', idx + 1));
-            card.appendChild(document.createTextNode(w.label));
-            card.onclick = () => toggleWeapon(w.id);
-            row.appendChild(card);
-        });
-        block.appendChild(row);
-        grid.appendChild(block);
+    LO.weapons.forEach(weapon => {
+        const index = LO.selected.indexOf(weapon.id);
+        const card = el('button', 'lo-card' + (index >= 0 ? ' on' : ''));
+        card.type = 'button';
+        card.setAttribute('aria-pressed', index >= 0 ? 'true' : 'false');
+        if (index >= 0) card.appendChild(el('span', 'n', index + 1));
+        card.appendChild(weaponIcon(weapon.name));
+        card.appendChild(el('span', 'lo-card-name', weapon.label));
+        card.onclick = () => toggleWeapon(weapon.id);
+        grid.appendChild(card);
     });
+    grid.scrollTop = scrollTop;
 
     const ok = $('.lo-ok');
     ok.disabled = LO.selected.length !== LO.count;
@@ -327,7 +326,7 @@ function openLoadout(d) {
     LO.done = false;
     LO.endsAt = Date.now() + (d.seconds || 10) * 1000;
     $('.lo-title').textContent = d.title || 'Choisis tes armes';
-    $('.lo-sub').textContent = `Sélectionne ${LO.count} armes · les armes gagnées dans les caisses apparaîtront ici`;
+    $('.lo-sub').textContent = `Choisis ${LO.count} armes parmi celles de ton Casier`;
     renderLoadout();
     tickLoadout();
     clearInterval(LO.timer);
@@ -466,6 +465,7 @@ window.addEventListener('message', (event) => {
             Object.assign(WEAPON_PHOTOS, msg.data || {});
             WEAPONS_SIG = '';
             renderWeapons(LAST_WEAPONS);
+            if (!$('#loadout').classList.contains('hidden')) renderLoadout();
             break;
         case 'killfeed': addKill(msg.data); break;
         case 'killfeed_clear': $('#killfeed').replaceChildren(); break;

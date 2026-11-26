@@ -8,6 +8,8 @@ local env = setmetatable({
     RegisterNUICallback = function() end,
     RegisterCommand = function() end,
     RegisterKeyMapping = function() end,
+    SetNuiFocus = function() end,
+    SetNuiFocusKeepInput = function() end,
     SendNUIMessage = function(message) messages[#messages + 1] = message end,
     GetResourceState = function() return available and 'started' or 'stopped' end,
     CreateThread = function(fn) if not loading then fn() end end,
@@ -40,4 +42,8 @@ handlers['gf_ui:weapons'](nil)
 available = false
 handlers['gf_ui:weapons']({ { name = 'WEAPON_SMG' } })
 assert(#calls == 2)
+available = true
+handlers['gf_ui:loadout_open']({ weapons = { { name = 'WEAPON_SMG' } } })
+assert(#calls == 3 and calls[3].names[1] == 'WEAPON_SMG')
+handlers['gf_ui:loadout_close']()
 print('Photos du HUD : chargement, cache, actualisation et munitions vérifiés')
