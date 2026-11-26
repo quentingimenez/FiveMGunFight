@@ -1,0 +1,44 @@
+-- Vérifie qu'un départ rapide du lobby ne désactive pas les prochaines photos.
+local root = os.getenv('GF_ROOT') or '.'
+local resource = root .. '/server-data/resources/[gunfight]/gf_thumbs/'
+local events, threads, sent = {}, {}, {}
+local mode = { gf_mode = 'lobby' }
+local stub = function() end
+local env = setmetatable({
+    Config = { AutoCapture = true, AutoCaptureDelay = 8000 },
+    LocalPlayer = { state = mode },
+    exports = setmetatable({}, { __call = stub }),
+    RegisterNetEvent = function(name, fn) events[name] = fn end,
+    RegisterNUICallback = stub,
+    CreateThread = function(fn) threads[#threads + 1] = fn end,
+    GetResourceKvpString = stub,
+    GetCurrentResourceName = function() return 'gf_thumbs' end,
+    GetGameTimer = function() return 0 end,
+    vector3 = function(x, y, z) return { x = x, y = y, z = z } end,
+    NetworkIsPlayerActive = function() return true end,
+    PlayerId = function() return 1 end,
+    TriggerServerEvent = function(name) sent[#sent + 1] = name end,
+    Wait = stub,
+}, { __index = _G })
+assert(loadfile(resource .. 'client.lua', 't', env))()
+local changed = assert(events['gf_core:modeChanged'])
+
+changed('lobby')
+local first = threads[#threads]
+mode.gf_mode = 'redzone'
+changed('redzone')
+first()
+assert(#sent == 0, 'départ avant le délai : aucune capture')
+
+mode.gf_mode = 'lobby'
+changed('lobby')
+threads[#threads]()
+assert(#sent == 1 and sent[1] == 'gf_thumbs:lobbyReady', 'retour : nouvelle demande')
+
+changed('lobby')
+local stale = threads[#threads]
+changed('lobby')
+stale()
+threads[#threads]()
+assert(#sent == 2, 'une seule demande pour les événements rapprochés')
+print('3 scénarios de capture automatique vérifiés')

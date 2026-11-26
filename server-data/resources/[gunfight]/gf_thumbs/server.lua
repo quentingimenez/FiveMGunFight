@@ -75,13 +75,15 @@ RegisterNetEvent('gf_thumbs:save', function(kind, id, url)
 end)
 
 -- Arrivée d'un joueur au lobby : si c'est un admin, son jeu prend les photos
--- manquantes (une fois par session et par joueur)
-local autoDone = {}
+-- manquantes. Une limite évite les demandes répétées d'un client.
+local lastAuto = {}
 RegisterNetEvent('gf_thumbs:lobbyReady', function()
     local src = source
-    if not Config.AutoCapture or autoDone[src] then return end
-    autoDone[src] = true
+    if not Config.AutoCapture then return end
     if not core:IsAdmin(src) then return end
+    local now = GetGameTimer()
+    if lastAuto[src] and now - lastAuto[src] < 3000 then return end
+    lastAuto[src] = now
     TriggerClientEvent('gf_thumbs:autoCapture', src)
 end)
 
@@ -106,7 +108,7 @@ end)
 
 AddEventHandler('playerDropped', function()
     lastRequest[source] = nil
-    autoDone[source] = nil
+    lastAuto[source] = nil
 end)
 
 -- Un client signale qu'un modèle l'a fait planter pendant sa photo (marqueur KVP
