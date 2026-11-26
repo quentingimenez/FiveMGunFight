@@ -64,6 +64,18 @@ def chemins_declares(manifeste: Path) -> set[str]:
     return chemins
 
 
+def scripts_client(manifeste: Path) -> set[str]:
+    """Scripts Lua exécutés par le client (client_script(s) et shared_script(s))."""
+    texte = lire(manifeste)
+    chemins: set[str] = set()
+    for mot in ("client_scripts", "client_script", "shared_scripts", "shared_script"):
+        motif = rf"\b{mot}\b\s*(\{{[^}}]*\}}|'[^']*'|\"[^\"]*\")"
+        for trouve in re.finditer(motif, texte):
+            for simple, double in re.findall(r"'([^']+)'|\"([^\"]+)\"", trouve.group(1)):
+                chemins.add(simple or double)
+    return chemins
+
+
 def cles_env(chemin: Path) -> dict[str, str]:
     valeurs: dict[str, str] = {}
     for ligne in lire(chemin).splitlines():
@@ -141,6 +153,44 @@ class ManifestesFiveM(unittest.TestCase):
                     self.assertTrue(
                         (manifeste.parent / chemin).is_file(),
                         f"fichier déclaré introuvable : {chemin}",
+                    )
+
+    def test_images_des_ressources_sont_declarees(self) -> None:
+        # Le client ne reçoit que les fichiers listés : une image qu'il charge
+        # lui-même (NUI, CreateRuntimeTextureFromImage) et absente de `files`
+        # est introuvable, et CreateRuntimeTextureFromImage échoue sans message
+        # clair. Les images que seul le serveur lit (gf_thumbs les envoie en
+        # base64) ne sont citées par aucun fichier client et sont ignorées.
+        extensions = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+        for manifeste in manifestes():
+            declares = chemins_declares(manifeste)
+            sources_client = "\n".join(
+                lire(source) for source in sorted(manifeste.parent.rglob("*"))
+                if source.is_file() and "cache" not in source.parts and (
+                    source.suffix in {".html", ".js", ".css"}
+                    or source.relative_to(manifeste.parent).as_posix() in scripts_client(manifeste)
+                )
+            )
+            for image in sorted(manifeste.parent.rglob("*")):
+                if image.suffix.lower() not in extensions or "cache" in image.parts:
+                    continue
+                if image.name not in sources_client:
+                    continue
+                chemin = image.relative_to(manifeste.parent).as_posix()
+                with self.subTest(manifeste=str(manifeste.relative_to(RACINE)), image=chemin):
+                    self.assertIn(chemin, declares, f"image non déclarée dans files : {chemin}")
+
+    def test_textures_runtime_recoivent_un_handle_de_txd(self) -> None:
+        # CreateRuntimeTextureFrom* attend le handle renvoyé par
+        # CreateRuntimeTxd. Un nom de dictionnaire en dur provoque
+        # « invalid handle » en jeu (erreur déjà rencontrée sur gf_lobby).
+        appel_avec_nom = re.compile(r"CreateRuntimeTextureFrom\w*\s*,?\s*\(?\s*['\"]")
+        for script in sorted(RESSOURCES.glob("*/gf_*/**/*.lua")):
+            for numero, ligne in enumerate(lire(script).splitlines(), start=1):
+                with self.subTest(script=str(script.relative_to(RACINE)), ligne=numero):
+                    self.assertIsNone(
+                        appel_avec_nom.search(ligne),
+                        f"txd passé par son nom au lieu du handle de CreateRuntimeTxd : {ligne.strip()}",
                     )
 
     def test_ressources_gunfight_listees_dans_les_manifestes(self) -> None:

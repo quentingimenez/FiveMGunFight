@@ -34,22 +34,28 @@ Config.Matchmaking = {
   attackMax = 30, -- plafond d'inscription, configuration documentaire
 }
 
--- Scene du lobby : les personnages sont alignes face a la camera.
+-- Scène du lobby et de la création : les personnages sont alignés face à la
+-- caméra, dans le vide (rien de la map entre la caméra et l'image de fond).
+-- `z` est l'altitude de la racine du ped. La hauteur du regard n'est pas
+-- réglable : elle est calculée pour poser les pieds sur la ligne de sol de
+-- l'image de fond (client.lua).
 Config.Stage = {
-  x = -1037.7,
-  y = -2737.9,
-  z = 20.2,
-  heading = 330.0,
+  x = 0.0,
+  y = 0.0,
+  z = 1000.0,
+  heading = 0.0,
   spacing = 1.45,
   camera = {
-    baseDistance = 3.2,
+    baseDistance = 4.4,
     distancePerMember = 0.95,
     height = 1.52,
-    lookHeight = 1.12,
     fov = 42.0,
-    creatorDistance = 2.9,
-    creatorOffset = -0.75,
-    creatorFov = 34.0,
+    -- Plan de création : corps entier, centré sur la colonne de scène.
+    creatorDistance = 4.2,
+    creatorOffset = 0.0,
+    creatorFov = 40.0,
+    creatorHeight = 1.45,
+    creatorLookOffset = 0.0,
   },
 }
 

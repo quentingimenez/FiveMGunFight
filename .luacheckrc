@@ -27,6 +27,7 @@ globals = {
   "Base64",
   "GFLobbyAppearance",
   "GFLobbyAppearanceSchema",
+  "GFLobbyBackdrop",
   "RateLimit",
   "Validation",
 }

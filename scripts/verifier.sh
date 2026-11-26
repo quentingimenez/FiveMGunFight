@@ -151,6 +151,30 @@ else
   fi
 fi
 
+# --- 5b. Tests unitaires Lua --------------------------------------------------
+# Modules purs (sans native FiveM) testés hors du jeu : tests/lua/*.lua.
+titre "Tests unitaires Lua (tests/lua)"
+lua=""
+for candidat in lua5.4 lua; do
+  if command -v "$candidat" >/dev/null 2>&1; then
+    lua="$candidat"
+    break
+  fi
+done
+
+if [ -z "$lua" ]; then
+  ignore "lua absent (installe Lua 5.4 ; la CI le fournit)"
+else
+  for fichier in tests/lua/*.lua; do
+    if sortie="$("$lua" "$fichier" 2>&1)"; then
+      ok "$fichier : $(printf '%s\n' "$sortie" | tail -n 1)"
+    else
+      echec "$fichier"
+      printf '%s\n' "$sortie" | details
+    fi
+  done
+fi
+
 # --- 6. Workflows GitHub Actions (actionlint) -------------------------------
 titre "Workflows GitHub Actions (actionlint)"
 if ! command -v actionlint >/dev/null 2>&1; then
