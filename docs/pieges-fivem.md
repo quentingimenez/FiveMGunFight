@@ -62,6 +62,13 @@ essai**.
   `native.py 00000000786d8bc3` aussi.
 - **`pcall` cache la vraie erreur** : afficher le message d'erreur du `pcall`,
   pas un texte générique (« image introuvable » a masqué un `invalid handle`).
+- **`sender` des événements de jeu serveur est une chaîne** :
+  `weaponDamageEvent`, `explosionEvent`, `ptFxEvent`… reçoivent l'identifiant
+  du joueur en `"3"` et non en `3` (`std::to_string(client->GetNetId())` dans
+  `ServerGameState.cpp`), même si la documentation indique `number`. Le
+  convertir avec `tonumber` avant d'indexer une table par joueur : sinon la
+  recherche rend `nil` sans erreur (tous les tirs entre joueurs étaient
+  annulés pour « modes différents »).
 
 ## 3. Textures et fond de scène
 

@@ -630,6 +630,12 @@ local function journaliserHit(sender, victim, data, accepted, reason)
 end
 
 AddEventHandler('weaponDamageEvent', function(sender, data)
+    -- FXServer passe le tireur en CHAÎNE (std::to_string du netId), alors que
+    -- toutes nos tables (Modes, Proteges, Equipes, Armes) sont indexées par
+    -- nombre : sans conversion, Modes[sender] vaut nil et chaque tir entre
+    -- joueurs était annulé pour « modes différents », sans même être journalisé.
+    sender = tonumber(sender)
+    if not sender then return end
     local netId = data.hitGlobalId
     if (not netId or netId == 0) and data.hitGlobalIds then netId = data.hitGlobalIds[1] end
     if not netId or netId == 0 then return end
