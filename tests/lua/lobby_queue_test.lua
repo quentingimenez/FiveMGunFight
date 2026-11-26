@@ -261,6 +261,13 @@ local function newServer()
     -- exemple ForceLaunchQueue), tout en gardant l'accès par champ pour les
     -- exports statiques gf_core / gf_attack.
     local registeredExports = {}
+    -- Vote de carte : choix exposés par gf_attack et appels à SetNextMap.
+    local mapChoices = {
+        { id = 'a', name = 'Alpha' },
+        { id = 'b', name = 'Bravo' },
+    }
+    local setNextMapCalls = {}
+    local randomFn = nil
 
     env.print = function(...)
         local parts = {}
@@ -278,6 +285,14 @@ local function newServer()
     env.GetPlayerRoutingBucket = function() return 0 end
     env.SetPlayerRoutingBucket = function() return nil end
     env.GetGameTimer = function() return clock end
+    -- math.random pilotable par les scénarios d'égalité ; les autres fonctions
+    -- math restent accessibles via _G.math.
+    env.math = setmetatable({
+        random = function(n)
+            if randomFn then return randomFn(n) end
+            return 1
+        end,
+    }, { __index = _G.math })
     env.GetPlayers = function()
         local list = {}
         for src in pairs(online) do list[#list + 1] = tostring(src) end
@@ -331,6 +346,13 @@ local function newServer()
             RegisterSquads = function(self, escouades)
                 local call = { escouades = escouades }
                 journal[#journal + 1] = { kind = 'RegisterSquads', call = call }
+                return true
+            end,
+            GetMapChoices = function() return mapChoices end,
+            SetNextMap = function(_self, id)
+                local call = { id = id }
+                setNextMapCalls[#setNextMapCalls + 1] = call
+                journal[#journal + 1] = { kind = 'SetNextMap', call = call }
                 return true
             end,
         },
@@ -460,6 +482,19 @@ local function newServer()
             return nil
         end,
         launchingCount = launchingCount, logs = logs,
+        setNextMapCalls = setNextMapCalls,
+        journalIndex = function(kind)
+            for i, entry in ipairs(journal) do
+                if entry.kind == kind then return i end
+            end
+            return nil
+        end,
+        setRandom = function(fn) randomFn = fn end,
+        -- 600 ms pour passer l'anti-spam de 500 ms du vote.
+        vote = function(src, id)
+            clock = clock + 600
+            callNet('gf_lobby:voteMap', src, { id = id })
+        end,
         advance = function(ms) clock = clock + ms end,
         setCanJoin = function(value) canJoin = value end,
         clearModes = function()
@@ -872,6 +907,235 @@ check('n. l escouade reste inscrite après un lancement forcé et un retour lobb
     -- Un second lancement forcé est de nouveau possible.
     s.clearModes()
     equal(2, s.forceLaunch(30), 'relancement forcé possible après retour')
+end)
+
+-- ---------------------------------------------------------------------------
+--  Partie F.1 : dépouillement pur (LobbyQueue.tally) et vote de carte.
+-- ---------------------------------------------------------------------------
+
+-- Nombre de voix d'une carte dans un état de file ; -1 si la carte est absente
+-- de la liste envoyée au client.
+local function mapVotes(queue, id)
+    for _, map in ipairs(queue.maps or {}) do
+        if map.id == id then return map.votes end
+    end
+    return -1
+end
+
+local choicesVote = {
+    { id = 'a', name = 'Alpha' },
+    { id = 'b', name = 'Bravo' },
+}
+
+check('o. tally : majorité simple', function()
+    local winner, counts = Q.tally(
+        { [1] = 'a', [2] = 'b', [3] = 'a' }, { 1, 2, 3 }, choicesVote,
+        function(_n) return 1 end
+    )
+    equal('a', winner, 'gagnant')
+    equal(2, counts.a, 'voix pour a')
+    equal(1, counts.b, 'voix pour b')
+end)
+
+check('p. tally : égalité départagée par l ordre des choix', function()
+    local winner, counts = Q.tally(
+        { [1] = 'a', [2] = 'b' }, { 1, 2 }, choicesVote,
+        function(_n) return 2 end
+    )
+    equal('b', winner, 'gagnant en égalité')
+    equal(1, counts.a, 'voix pour a')
+    equal(1, counts.b, 'voix pour b')
+end)
+
+check('q. tally : aucun vote donne un gagnant nil', function()
+    local winner, counts = Q.tally({}, {}, choicesVote, function(_n) return 1 end)
+    equal(nil, winner, 'gagnant sans vote')
+    equal(nil, next(counts), 'comptes vides')
+end)
+
+check('r. tally : votes hors liste ou id inconnu ignorés', function()
+    local votes = { [1] = 'a', [2] = 'b', [4] = 'a', [5] = 'z' }
+    local voters = { 1, 2 }
+    local winner1, counts1 = Q.tally(votes, voters, choicesVote, function(_n) return 1 end)
+    equal('a', winner1, 'gagnant avec tirage 1')
+    equal(1, counts1.a, 'voix pour a')
+    equal(1, counts1.b, 'voix pour b')
+    equal(nil, counts1.z, 'id inconnu non compté')
+    local winner2 = Q.tally(votes, voters, choicesVote, function(_n) return 2 end)
+    equal('b', winner2, 'gagnant avec tirage 2')
+end)
+
+check('s. tally : fonction pure (votes et voters inchangés)', function()
+    local votes = { [1] = 'a', [2] = 'b', [4] = 'a', [5] = 'z' }
+    local voters = { 1, 2 }
+    Q.tally(votes, voters, choicesVote, function(_n) return 1 end)
+    equal('a', votes[1], 'votes[1] inchangé')
+    equal(2, #voters, 'voters inchangé')
+end)
+
+check('t. tally : sans fonction aléatoire, premier candidat gagne', function()
+    local winner, counts = Q.tally({ [1] = 'a', [2] = 'b' }, { 1, 2 }, choicesVote)
+    equal('a', winner, 'gagnant par défaut en égalité')
+    equal(1, counts.a, 'voix pour a')
+    equal(1, counts.b, 'voix pour b')
+end)
+
+check('u. vote : un joueur non inscrit reçoit une erreur', function()
+    local s = newServer()
+    s.makePlayer(1)
+    s.vote(1, 'a')
+    equal('Inscris ton escouade dans la file pour voter.', s.lastNotice(1), 'notice d erreur exacte')
+    equal(false, s.queueOf(1).joined, 'joueur toujours non inscrit')
+    equal(0, mapVotes(s.queueOf(1), 'a'), 'aucune voix pour a')
+    equal(0, mapVotes(s.queueOf(1), 'b'), 'aucune voix pour b')
+    equal(nil, s.queueOf(1).myVote, 'aucun vote personnel')
+end)
+
+check('v. vote : deux joueurs inscrits votent pour des cartes distinctes', function()
+    local s = newServer()
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local partyId = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+    s.play(1, 'attack')
+    s.vote(1, 'a')
+    s.vote(2, 'b')
+    equal(1, mapVotes(s.queueOf(1), 'a'), 'voix pour a')
+    equal(1, mapVotes(s.queueOf(1), 'b'), 'voix pour b')
+    equal('a', s.queueOf(1).myVote, 'vote du joueur 1')
+    equal('b', s.queueOf(2).myVote, 'vote du joueur 2')
+end)
+
+check('w. vote : revoter la même carte retire le vote, id inconnu refusé', function()
+    local s = newServer()
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local partyId = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+    s.play(1, 'attack')
+    s.vote(1, 'a')
+    s.vote(2, 'b')
+
+    s.vote(1, 'a')
+    equal(nil, s.queueOf(1).myVote, 'vote du joueur 1 retiré')
+    equal(0, mapVotes(s.queueOf(1), 'a'), 'voix pour a après retrait')
+    equal(1, mapVotes(s.queueOf(1), 'b'), 'voix pour b après retrait')
+
+    s.vote(1, 'z')
+    contains(s.lastNotice(1), 'Carte inconnue.', 'notice d id inconnu')
+    equal(nil, s.queueOf(1).myVote, 'vote du joueur 1 toujours nil')
+    equal(0, mapVotes(s.queueOf(1), 'a'), 'voix pour a inchangée')
+    equal(1, mapVotes(s.queueOf(1), 'b'), 'voix pour b inchangée')
+end)
+
+check('x. lancement : SetNextMap avant l enregistrement et le premier SetMode', function()
+    local s = newServer()
+    s.min(2)
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.makePlayer(3)
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local partyId = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+    s.play(1, 'attack')
+    s.play(3, 'attack')
+    s.vote(1, 'a')
+    s.vote(2, 'a')
+    s.vote(3, 'b')
+    equal(2, mapVotes(s.queueOf(1), 'a'), 'deux voix pour a avant seuil')
+    equal(1, mapVotes(s.queueOf(1), 'b'), 'une voix pour b avant seuil')
+
+    s.threshold()
+
+    equal(1, #s.setNextMapCalls, 'un seul appel à SetNextMap')
+    equal('a', s.setNextMapCalls[1].id, 'carte gagnante')
+    local setNextMapIndex = s.journalIndex('SetNextMap')
+    assert(setNextMapIndex, 'SetNextMap doit figurer au journal')
+    local registerIndex = s.journalIndex('RegisterSquads')
+    assert(registerIndex, 'RegisterSquads doit figurer au journal')
+    local firstSetMode = s.firstSetModeIndex()
+    assert(firstSetMode, 'au moins un SetMode attendu')
+    assert(setNextMapIndex < registerIndex, 'SetNextMap avant RegisterSquads')
+    assert(setNextMapIndex < firstSetMode, 'SetNextMap avant le premier SetMode')
+
+    equal(true, s.setModeFor(1, 'attack'), 'SetMode pour 1')
+    equal(true, s.setModeFor(2, 'attack'), 'SetMode pour 2')
+    equal(true, s.setModeFor(3, 'attack'), 'SetMode pour 3')
+
+    equal(nil, s.queueOf(1).myVote, 'votes vidés pour 1')
+    equal(nil, s.queueOf(2).myVote, 'votes vidés pour 2')
+    equal(nil, s.queueOf(3).myVote, 'votes vidés pour 3')
+    equal(0, mapVotes(s.queueOf(1), 'a'), 'carte a à 0 après lancement')
+    equal(0, mapVotes(s.queueOf(1), 'b'), 'carte b à 0 après lancement')
+    for _, src in ipairs({ 1, 2, 3 }) do
+        contains(s.lastNotice(src), 'Carte choisie : Alpha (2 vote(s)).',
+            ('notice de carte envoyée à %d'):format(src))
+    end
+end)
+
+check('y. égalité : le gagnant suit math.random', function()
+    local function equalVote(randomValue)
+        local s = newServer()
+        s.min(2)
+        s.makePlayer(1)
+        s.makePlayer(2)
+        s.callNet('gf_lobby:invite', 1, { id = 2 })
+        local partyId = s.stateOf(1).party.id
+        s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+        s.play(1, 'attack')
+        s.vote(1, 'a')
+        s.vote(2, 'b')
+        s.setRandom(function(_n) return randomValue end)
+        s.threshold()
+        return s
+    end
+
+    local first = equalVote(1)
+    equal(1, #first.setNextMapCalls, 'un seul appel sur le premier serveur')
+    equal('a', first.setNextMapCalls[1].id, 'tirage 1 donne a')
+
+    local second = equalVote(2)
+    equal(1, #second.setNextMapCalls, 'un seul appel sur le second serveur')
+    equal('b', second.setNextMapCalls[1].id, 'tirage 2 donne b')
+end)
+
+check('z. aucun vote : SetNextMap jamais appelé mais escouades enregistrées', function()
+    local s = newServer()
+    s.min(2)
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local partyId = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+    s.play(1, 'attack')
+    s.threshold()
+    equal(0, #s.setNextMapCalls, 'aucun appel à SetNextMap')
+    equal(nil, s.journalIndex('SetNextMap'), 'aucune trace de SetNextMap')
+    equal(1, #s.registerCalls(), 'RegisterSquads toujours appelé')
+end)
+
+check('aa. annulation par le chef : votes de l escouade effacés', function()
+    local s = newServer()
+    s.min(20)
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local partyId = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+    s.play(1, 'attack')
+    s.vote(1, 'a')
+    s.vote(2, 'b')
+    equal(1, mapVotes(s.queueOf(1), 'a'), 'voix pour a avant annulation')
+    equal(1, mapVotes(s.queueOf(1), 'b'), 'voix pour b avant annulation')
+
+    s.cancel(1)
+    equal(false, s.queueOf(1).joined, 'chef retiré de la file')
+    equal(nil, s.queueOf(1).myVote, 'vote du chef effacé')
+    equal(nil, s.queueOf(2).myVote, 'vote du membre effacé')
+    equal(0, mapVotes(s.queueOf(1), 'a'), 'carte a à 0 après annulation')
+    equal(0, mapVotes(s.queueOf(1), 'b'), 'carte b à 0 après annulation')
 end)
 
 print(('%d passed, %d failed'):format(passed, failed))

@@ -92,6 +92,13 @@ local function loadMap(index)
     currentMap = finalizeMap(list[zoneIndex])
 end
 
+-- Identifiant stable d'une carte pour le vote du lobby : les maps de gf_maps
+-- ont un id, les zones de secours de config.lua n'en ont pas (secours_N).
+local function choiceId(m, i)
+    if type(m) == 'table' and type(m.id) == 'string' and m.id ~= '' then return m.id end
+    return 'secours_' .. i
+end
+
 loadMap(zoneIndex)
 
 local function zone() return currentMap end
@@ -625,6 +632,34 @@ exports('RegisterSquads', function(escouades)
     if type(escouades) ~= 'table' then return false end
     executer(AttackRules.definirGroupes(etat, escouades))
     return true
+end)
+
+-- Cartes proposées au vote du lobby, dans l'ordre de la rotation.
+exports('GetMapChoices', function()
+    local choices = {}
+    for i, m in ipairs(mapList()) do
+        choices[#choices + 1] = {
+            id = choiceId(m, i),
+            name = tostring(m.name or ('Zone ' .. i)),
+        }
+    end
+    return choices
+end)
+
+-- Choix de la carte du prochain match, uniquement en attente. Le rechargement
+-- de la carte au début du match jouera cette carte et reprendra la rotation.
+exports('SetNextMap', function(id)
+    if type(id) ~= 'string' or etat.phase ~= 'waiting' then return false end
+    for i, m in ipairs(mapList()) do
+        if choiceId(m, i) == id then
+            loadMap(i)
+            if next(etat.equipes) ~= nil then
+                executer(AttackRules.allerEnAttente(etat))
+            end
+            return true
+        end
+    end
+    return false
 end)
 
 local function reply(src, msg)

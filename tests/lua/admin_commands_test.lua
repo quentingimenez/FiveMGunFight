@@ -236,7 +236,11 @@ local function newHarness(admin)
 
     -- Ordre des fxmanifest.lua : shared puis scripts serveur, modules gf_core
     -- chargés dans env (visibles via _G) avant server.lua.
-    loadFiles(newEnv('gf_attack'), {
+    -- On garde la référence à l'environnement gf_attack pour lire Config.Zones
+    -- (les zones de secours servent de référence aux tests des exports de cartes).
+    local attackEnv = newEnv('gf_attack')
+    h.attackEnv = attackEnv
+    loadFiles(attackEnv, {
         'gf_attack/config.lua', 'gf_attack/rules.lua', 'gf_attack/server.lua',
     })
     loadFiles(newEnv('gf_redzone'), {
@@ -507,6 +511,66 @@ check('4c. startround : ForceLaunchQueue lève une erreur, rien ne propage', fun
         if msg == 'Aucun joueur dans le mode Attaque.' then found = true end
     end
     eq(true, found, 'message actuel conservé')
+end)
+
+-- ---------------------------------------------------------------------------
+--  Scénarios 4 (suite) : exports GetMapChoices / SetNextMap (partie F.2).
+--  Sans maps gf_maps, mapList() retombe sur les 3 zones de Config.Zones,
+--  dans l'ordre, sous les identifiants secours_1, secours_2, secours_3.
+-- ---------------------------------------------------------------------------
+
+check('4e. GetMapChoices sans maps gf_maps renvoie les 3 zones de secours', function()
+    local h = newHarness(false)
+    local choices = h.exportsByName.GetMapChoices()
+
+    eq('table', type(choices), 'GetMapChoices renvoie une table')
+    eq(3, #choices, 'trois choix de secours')
+
+    for i = 1, 3 do
+        local choice = choices[i]
+        eq('table', type(choice), ('choix %d est une table'):format(i))
+        eq('secours_' .. i, choice.id, ('identifiant du choix %d'):format(i))
+        eq(h.attackEnv.Config.Zones[i].name, choice.name, ('nom du choix %d (ordre de Config.Zones)'):format(i))
+        eq('string', type(choice.name), ('nom du choix %d est une chaîne'):format(i))
+        eq(true, choice.name ~= '', ('nom du choix %d n est pas vide'):format(i))
+        local fields = 0
+        for key in pairs(choice) do
+            if key ~= 'id' and key ~= 'name' then
+                error(('champ inattendu %s dans le choix %d'):format(tostring(key), i), 2)
+            end
+            fields = fields + 1
+        end
+        eq(2, fields, ('le choix %d ne contient que id et name'):format(i))
+    end
+end)
+
+check('4f. SetNextMap secours_2 puis /nextzone passe à la zone 3', function()
+    local h = newHarness(true)
+    h.resetRecords()
+
+    eq(true, h.exportsByName.SetNextMap('secours_2'), 'SetNextMap accepte secours_2')
+
+    h.resetRecords()
+    h.call('nextzone', 5)
+
+    expectList(h.noticesMessages(), { 'Zone : Aérodrome Sandy Shores' },
+        'message de zone exact après secours_2')
+    eq(false, hasMessage(h.noticesMessages(), 'Utilise /endmatch'), 'aucune erreur de phase')
+end)
+
+check('4g. SetNextMap refuse un id inconnu et un id non chaîne', function()
+    local h = newHarness(true)
+    h.resetRecords()
+
+    eq(false, h.exportsByName.SetNextMap('inconnu'), 'id inconnu')
+    eq(false, h.exportsByName.SetNextMap(42), 'id non chaîne')
+
+    -- La rotation reste intacte : depuis la zone 1 initiale, /nextzone donne la zone 2.
+    h.resetRecords()
+    h.call('nextzone', 5)
+
+    expectList(h.noticesMessages(), { 'Zone : Grove Street' },
+        'message de zone exact : la carte n a pas changé')
 end)
 
 print(('%d passed, %d failed'):format(passed, failed))
