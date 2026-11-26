@@ -14,6 +14,8 @@ import importlib.util
 import io
 import json
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -257,6 +259,43 @@ class RconDansLeConteneur(unittest.TestCase):
         # Aucun rcon_password en dehors de ce bloc.
         hors_bloc = texte.replace(bloc.group(0), "")
         self.assertNotIn('rcon_password \\"', hors_bloc)
+
+    def executer_bloc_rcon(self, txadmin: str, dev_rcon: str) -> Path:
+        """Exécute le vrai bloc rcon de l'entrypoint dans un dossier temporaire."""
+        bash = shutil.which("bash")
+        if bash is None:
+            self.skipTest("bash absent")
+        texte = (RACINE / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
+        bloc = re.search(r'\nRCON_FICHIER=.*?\nfi\n', texte, re.DOTALL)
+        self.assertIsNotNone(bloc, "bloc rcon introuvable dans l'entrypoint")
+        dossier = Path(tempfile.mkdtemp(prefix="gf-entrypoint-"))
+        (dossier / "secrets.cfg").write_text('sv_maxclients 48\n', encoding="utf-8")
+        # Mot de passe d'un démarrage précédent : il doit disparaître.
+        (dossier / "cache").mkdir()
+        (dossier / "cache" / "rcon_password").write_text("ancien\n", encoding="utf-8")
+        # Chemins relatifs et variables dans le script : marche aussi avec le
+        # bash de WSL, qui n'hérite ni des chemins ni de l'environnement Windows.
+        script = f"set -e\nDATA=.\nTXADMIN={txadmin}\nGF_DEV_RCON={dev_rcon}\n" + bloc.group(0)
+        resultat = subprocess.run(
+            [bash, "-s"], input=script.replace("\r", ""), cwd=dossier,
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+        return dossier
+
+    def test_bloc_rcon_actif_en_dev_direct(self) -> None:
+        dossier = self.executer_bloc_rcon(txadmin="false", dev_rcon="true")
+        mot_de_passe = (dossier / "cache" / "rcon_password").read_text(encoding="utf-8").strip()
+        self.assertRegex(mot_de_passe, r"^[0-9a-f]{48}$")
+        secrets = (dossier / "secrets.cfg").read_text(encoding="utf-8")
+        self.assertIn(f'set rcon_password "{mot_de_passe}"', secrets)
+
+    def test_bloc_rcon_ferme_en_mode_txadmin_ou_hors_dev(self) -> None:
+        for txadmin, dev_rcon in (("true", "true"), ("false", "false"), ("false", "")):
+            with self.subTest(TXADMIN=txadmin, GF_DEV_RCON=dev_rcon):
+                dossier = self.executer_bloc_rcon(txadmin=txadmin, dev_rcon=dev_rcon)
+                self.assertFalse((dossier / "cache" / "rcon_password").exists())
+                self.assertNotIn("rcon_password", (dossier / "secrets.cfg").read_text(encoding="utf-8"))
 
     def test_seule_la_surcouche_dev_active_rcon(self) -> None:
         self.assertIn(
