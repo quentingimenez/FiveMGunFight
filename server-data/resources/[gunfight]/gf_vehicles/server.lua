@@ -1,14 +1,17 @@
 -- =============================================================================
 --  gf_vehicles - SERVEUR
---  Custom des véhicules de mode (pour l'instant une seule, réglée par un admin).
---  La custom est partagée à tous via GlobalState.gf_vehicle_custom ; gf_core
---  l'applique à chaque véhicule de mode qu'il crée.
+--  Véhicule de base des modes et custom de chaque véhicule (réglés par un admin).
+--  Partagés à tous via GlobalState.gf_vehicle_base et GlobalState.gf_vehicle_customs ;
+--  gf_core crée le véhicule de base et lui applique sa custom.
 -- =============================================================================
 
 local RES = GetCurrentResourceName()
 local core = exports.gf_core
 
-local Custom = { default = {} }
+local KNOWN = {}
+for _, v in ipairs(Config.Vehicles) do KNOWN[v.model] = true end
+
+local Data = { base = Config.DefaultModel, customs = {} }
 
 -- ---------------------------------------------------------------- Validation
 local function int(v, min, max)
@@ -62,7 +65,9 @@ end
 
 -- ---------------------------------------------------------------- Fichier
 local function publish()
-    GlobalState:set('gf_vehicle_custom', Custom.default, true) -- répliqué à tous les clients
+    -- répliqués à tous les clients
+    GlobalState:set('gf_vehicle_base', Data.base, true)
+    GlobalState:set('gf_vehicle_customs', Data.customs, true)
 end
 
 local function load()
@@ -70,7 +75,16 @@ local function load()
     if raw and raw ~= '' then
         local ok, data = pcall(json.decode, raw)
         if ok and type(data) == 'table' then
-            Custom.default = sanitize(data.default) or {}
+            if type(data.base) == 'string' and KNOWN[data.base] then Data.base = data.base end
+            if type(data.customs) == 'table' then
+                for model, p in pairs(data.customs) do
+                    if KNOWN[model] then Data.customs[model] = sanitize(p) end
+                end
+            end
+            -- Ancien format { default = ... } : custom du véhicule par défaut
+            if type(data.default) == 'table' and not Data.customs[Config.DefaultModel] then
+                Data.customs[Config.DefaultModel] = sanitize(data.default)
+            end
         else
             print(('^1[gf_vehicles] %s est illisible, custom par défaut utilisée^0'):format(Config.CustomFile))
         end
@@ -79,7 +93,7 @@ local function load()
 end
 
 local function save()
-    SaveResourceFile(RES, Config.CustomFile, json.encode(Custom), -1)
+    SaveResourceFile(RES, Config.CustomFile, json.encode(Data), -1)
 end
 
 load()
@@ -90,17 +104,20 @@ RegisterCommand('customveh', function(src)
     if not core:IsAdmin(src) then
         return core:Notify(src, 'Réservé aux administrateurs.')
     end
-    TriggerClientEvent('gf_vehicles:openMenu', src, Config.CustomModel, Custom.default)
+    TriggerClientEvent('gf_vehicles:openMenu', src, { base = Data.base, customs = Data.customs })
 end, false)
 
-RegisterNetEvent('gf_vehicles:saveCustom', function(props)
+-- Enregistrer : le véhicule affiché devient le véhicule de base, avec cette custom
+RegisterNetEvent('gf_vehicles:saveCustom', function(model, props)
     local src = source
     if not core:IsAdmin(src) then return end
+    if type(model) ~= 'string' or not KNOWN[model] then return end
     local clean = sanitize(props)
     if not clean then return end
-    Custom.default = clean
+    Data.base = model
+    Data.customs[model] = clean
     save()
     publish()
-    core:Notify(src, 'Custom enregistrée : elle s\'applique aux prochains véhicules.')
-    print(('[gf_vehicles] Custom du véhicule de base modifiée par %s'):format(GetPlayerName(src) or src))
+    core:Notify(src, 'Véhicule de base enregistré : il s\'applique aux prochains véhicules.')
+    print(('[gf_vehicles] Véhicule de base %s choisi (avec sa custom) par %s'):format(model, GetPlayerName(src) or src))
 end)

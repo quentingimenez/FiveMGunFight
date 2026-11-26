@@ -5,12 +5,19 @@
 --  - Menu /customveh (admin) : aperçu local du véhicule, caméra, réglages en direct.
 -- =============================================================================
 
--- Nom affiché du véhicule (au lieu de « NULL »)
-AddTextEntry('gstbisxl3', 'Bison XL Hellfire')
+-- Noms affichés des véhicules (au lieu de « NULL ») et modèle -> nom
+local MODEL_BY_HASH = {}
+for _, v in ipairs(Config.Vehicles) do
+    AddTextEntry(v.model, v.label)
+    MODEL_BY_HASH[joaat(v.model)] = v.model
+end
 
 -- ---------------------------------------------------------------- Application
 local function applyCustom(veh, p)
-    p = p or GlobalState.gf_vehicle_custom
+    if not p and veh and veh ~= 0 and DoesEntityExist(veh) then
+        local customs = GlobalState.gf_vehicle_customs or {}
+        p = customs[MODEL_BY_HASH[GetEntityModel(veh)] or '']
+    end
     if not veh or veh == 0 or not DoesEntityExist(veh) or type(p) ~= 'table' then return end
     SetVehicleModKit(veh, 0)
 
@@ -48,6 +55,8 @@ exports('ApplyCustom', applyCustom)
 local preview, cam, heading = nil, nil, 0.0
 local previewHash, previewPos = nil, nil
 local props = {}
+local menu = nil          -- { vehicles, base, customs } envoyé par le serveur
+local currentModel = nil  -- modèle affiché dans l'aperçu
 
 local function label(text, fallback)
     if not text or text == '' or text == 'NULL' then return fallback end
@@ -84,6 +93,9 @@ local function buildOptions()
         xenonColors = Config.XenonColors,
         gameColors = Config.GameColors,
         plateMax = Config.PlateMaxLength,
+        vehicles = Config.Vehicles,
+        model = currentModel,
+        base = menu and menu.base,
     }
 end
 
@@ -101,6 +113,7 @@ local function closeMenu()
     end
     preview = nil
     SetModelAsNoLongerNeeded(previewHash or 0)
+    previewHash, currentModel, menu = nil, nil, nil
     FreezeEntityPosition(PlayerPedId(), false)
 end
 
@@ -116,24 +129,43 @@ local function spawnPreview()
     return true
 end
 
-RegisterNetEvent('gf_vehicles:openMenu', function(model, current)
-    if preview then return end
+local function loadModel(model)
     local hash = joaat(model)
-    if not IsModelInCdimage(hash) then return print(('[gf_vehicles] Modèle inconnu : %s'):format(model)) end
+    if not IsModelInCdimage(hash) then
+        print(('[gf_vehicles] Modèle inconnu : %s'):format(model))
+        return nil
+    end
     RequestModel(hash)
     local timeout = GetGameTimer() + 10000
     while not HasModelLoaded(hash) and GetGameTimer() < timeout do Wait(0) end
-    if not HasModelLoaded(hash) then return end
+    return HasModelLoaded(hash) and hash or nil
+end
 
-    local ped = PlayerPedId()
-    local pos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 7.0, 0.0)
-    heading = GetEntityHeading(ped) + 140.0
-    previewHash, previewPos = hash, pos
-    if not spawnPreview() then return end
-    FreezeEntityPosition(ped, true)
-
-    props = type(current) == 'table' and current or {}
+-- Affiche un autre véhicule dans l'aperçu, avec sa custom enregistrée
+local function showModel(model)
+    local hash = loadModel(model)
+    if not hash then return false end
+    if preview and DoesEntityExist(preview) then
+        SetEntityAsMissionEntity(preview, true, true)
+        DeleteVehicle(preview)
+    end
+    if previewHash and previewHash ~= hash then SetModelAsNoLongerNeeded(previewHash) end
+    previewHash, currentModel = hash, model
+    if not spawnPreview() then return false end
+    local saved = menu and menu.customs and menu.customs[model]
+    props = type(saved) == 'table' and json.decode(json.encode(saved)) or {}
     applyCustom(preview, props)
+    return true
+end
+
+RegisterNetEvent('gf_vehicles:openMenu', function(data)
+    if preview or type(data) ~= 'table' then return end
+    menu = data
+    local ped = PlayerPedId()
+    previewPos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 7.0, 0.0)
+    heading = GetEntityHeading(ped) + 140.0
+    if not showModel(data.base or Config.DefaultModel) then return end
+    FreezeEntityPosition(ped, true)
 
     local vpos = GetEntityCoords(preview)
     cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
@@ -166,6 +198,13 @@ RegisterNUICallback('reset', function(_, cb)
     cb({ options = preview and buildOptions() or nil })
 end)
 
+-- Onglet Véhicule : changer de véhicule dans l'aperçu
+RegisterNUICallback('selectVehicle', function(data, cb)
+    if not preview or type(data) ~= 'table' or type(data.model) ~= 'string' then return cb({}) end
+    if not showModel(data.model) then return cb({}) end
+    cb({ options = buildOptions(), props = props })
+end)
+
 RegisterNUICallback('rotate', function(data, cb)
     if preview and type(data) == 'table' and type(data.delta) == 'number' then
         heading = (heading + data.delta) % 360.0
@@ -175,7 +214,7 @@ RegisterNUICallback('rotate', function(data, cb)
 end)
 
 RegisterNUICallback('save', function(_, cb)
-    TriggerServerEvent('gf_vehicles:saveCustom', props)
+    TriggerServerEvent('gf_vehicles:saveCustom', currentModel, props)
     closeMenu()
     cb({})
 end)

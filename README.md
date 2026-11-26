@@ -33,10 +33,11 @@ Deux modes de jeu :
 
 Les véhicules ne se percutent pas entre eux (pas de « pit »), seuls les piétons peuvent être renversés.
 
-Le véhicule de base (attaquants et point véhicule de la Redzone) est un **Bison XL Hellfire**
-(ressource `gf_vehicles`). Un admin peut le customiser avec **`/customveh`** (peinture, pièces,
-jantes, xénons, néons, vitres, plaque) : la custom enregistrée s'applique à tous les véhicules de mode
-suivants (fichier `gf_vehicles/custom/custom.json`).
+Le véhicule de base (attaquants et point véhicule de la Redzone) est au départ un **Bison XL
+Hellfire** (ressource `gf_vehicles`, qui contient aussi la **Jeep Trackhawk**). Un admin le choisit et le
+customise avec **`/customveh`** : onglet **Véhicule** (photo et nom de chaque véhicule du serveur), puis
+peinture, pièces, jantes, xénons, néons, vitres, plaque. **Enregistrer** fait du véhicule affiché le
+véhicule de base de tous les joueurs, avec sa custom (fichier `gf_vehicles/custom/custom.json`).
 
 Sur tous les modes : en bas au centre, un gros chiffre de **vie** (« + VIE », barre blanche en
 segments) et de **kevlar** (bouclier, barre bleue) ; sous 25, la vie passe en rouge. En bas à
@@ -242,7 +243,7 @@ server-data/
     gf_redzone  mode Redzone
     gf_maps     éditeur de maps en jeu (/editor) + sauvegarde data/maps.json
     gf_ui       interface : HUD, kill feed, dégâts, multi-kills, sons, classement
-    gf_vehicles véhicules ajoutés (stream/, data/*.meta, son) : Bison XL Hellfire « gstbisxl3 »
+    gf_vehicles véhicules du serveur (stream/, data/<modèle>/*.meta, son) : Bison XL « gstbisxl3 », Trackhawk « keyhawk »
     gf_stats    statistiques persistantes (MariaDB via oxmysql)
 ```
 

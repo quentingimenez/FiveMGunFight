@@ -118,7 +118,48 @@ function setMod(type, id) {
     change();
 }
 
+// Silhouette affichée tant que html/img/vehicles/<modèle>.png n'existe pas
+const CAR_SVG = 'M3 13l2-5c.5-1.2 1.6-2 2.9-2h8.2c1.3 0 2.4.8 2.9 2l2 5h1a2 2 0 0 1 2 2v3h-2a3 3 0 0 1-6 0H10a3 3 0 0 1-6 0H2v-3a2 2 0 0 1 1-2zm4-1h12l-1.4-3.4c-.2-.4-.6-.6-1-.6H9.4c-.4 0-.8.2-1 .6z';
+function vehiclePhoto(model) {
+    const box = el('div', 'photo');
+    const img = new Image();
+    img.onerror = () => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 26 22');
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', CAR_SVG);
+        svg.appendChild(p);
+        box.replaceChildren(svg);
+    };
+    img.src = `img/vehicles/${encodeURIComponent(model)}.png`;
+    box.appendChild(img);
+    return box;
+}
+
+function selectVehicle(model) {
+    if (model === options.model) return;
+    post('selectVehicle', { model }).then(res => {
+        if (!res || !res.options) return;
+        options = res.options;
+        props = res.props && typeof res.props === 'object' && !Array.isArray(res.props) ? res.props : {};
+        if (Array.isArray(props.mods)) props.mods = {};
+        render();
+    });
+}
+
 function render() {
+    const vehicle = $('section[data-tab=vehicle]');
+    const grid = el('div', 'vehicles');
+    (options.vehicles || []).forEach(v => {
+        const card = el('div', 'vcard' + (v.model === options.model ? ' on' : ''));
+        card.appendChild(vehiclePhoto(v.model));
+        card.appendChild(el('div', 'name', v.label));
+        if (v.model === options.base) card.appendChild(el('span', 'badge', 'ACTUEL'));
+        card.onclick = () => selectVehicle(v.model);
+        grid.appendChild(card);
+    });
+    vehicle.replaceChildren(grid);
+
     const paint = $('section[data-tab=paint]');
     paint.replaceChildren(
         field('Type de peinture', stepper(listOf(options.paintTypes, true), props.paintType, v => set('paintType', v))),
