@@ -10,6 +10,7 @@ décrivent le fonctionnement interne et l'exploitation.
 |---|---|
 | [`architecture.md`](architecture.md) | tu veux comprendre comment le serveur est assemblé (Docker, ressources, données) |
 | [`lobby.md`](lobby.md) | tu travailles sur le lobby, l'escouade ou la création de personnage |
+| [`menu-pause.md`](menu-pause.md) | tu travailles sur le menu pause (Échap), sa page NUI ou son protocole |
 | [`must-have.md`](must-have.md) | tu veux connaître les fonctionnalités prévues et l'ordre dans lequel les construire |
 | [`regles-de-code.md`](regles-de-code.md) | tu écris ou relis du code : les règles à respecter (autorité du serveur, performance, données, tests et preuve) |
 | [`chantiers-techniques.md`](chantiers-techniques.md) | tu cherches ce qui doit être revu, corrigé ou ajouté pour que le code existant respecte ces règles |

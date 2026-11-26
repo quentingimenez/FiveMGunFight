@@ -173,6 +173,8 @@ modifiées, démarrées avant nos ressources.
 | `gf_maps` | éditeur de maps en jeu (`/editor`), liste (`/maps`), stockage `data/maps.json` | `html/`, `server.lua`, `client.lua` |
 | `gf_attack` | mode Attaque de zone : deux équipes, manches en 3 phases (choix des armes, placement, combat), voitures, spectateur sur les alliés | `config.lua`, `server.lua`, `client.lua` |
 | `gf_redzone` | mode Redzone : zone libre, prise de véhicule, podium | `config.lua`, `server.lua`, `client.lua` |
+| `gf_stats` | statistiques persistantes (MariaDB via `oxmysql`), export `GetPlayerStats` | `server.lua` |
+| `gf_menu` | menu pause NUI (Échap) remplaçant le frontend natif : profil, règlement, chat, Discord, déconnexion | `html/` (page `ui_page`), `config.lua`, `menu_state.lua`, `server.lua`, `client.lua` ; dépend de `gf_core` et `gf_stats` |
 
 Chaque ressource déclare ses scripts dans `fxmanifest.lua`
 (`fx_version 'cerulean'`, `game 'gta5'`, `lua54 'yes'`). Les tests vérifient que
@@ -183,8 +185,15 @@ Ordre de démarrage imposé par `server.cfg` (les dépendances vont dans ce sens
 
 ```text
 chat · mapmanager · spawnmanager · baseevents
-gf_ui · gf_core · gf_maps · gf_attack · gf_redzone
+gf_ui · gf_core · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu
 ```
+
+Les interfaces NUI sont portées par `gf_ui` (HUD, classement, choix des armes)
+et par `gf_menu`. Ce dernier remplace le menu pause natif : son `client.lua`
+bloque le frontend à chaque frame, ouvre `html/index.html` avec Échap et reçoit
+l'état construit côté serveur à partir de `gf_stats`. Les trois callbacks
+(`ready`, `close`, `quit`) répondent une seule fois à la page ; le protocole est
+détaillé dans [`menu-pause.md`](menu-pause.md).
 
 `sessionmanager` et `hardcap` n'existent plus dans les artefacts FXServer
 récents : ne pas les remettre dans `server.cfg`.

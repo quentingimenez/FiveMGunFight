@@ -28,6 +28,7 @@ globals = {
   "GFLobbyAppearance",
   "GFLobbyAppearanceSchema",
   "GFLobbyBackdrop",
+  "GFMenuState",
   "RateLimit",
   "Validation",
 }
