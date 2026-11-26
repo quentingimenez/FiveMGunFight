@@ -400,7 +400,9 @@ executer = function(effets)
             -- L'état a déjà été muté par les règles : on diffuse la zone complète.
             sendZoneAll()
         elseif e.type == 'equipe' then
-            Player(e.src).state:set('gf_team', e.equipe, true)
+            -- L'équipe est tenue par gf_core : on passe par l'export, qui pose
+            -- la table serveur avant d'écrire le state bag.
+            core:SetTeam(e.src, e.equipe)
         elseif e.type == 'vivant' then
             if GetPlayerName(e.src) then
                 Player(e.src).state:set('gf_alive', e.vivant and true or false, true)
@@ -495,7 +497,7 @@ executer = function(effets)
             clearItems(e.src)
             TriggerClientEvent('gf_ui:match_results', e.src, nil)
             if GetPlayerName(e.src) then
-                Player(e.src).state:set('gf_team', nil, true)
+                core:SetTeam(e.src, nil)
                 Player(e.src).state:set('gf_alive', nil, true)
                 TriggerClientEvent('gf_ui:loadout_close', e.src)
                 TriggerClientEvent('gf_attack:clear', e.src)
@@ -511,7 +513,7 @@ executer = function(effets)
             TriggerClientEvent('gf_ui:match_results', e.src, nil)
         elseif e.type == 'nettoyerJoueur' then
             if GetPlayerName(e.src) then
-                Player(e.src).state:set('gf_team', nil, true)
+                core:SetTeam(e.src, nil)
                 Player(e.src).state:set('gf_alive', nil, true)
                 TriggerClientEvent('gf_ui:loadout_close', e.src)
                 TriggerClientEvent('gf_attack:clear', e.src)
@@ -601,7 +603,7 @@ AddEventHandler('onResourceStart', function(res)
     if res ~= GetCurrentResourceName() then return end
     for _, id in ipairs(GetPlayers()) do
         local src = tonumber(id)
-        if Player(src).state.gf_mode == 'attack' then core:SetMode(src, 'lobby') end
+        if core:GetMode(src) == 'attack' then core:SetMode(src, 'lobby') end
     end
 end)
 

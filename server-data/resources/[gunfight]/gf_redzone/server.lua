@@ -316,7 +316,7 @@ AddEventHandler('onResourceStart', function(res)
     if res ~= GetCurrentResourceName() then return end
     for _, id in ipairs(GetPlayers()) do
         local src = tonumber(id)
-        if Player(src).state.gf_mode == 'redzone' then core:SetMode(src, 'lobby') end
+        if core:GetMode(src) == 'redzone' then core:SetMode(src, 'lobby') end
     end
 end)
 

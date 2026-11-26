@@ -43,6 +43,12 @@ Config.ReadyRateLimit = { max = 1, window = 5000 }
 -- pour qu'un client qui insiste ne remplisse pas la console.
 Config.RefusLogRateLimit = { max = 1, window = 60000 }
 
+-- Garde des state bags : intervalle minimal entre deux signalements d'anomalie
+-- pour un même joueur et une même clé (millisecondes). Valeur choisie, non
+-- mesurée : elle limite seulement le volume du journal ; le rétablissement de
+-- la valeur serveur reste immédiat à chaque écriture.
+Config.StateGuard = { reportIntervalMs = 5000 }
+
 -- Créditation des kills : fenêtre (secondes) pendant laquelle le dernier dégât
 -- autorisé vu par weaponDamageEvent désigne le tueur. Au-delà, aucun kill
 -- n'est crédité (le client ne peut pas fournir lui-même un tueur).
