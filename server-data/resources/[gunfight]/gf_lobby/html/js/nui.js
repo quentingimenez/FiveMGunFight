@@ -32,5 +32,26 @@
       });
   }
 
-  window.NUI = Object.freeze({ post: post, resource: resource });
+  // Player-facing text for the codes returned by post() and the Lua callbacks.
+  var ERROR_TEXT = {
+    callback_unreachable: 'Le jeu ne répond pas. Réessaie.',
+    fetch_unavailable: 'Interface indisponible. Relance le jeu.',
+    nui_missing: 'Interface indisponible. Relance le jeu.',
+    internal_error: 'Erreur interne. Réessaie.',
+    invalid_payload: 'Demande invalide.',
+    invalid_character: 'Apparence invalide.',
+    invalid_name: 'Nom invalide.',
+  };
+  var CODE_SHAPE = /^[a-z][a-z0-9_]*$/;
+
+  // Never shows a raw code: a known code gets its message, an unknown one the
+  // caller's fallback. A sentence already written for the player is kept.
+  function errorText(error, fallback) {
+    if (typeof error !== 'string' || error === '') return fallback;
+    if (Object.prototype.hasOwnProperty.call(ERROR_TEXT, error)) return ERROR_TEXT[error];
+    if (CODE_SHAPE.test(error)) return fallback;
+    return error;
+  }
+
+  window.NUI = Object.freeze({ post: post, resource: resource, errorText: errorText });
 })();
