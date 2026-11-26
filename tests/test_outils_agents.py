@@ -14,13 +14,15 @@ import importlib.util
 import io
 import json
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+
+from outils import bash as bash_utilisable
+from outils import exiger
 
 RACINE = Path(__file__).resolve().parents[1]
 
@@ -262,9 +264,8 @@ class RconDansLeConteneur(unittest.TestCase):
 
     def executer_bloc_rcon(self, txadmin: str, dev_rcon: str) -> Path:
         """Exécute le vrai bloc rcon de l'entrypoint dans un dossier temporaire."""
-        bash = shutil.which("bash")
-        if bash is None:
-            self.skipTest("bash absent")
+        bash = bash_utilisable()
+        exiger(self, "bash", bash)
         texte = (RACINE / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
         bloc = re.search(r'\nRCON_FICHIER=.*?\nfi\n', texte, re.DOTALL)
         self.assertIsNotNone(bloc, "bloc rcon introuvable dans l'entrypoint")

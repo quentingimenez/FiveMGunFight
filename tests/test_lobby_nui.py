@@ -15,6 +15,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from outils import exiger
+
 ROOT = Path(__file__).resolve().parents[1]
 LOBBY_JS = ROOT / "server-data" / "resources" / "[gunfight]" / "gf_lobby" / "html" / "js"
 
@@ -35,8 +37,7 @@ def run(command: list[str]) -> subprocess.CompletedProcess[str]:
 class LuaUnitTests(unittest.TestCase):
     def test_lua_suites_pass(self) -> None:
         lua = shutil.which("lua5.4") or shutil.which("lua")
-        if lua is None:
-            self.skipTest("lua absent (install Lua 5.4; CI provides it)")
+        exiger(self, "lua", lua)
         suites = sorted((ROOT / "tests" / "lua").glob("*.lua"))
         self.assertTrue(suites, "no Lua suite found")
         for suite in suites:
@@ -48,8 +49,7 @@ class LuaUnitTests(unittest.TestCase):
 class JsUnitTests(unittest.TestCase):
     def test_node_suites_pass(self) -> None:
         node = shutil.which("node")
-        if node is None:
-            self.skipTest("node absent (CI provides it)")
+        exiger(self, "node", node)
         suites = sorted((ROOT / "tests" / "js").glob("*.test.js"))
         self.assertTrue(suites, "no Node suite found")
         result = run([node, "--test", *(str(s.relative_to(ROOT)) for s in suites)])

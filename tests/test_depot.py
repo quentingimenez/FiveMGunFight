@@ -828,23 +828,85 @@ class ChaineCI(unittest.TestCase):
         for bloc in blocs:
             self.assertNotIn("${{", bloc, "expression GitHub interpolée dans un script")
 
-    def test_qualite_execute_les_nouveaux_controles(self) -> None:
+    def test_qualite_lance_la_commande_unique(self) -> None:
         texte = lire(self.WORKFLOWS / "qualite.yml")
-        attendus = (
-            "name: Qualité du dépôt",
-            "luacheck server-data/resources",
-            "run: actionlint",
-            "run: hadolint --config .hadolint.yaml Dockerfile",
-            "run: gitleaks dir",
-            "run: ruff check tests/",
-            "run: bash scripts/verifier.sh",
-            "fetch-depth: 0",
-            "run: gitleaks git",
+        bloc = bloc_service(texte, "qualite")
+        if bloc is None:
+            self.fail("job qualite absent de qualite.yml")
+        self.assertIn("name: Qualité du dépôt", bloc)
+        self.assertIn("run: bash scripts/verifier-docker.sh", bloc)
+        self.assertIn("timeout-minutes: 20", bloc)
+        self.assertNotIn(
+            "apt-get install",
+            bloc,
+            "le job qualite ne doit plus installer d'outils sur le runner",
         )
-        for attendu in attendus:
-            with self.subTest(controle=attendu):
-                self.assertIn(attendu, texte)
+        self.assertNotIn(
+            "setup-node",
+            bloc,
+            "Node doit venir de l'image de vérification, pas du runner",
+        )
+        # Le job séparé garde tout l'historique pour gitleaks git.
         self.assertIn("  securite:", texte, "job securite séparé absent")
+        self.assertIn("fetch-depth: 0", texte)
+        self.assertIn("run: gitleaks git", texte)
+
+    def test_image_de_verification_est_epinglee(self) -> None:
+        chemin = RACINE / "docker" / "verifier" / "Dockerfile"
+        self.assertTrue(chemin.is_file(), "docker/verifier/Dockerfile manquant")
+        texte = lire(chemin)
+        self.assertRegex(
+            texte,
+            r"(?m)^FROM\s+ubuntu:24\.04@sha256:[0-9a-f]{64}\s*$",
+            "l'image de vérification doit être épinglée par digest",
+        )
+        for outil in (
+            "actionlint",
+            "hadolint",
+            "gitleaks",
+            "ruff",
+            "node",
+            "docker",
+            "docker-compose",
+        ):
+            with self.subTest(outil=outil):
+                self.assertIn(outil, texte)
+        self.assertGreaterEqual(
+            texte.count("| sha256sum -c -"),
+            7,
+            "chacun des 7 binaires doit être vérifié par son empreinte SHA256",
+        )
+        for paquet in ("luacheck", "shellcheck", "lua5.4"):
+            with self.subTest(paquet=paquet):
+                self.assertIn(paquet, texte)
+
+    def test_gitleaks_est_aligne_entre_ci_et_image(self) -> None:
+        workflow = lire(self.WORKFLOWS / "qualite.yml")
+        image = lire(RACINE / "docker" / "verifier" / "Dockerfile")
+        version_ci = re.search(r'GITLEAKS_VERSION:\s*"([^"]+)"', workflow)
+        sha_ci = re.search(r'GITLEAKS_SHA256:\s*"([^"]+)"', workflow)
+        version_image = re.search(r"ARG GITLEAKS_VERSION=(\S+)", image)
+        sha_image = re.search(r"ARG GITLEAKS_SHA256=(\S+)", image)
+        for nom, trouve in (
+            ("version gitleaks CI", version_ci),
+            ("SHA256 gitleaks CI", sha_ci),
+            ("version gitleaks image", version_image),
+            ("SHA256 gitleaks image", sha_image),
+        ):
+            if trouve is None:
+                self.fail(f"{nom} illisible")
+        self.assertEqual(version_ci.group(1), version_image.group(1))
+        self.assertEqual(sha_ci.group(1), sha_image.group(1))
+
+    def test_verifier_sh_est_strict(self) -> None:
+        texte = lire(RACINE / "scripts" / "verifier.sh")
+        self.assertNotIn('ignore "', texte, "plus aucun outil ne doit être ignoré")
+        self.assertIn("GF_OUTILS_OBLIGATOIRES=1", texte)
+        self.assertIn("unittest discover", texte)
+
+    def test_dependabot_suit_l_image_de_verification(self) -> None:
+        texte = lire(self.DEPENDABOT)
+        self.assertIn('directory: "/docker/verifier"', texte)
 
     def test_fxserver_version_est_epingle(self) -> None:
         chemin = RACINE / ".fxserver-version"
