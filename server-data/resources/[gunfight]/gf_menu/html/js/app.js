@@ -293,6 +293,10 @@
       menu.classList.add('hidden');
       menu.setAttribute('aria-hidden', 'true');
     }
+    var veil = $('veil');
+    if (veil) {
+      veil.classList.add('hidden');
+    }
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
     }
@@ -306,6 +310,10 @@
     if (menu) {
       menu.classList.remove('hidden');
       menu.setAttribute('aria-hidden', 'false');
+    }
+    var veil = $('veil');
+    if (veil) {
+      veil.classList.remove('hidden');
     }
     renderProfile();
     renderStatus();
