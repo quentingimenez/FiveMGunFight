@@ -79,7 +79,7 @@ hadolint, gitleaks, ruff, Docker CLI et Compose).
 | Scripts shell | `sh -n` / `bash -n` + `shellcheck -S error` | `entrypoint.sh` cassé : le conteneur ne démarre plus du tout |
 | Workflows | `actionlint` | expression `${{ }}` invalide, dépendance de job incohérente, `runs-on` inconnu |
 | Dockerfiles | `hadolint` (`.hadolint.yaml`) | mauvaise pratique Docker, instruction qui casse le build ; vérifie le `Dockerfile` racine et `docker/verifier/Dockerfile`. Les ignores DL3008/DL4006 sont justifiés dans la configuration |
-| Secrets | `gitleaks dir` (`.gitleaks.toml`) | clé ou jeton accidentellement présent dans l'arbre de travail |
+| Secrets | `gitleaks dir` (`.gitleaks.toml`) sur une copie des fichiers vus par Git (`scripts/arbre-suivi.sh`) | clé ou jeton accidentellement présent dans un fichier suivi ou non ignoré. `.env`, `secrets/` et les autres fichiers ignorés ne sont jamais lus : ils sont protégés par `.gitignore` et par la classe `DepotGit` |
 | Style Python | `ruff check --extend-ignore EXE002 tests/` | import inutilisé, nom non défini, erreur évidente dans les tests. EXE002 est ignoré : un dossier Windows monté sous Docker Desktop est vu en 0777 |
 | Tests du dépôt | `python -m unittest discover -s tests -v` | manifestes, configuration, maps, documentation, Compose, chaîne CI ; `GF_OUTILS_OBLIGATOIRES=1` fait échouer un test sauté faute d'outil |
 | Compose | `docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q` et idem avec `docker-compose.prod.yml` | YAML invalide, référence de volume inexistante, variable mal écrite, surcouche qui ne se combine plus au socle |
@@ -137,7 +137,10 @@ versions) :
 luacheck server-data/resources
 actionlint
 hadolint Dockerfile docker/verifier/Dockerfile
-gitleaks dir --no-banner --redact --config .gitleaks.toml .
+dossier="$(mktemp -d)"
+bash scripts/arbre-suivi.sh "$dossier" &&
+  gitleaks dir --no-banner --redact --config .gitleaks.toml "$dossier"
+rm -rf -- "$dossier"
 ruff check --extend-ignore EXE002 tests/
 docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
 IMAGE_REF=exemple.invalid/gunfight:test \
