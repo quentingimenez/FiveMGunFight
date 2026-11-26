@@ -150,6 +150,14 @@ local function selectSlot(i)
     SetCurrentPedWeapon(ped, hash, true)
 end
 
+-- Liste pour le studio photo (gf_thumbs, famille « weapons ») : une photo par arme du catalogue
+exports('GetWeaponThumbList', function()
+    local list = {}
+    for _, w in pairs(Config.Weapons) do list[#list + 1] = { id = w.name, label = w.label } end
+    table.sort(list, function(x, y) return x.id < y.id end)
+    return list
+end)
+
 for i = 1, Config.WeaponSlots do
     RegisterCommand('+gf_slot' .. i, function() selectSlot(i) end, false)
     RegisterCommand('-gf_slot' .. i, function() end, false)

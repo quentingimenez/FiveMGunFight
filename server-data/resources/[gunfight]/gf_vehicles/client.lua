@@ -51,12 +51,29 @@ local function applyCustom(veh, p)
 end
 exports('ApplyCustom', applyCustom)
 
+-- Liste pour le studio photo (gf_thumbs, famille « vehicles »)
+exports('GetThumbList', function()
+    local list = {}
+    for _, v in ipairs(Config.Vehicles) do list[#list + 1] = { id = v.model, label = v.label } end
+    return list
+end)
+
+-- Photos des véhicules (data URL), générées en jeu par /thumbs vehicles
+local function vehicleThumbs()
+    if GetResourceState('gf_thumbs') ~= 'started' then return {} end
+    local ids = {}
+    for _, v in ipairs(Config.Vehicles) do ids[#ids + 1] = v.model end
+    local ok, res = pcall(function() return exports.gf_thumbs:Get('vehicles', ids) end)
+    return ok and res or {}
+end
+
 -- ---------------------------------------------------------------- Menu admin
 local preview, cam, heading = nil, nil, 0.0
 local previewHash, previewPos = nil, nil
 local props = {}
 local menu = nil          -- { vehicles, base, customs } envoyé par le serveur
 local currentModel = nil  -- modèle affiché dans l'aperçu
+local thumbs = {}         -- [modèle] = data URL de la photo
 
 local function label(text, fallback)
     if not text or text == '' or text == 'NULL' then return fallback end
@@ -93,7 +110,13 @@ local function buildOptions()
         xenonColors = Config.XenonColors,
         gameColors = Config.GameColors,
         plateMax = Config.PlateMaxLength,
-        vehicles = Config.Vehicles,
+        vehicles = (function()
+            local list = {}
+            for _, v in ipairs(Config.Vehicles) do
+                list[#list + 1] = { model = v.model, label = v.label, thumb = thumbs[v.model] }
+            end
+            return list
+        end)(),
         model = currentModel,
         base = menu and menu.base,
     }
@@ -161,6 +184,7 @@ end
 RegisterNetEvent('gf_vehicles:openMenu', function(data)
     if preview or type(data) ~= 'table' then return end
     menu = data
+    thumbs = vehicleThumbs()
     local ped = PlayerPedId()
     previewPos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 7.0, 0.0)
     heading = GetEntityHeading(ped) + 140.0
