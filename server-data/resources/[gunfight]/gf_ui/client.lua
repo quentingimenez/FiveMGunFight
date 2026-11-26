@@ -6,6 +6,7 @@
 --    gf_ui:hud        (data | nil)   { title, subtitle, timer, badge{text,color},
 --                                      left{label,value,sub,color}, right{...} }
 --    gf_ui:announce   (data)         { title, subtitle, duration }
+--    gf_ui:notify     (data)         { text, level, title, duration }
 --    gf_ui:killfeed   (entry)        { killer, killerTeam, victim, victimTeam, weapon }
 --    gf_ui:scoreboard (data | nil)   { title, columns{}, rows{ {cells{}, color} } }
 -- =============================================================================
@@ -36,6 +37,30 @@ end)
 
 RegisterNetEvent('gf_ui:announce', function(d)
     SendNUIMessage({ type = 'announce', data = d })
+end)
+
+-- Notifications (toasts en haut à gauche, hors HUD / killfeed / minimap)
+RegisterNetEvent('gf_ui:notify', function(d)
+    if type(d) ~= 'table' or type(d.text) ~= 'string' or d.text == '' then return end
+
+    local text = d.text
+    if #text > 300 then text = text:sub(1, 300) end
+
+    local level = d.level
+    if level ~= 'info' and level ~= 'success' and level ~= 'error' then level = 'info' end
+
+    local title = type(d.title) == 'string' and d.title or 'GUNFIGHT'
+    if #title > 40 then title = title:sub(1, 40) end
+
+    local duration = type(d.duration) == 'number' and d.duration or 5000
+    if duration < 1500 then duration = 1500 elseif duration > 15000 then duration = 15000 end
+
+    SendNUIMessage({ type = 'notify', data = {
+        text = text,
+        level = level,
+        title = title,
+        duration = duration,
+    } })
 end)
 
 -- Touché : chiffre de dégâts + marqueur + son

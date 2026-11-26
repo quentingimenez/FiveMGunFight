@@ -168,12 +168,6 @@
     stage.replaceChildren(weaponPanel(kind, data, photos));
   }
 
-  function chatPanel() {
-    var panel = basePanel('SERVEUR', 'CHAT');
-    addText(panel, "Le chat s'ouvre avec T en jeu. Appuie sur T pour écrire un message à tous les joueurs connectés.");
-    return panel;
-  }
-
   function rulesPanel() {
     var panel = basePanel('SERVEUR', 'RÈGLEMENT');
     var rules = state && Array.isArray(state.rules) ? state.rules : [];
@@ -336,7 +330,6 @@
       send('locker', {});
     }
     else if (SOON_KEYS[key]) panel = soonPanel(label);
-    else if (key === 'chat') panel = chatPanel();
     else if (key === 'rules') panel = rulesPanel();
     else if (key === 'discord') panel = discordPanel();
     else if (key === 'quit') panel = quitPanel();

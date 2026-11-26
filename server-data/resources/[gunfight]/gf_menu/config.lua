@@ -40,7 +40,6 @@ Config.Features = {
     battlepass = false,
     contributor = false,
     gameSettings = false,
-    chat = true,
 }
 
 -- Règles générales affichées dans le menu. Aucune sanction chiffrée : le

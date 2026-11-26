@@ -277,11 +277,11 @@ local function newHarness(admin)
         return true
     end
 
-    function h.chatMessages(src)
+    function h.notifyMessages(src)
         local list = {}
         for _, c in ipairs(h.clients) do
-            if c.name == 'chat:addMessage' and c.target == src then
-                list[#list + 1] = c.data and c.data.args and c.data.args[2] or nil
+            if c.name == 'gf_ui:notify' and c.target == src then
+                list[#list + 1] = c.data and c.data.text
             end
         end
         return list
@@ -313,7 +313,7 @@ local COMMANDES = {
     { name = 'setteam',    canal = 'notify' },
     { name = 'endgame',    canal = 'notify' },
     { name = 'nextmap',    canal = 'notify' },
-    { name = 'setmode',    canal = 'chat' },
+    { name = 'setmode',    canal = 'client' },
 }
 
 for _, commande in ipairs(COMMANDES) do
@@ -328,10 +328,10 @@ for _, commande in ipairs(COMMANDES) do
             eq(true, h.noticesFrom(5), 'Notify destiné au joueur 5')
             expectList(h.noticesMessages(), { ADMIN_REQUIS }, 'message ADMIN_REQUIS')
             expectList(h.clientNames(), {}, 'aucun TriggerClientEvent')
-        else
+        elseif commande.canal == 'client' then
             expectList(h.noticesMessages(), {}, 'aucun Notify pour setmode')
-            expectList(h.clientNames(), { 'chat:addMessage' }, 'un seul chat:addMessage')
-            expectList(h.chatMessages(5), { ADMIN_REQUIS }, 'message ADMIN_REQUIS exact')
+            expectList(h.clientNames(), { 'gf_ui:notify' }, 'une seule notification')
+            expectList(h.notifyMessages(5), { ADMIN_REQUIS }, 'message ADMIN_REQUIS exact')
         end
         expectList(h.eventNames(), {}, 'aucun TriggerEvent')
         expectList(h.logs, {}, 'aucun print')
@@ -355,9 +355,9 @@ for _, commande in ipairs(COMMANDES) do
                 error('message ADMIN_REQUIS envoyé à un admin', 2)
             end
         end
-        for _, msg in ipairs(h.chatMessages(5)) do
+        for _, msg in ipairs(h.notifyMessages(5)) do
             if msg == ADMIN_REQUIS then
-                error('chat ADMIN_REQUIS envoyé à un admin', 2)
+                error('notification ADMIN_REQUIS envoyée à un admin', 2)
             end
         end
     end)
@@ -373,9 +373,9 @@ check('3a. /whoami non-admin : identifiants sans ip puis aide', function()
     h.call('whoami', 5)
 
     expectList(h.clientNames(), {
-        'chat:addMessage', 'chat:addMessage', 'chat:addMessage',
+        'gf_ui:notify', 'gf_ui:notify', 'gf_ui:notify',
     }, 'trois messages')
-    expectList(h.chatMessages(5), {
+    expectList(h.notifyMessages(5), {
         'Administrateur : non', IDENTIFIANTS, AIDE_ADMIN,
     }, 'contenu exact des messages')
     expectList(h.noticesMessages(), {}, 'aucun Notify')
@@ -388,11 +388,11 @@ check('3b. /whoami admin : pas de message d aide', function()
     h.resetRecords()
     h.call('whoami', 5)
 
-    expectList(h.clientNames(), { 'chat:addMessage', 'chat:addMessage' }, 'deux messages')
-    expectList(h.chatMessages(5), {
+    expectList(h.clientNames(), { 'gf_ui:notify', 'gf_ui:notify' }, 'deux messages')
+    expectList(h.notifyMessages(5), {
         'Administrateur : oui', IDENTIFIANTS,
     }, 'contenu exact des messages')
-    for _, msg in ipairs(h.chatMessages(5)) do
+    for _, msg in ipairs(h.notifyMessages(5)) do
         if msg == AIDE_ADMIN then error('aide envoyée à un admin', 2) end
     end
     expectList(h.noticesMessages(), {}, 'aucun Notify')

@@ -6,7 +6,7 @@ Remplacer le menu pause natif de GTA V (touche Échap, `INPUT_FRONTEND_PAUSE`)
 par une page NUI propre au serveur. Le frontend natif est bloqué à chaque frame
 par `DisableFrontendThisFrame()` ; la touche 200 est neutralisée puis capturée
 par la ressource. Le joueur garde un seul point d'entrée pour reprendre la
-partie, consulter son profil, lire le règlement, ouvrir le chat, rejoindre
+partie, consulter son profil, lire le règlement, rejoindre
 Discord et quitter le serveur.
 
 ## Écran
@@ -15,7 +15,7 @@ La page `html/index.html` se décompose en quatre zones :
 
 - un rail de navigation à gauche, organisé en groupes **PARTIE** (REPRENDRE),
   **ÉQUIPEMENT** (CASIER, CROSSHAIR, BOUTIQUE, CAISSES, PASS DE COMBAT,
-  CONTRIBUTEUR — tous marqués « BIENTÔT ») et **SERVEUR** (CHAT, RÉGLEMENT,
+  CONTRIBUTEUR — tous marqués « BIENTÔT ») et **SERVEUR** (RÉGLEMENT,
   DISCORD, PARAMÈTRES DU JEU « BIENTÔT », QUITTER LE SERVEUR) ;
 - une carte de profil à droite : pseudo, ID, K/D, victoires, parties, durée de
   session, date d'adhésion (« membre depuis ») et libellé du mode ;
@@ -101,8 +101,6 @@ L'ordre de démarrage est décrit dans [l'architecture](architecture.md) :
 - Le menu est indisponible quand l'interface du lobby est ouverte.
 - Il n'y a pas de carte : le serveur n'utilise pas les minimaps interactives
   natives, et la page n'en affiche aucune.
-- Le chat de la page est un panneau d'information ; il ne remplace pas encore
-  le chat natif du jeu.
 - `Config.DiscordUrl` est vide par défaut : renseigne l'invitation Discord dans
   `gf_menu/config.lua` (côté serveur) pour que le panneau Discord affiche un
   lien cliquable. Aucune URL n'est codée en dur dans la page.
@@ -119,7 +117,7 @@ L'ordre de démarrage est décrit dans [l'architecture](architecture.md) :
    ne dépend d'aucun service externe.
 3. Contrôle du dépôt : `bash scripts/verifier-docker.sh`.
 4. En jeu : appuyer sur Échap, vérifier que le menu natif ne s'ouvre pas,
-   naviguer au clavier et à la souris, ouvrir le chat et le règlement, puis
+   naviguer au clavier et à la souris, ouvrir le règlement, puis
    refermer avec Échap. Vérifier aussi que le menu ne s'ouvre pas dans le
    lobby et qu'il se referme sur un changement de mode. Le démarrage du
    serveur et la procédure de test local sont décrits dans

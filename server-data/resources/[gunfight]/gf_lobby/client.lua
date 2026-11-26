@@ -96,10 +96,7 @@ local function touchNui()
 end
 
 local function notify(message, level)
-    TriggerEvent('chat:addMessage', {
-        color = { 255, 180, 60 },
-        args = { 'GUNFIGHT', message }
-    })
+    TriggerEvent('gf_ui:notify', { text = message, level = level })
 end
 
 -- Enveloppe unique Lua → NUI (§5.2).
@@ -747,12 +744,12 @@ local function suspendUi(reason)
     local ped = PlayerPedId()
     SetPlayerControl(PlayerId(), true, 0)
     -- Le ped reste gelé : la scène est dans le vide, le dégeler le ferait tomber.
-    -- Le joueur garde le chat (/lobbyui, /attack, /redzone).
+    -- Le joueur garde la console F8 (lobbyui, attack, redzone).
     if ped and ped ~= 0 then SetEntityInvincible(ped, false) end
     DisplayHud(true)
     DisplayRadar(true)
     SetNuiFocus(false, false)
-    notify(('Interface lobby suspendue (%s). Tape /lobbyui pour la rouvrir.'):format(reason))
+    notify(('Interface lobby suspendue (%s). Ouvre la console (F8) et tape lobbyui pour la rouvrir.'):format(reason))
 end
 
 CreateThread(function()
@@ -787,7 +784,6 @@ RegisterCommand('lobbyui', function()
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
 end, false)
-TriggerEvent('chat:addSuggestion', '/lobbyui', 'Rouvrir l’interface du lobby')
 
 -- ---------------------------------------------------------------- Récupération d'état
 -- Une course au chargement peut faire arriver gf_lobby:state avant que le

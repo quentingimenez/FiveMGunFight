@@ -512,18 +512,13 @@ CreateThread(function()
             if not spawning then TriggerServerEvent('gf_core:ready') end
         end
     end)
-
-    TriggerEvent('chat:addSuggestion', '/lobby', 'Retourner au lobby')
-    TriggerEvent('chat:addSuggestion', '/attack', 'Rejoindre le mode Attaque de zone')
-    TriggerEvent('chat:addSuggestion', '/redzone', 'Rejoindre la Redzone')
-    TriggerEvent('chat:addSuggestion', '/pos', 'Afficher ta position (pour créer des zones)')
 end)
 
 -- /pos : affiche tes coordonnées pour les copier dans un config.lua
 RegisterCommand('pos', function()
     local p = GetEntityCoords(PlayerPedId())
     local text = ('vector3(%.1f, %.1f, %.1f)  heading %.0f'):format(p.x, p.y, p.z, GetEntityHeading(PlayerPedId()))
-    TriggerEvent('chat:addMessage', { color = { 120, 200, 255 }, args = { 'Position', text } })
+    TriggerEvent('gf_ui:notify', { title = 'Position', text = text, duration = 10000 })
     print(text)
 end, false)
 

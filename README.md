@@ -134,26 +134,28 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
 ## 4. Commandes en jeu
 
+Le chat est retiré : les commandes se tapent dans la console F8, sans barre oblique.
+
 | Commande | Qui | Effet |
 |---|---|---|
-| `/lobby` | tous | retour au lobby |
-| `/attack` | tous | ramène au lobby pour lancer la recherche d’Attaque de zone |
-| `/redzone` | tous | rejoindre la Redzone |
-| `/pos` | tous | affiche ta position (pour créer de nouvelles zones) |
-| `/lobbyui` | tous | réaffiche l'interface du lobby si elle a disparu |
+| `lobby` | tous | retour au lobby |
+| `attack` | tous | ramène au lobby pour lancer la recherche d’Attaque de zone |
+| `redzone` | tous | rejoindre la Redzone |
+| `pos` | tous | affiche ta position (pour créer de nouvelles zones) |
+| `lobbyui` | tous | réaffiche l'interface du lobby si elle a disparu |
 | touche **Z** (maintenue) | tous | classement |
 | touches **1** et **2** | tous | sortir l'arme choisie en 1re / 2e position (la roue des armes de GTA est désactivée) |
-| touche **Échap** | tous | ouvre le menu pause GUNFIGHT (profil, règlement, chat, Discord, quitter) à la place du menu natif |
-| `/startround` | admin | force le lancement : fait entrer l'admin et toute la file du lobby (escouades entières, sans seuil, dans la limite des places), puis lance la manche (possible en solo) |
-| `/endmatch` | admin | arrête le match, scores à zéro |
-| `/nextzone` | admin | zone d'attaque suivante (hors match) |
-| `/setteam [id] [A\|B]` | admin | change l'équipe d'un joueur |
-| `/endgame` | admin | termine la partie Redzone en cours (podium puis map suivante) |
-| `/nextmap` | admin | relance une partie Redzone sur la map suivante |
-| `/setmode [id] [lobby\|attack\|redzone]` | admin | déplace un joueur |
-| `/whoami` | tous | affiche si tu es admin et tes identifiants à mettre dans ADMIN_IDENTIFIERS |
-| `/editor` ou `/maps` | admin | éditeur et liste des maps (voir ci-dessous) |
-| `/resetchar [id]` | admin | efface le personnage d'un joueur pour retester la création |
+| touche **Échap** | tous | ouvre le menu pause GUNFIGHT (profil, règlement, Discord, quitter) à la place du menu natif |
+| `startround` | admin | force le lancement : fait entrer l'admin et toute la file du lobby (escouades entières, sans seuil, dans la limite des places), puis lance la manche (possible en solo) |
+| `endmatch` | admin | arrête le match, scores à zéro |
+| `nextzone` | admin | zone d'attaque suivante (hors match) |
+| `setteam [id] [A\|B]` | admin | change l'équipe d'un joueur |
+| `endgame` | admin | termine la partie Redzone en cours (podium puis map suivante) |
+| `nextmap` | admin | relance une partie Redzone sur la map suivante |
+| `setmode [id] [lobby\|attack\|redzone]` | admin | déplace un joueur |
+| `whoami` | tous | affiche si tu es admin et tes identifiants à mettre dans ADMIN_IDENTIFIERS |
+| `editor` ou `maps` | admin | éditeur et liste des maps (voir ci-dessous) |
+| `resetchar [id]` | admin | efface le personnage d'un joueur pour retester la création |
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
 
@@ -273,7 +275,7 @@ server-data/
     gf_inventory armes possédées et équipées par joueur
     gf_stats    statistiques persistantes (MariaDB via oxmysql)
     gf_journal  journal JSON des événements de match (morts, tueurs, résultats)
-    gf_menu     menu pause NUI (Échap) : profil, règlement, chat, Discord, quitter
+    gf_menu     menu pause NUI (Échap) : profil, règlement, Discord, quitter
 ```
 
 Chaque mode a son propre « monde » (routing bucket) : les joueurs du lobby, de

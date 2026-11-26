@@ -175,7 +175,7 @@ modifiées, démarrées avant nos ressources.
 | `gf_redzone` | mode Redzone : zone libre, prise de véhicule, podium | `config.lua`, `server.lua`, `client.lua` |
 | `gf_db` | migrations du schéma MariaDB au démarrage via `oxmysql`, sommes enregistrées dans `gf_schema_version` | `server.lua`, `migrations.lua`, `migrations/` |
 | `gf_stats` | statistiques persistantes (MariaDB via `oxmysql`), export `GetPlayerStats` | `server.lua` |
-| `gf_menu` | menu pause NUI (Échap) remplaçant le frontend natif : profil, règlement, chat, Discord, déconnexion | `html/` (page `ui_page`), `config.lua`, `menu_state.lua`, `server.lua`, `client.lua` ; dépend de `gf_core` et `gf_stats` |
+| `gf_menu` | menu pause NUI (Échap) remplaçant le frontend natif : profil, règlement, Discord, déconnexion | `html/` (page `ui_page`), `config.lua`, `menu_state.lua`, `server.lua`, `client.lua` ; dépend de `gf_core` et `gf_stats` |
 
 Chaque ressource déclare ses scripts dans `fxmanifest.lua`
 (`fx_version 'cerulean'`, `game 'gta5'`, `lua54 'yes'`). Les tests vérifient que
@@ -185,7 +185,7 @@ manifeste casse le démarrage de la ressource.
 Ordre de démarrage imposé par `server.cfg` (les dépendances vont dans ce sens) :
 
 ```text
-chat · mapmanager · spawnmanager · baseevents
+mapmanager · spawnmanager · baseevents
 oxmysql · gf_db · gf_thumbs · gf_vehicles · gf_ui · gf_core · gf_lobby · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu
 ```
 

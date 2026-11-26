@@ -24,10 +24,10 @@ procédures de production.
 | Console du serveur | `console.bat` ou `docker attach gunfight-fxserver` | `stdin_open`/`tty` du service | `Ctrl+P` puis `Ctrl+Q` pour se détacher sans arrêter |
 | MariaDB | `docker compose ... exec mariadb mariadb -u gunfight -p gunfight` | `.env` (`MARIADB_*`) | aucun port exposé sur l'hôte ; la base n'est pas encore utilisée par le jeu |
 | Fichiers montés | `server-data/` | `docker-compose.dev.yml` | les modifications Lua/NUI sont prises en compte sans reconstruire l'image |
-| Personnages | `server-data/resources/[gunfight]/gf_lobby/data/characters.json` | `gf_lobby/config.lua` | ignoré par Git ; `/resetchar` pour repartir de zéro |
+| Personnages | `server-data/resources/[gunfight]/gf_lobby/data/characters.json` | `gf_lobby/config.lua` | ignoré par Git ; `resetchar` dans la console F8 pour repartir de zéro |
 | Maps | `server-data/resources/[gunfight]/gf_maps/data/maps.json` | `gf_maps/server.lua` | suivi par Git ; sauvegarde-le après une création volontaire |
-| Console de jeu | **F8** (client) et **T** (chat) | client FiveM | `connect`, `quit`, `reconnect` ; commandes `/...` dans le chat |
-| Éditeur de maps | `/editor` (admin) | `gf_maps` | voir section 5 du README |
+| Console de jeu | **F8** (client) | client FiveM | `connect`, `quit`, `reconnect` ; commandes sans barre oblique (`lobbyui`, `attack`, `redzone`, `lobby`) ; la touche **T** n'ouvre plus rien (chat retiré) |
+| Éditeur de maps | `editor` (admin, console F8) | `gf_maps` | voir section 5 du README |
 | Tests locaux | `bash scripts/verifier-docker.sh` | `scripts/`, `tests/`, `docker/verifier/` | même commande qu'en CI, dans l'image ; Docker Desktop doit tourner |
 
 Les scripts `start.bat`, `stop.bat`, `status.bat` et `console.bat` enveloppent
@@ -153,8 +153,9 @@ curl -fsS http://127.0.0.1:30120/dynamic.json
 
 ## 3. Devenir administrateur pour tester
 
-Les commandes de test (`/startround`, `/editor`, `/setteam`, `/resetchar`…)
-sont réservées au groupe `admin`, déclaré dans `server-data/server.cfg`.
+Les commandes de test (`startround`, `editor`, `setteam`, `resetchar`…), à taper
+dans la console F8 sans barre oblique, sont réservées au groupe `admin`, déclaré
+dans `server-data/server.cfg`.
 
 1. Connecte-toi une fois au serveur.
 2. Cherche dans les journaux la ligne d'identification du joueur :
@@ -199,13 +200,15 @@ la documentation et les exemples.
    parents, tenue, tatouages) puis le lobby avec le personnage visible.
 2. Vérifie la caméra fixe, l'escouade (1/4), la barre de modes et le bouton
    **JOUER**. Les modes **Gun Game** et **TDM** doivent afficher « bientôt ».
-3. Pour recommencer la création : un admin lance `/resetchar [id]`.
-4. Si l'interface a disparu : `/lobbyui`.
+3. Pour recommencer la création : un admin lance `resetchar [id]` dans la
+   console F8.
+4. Si l'interface a disparu : `lobbyui` dans la console F8.
 5. Détails du protocole et des règles : [`lobby.md`](lobby.md).
 
 ### Redzone (testable en solo)
 
-1. `/redzone`, ou sélectionne **Redzone** dans le lobby puis **JOUER**.
+1. `redzone` dans la console F8, ou sélectionne **Redzone** dans le lobby puis
+   **JOUER**.
 2. Approche-toi du **marqueur bleu** et appuie sur **E** : la Sultan doit
    apparaître et le personnage monter dedans. Le prompt E doit disparaître.
 3. Roule jusqu'au cercle rouge de la minimap, puis **F** pour sortir (la
@@ -214,35 +217,38 @@ la documentation et les exemples.
    subit des dégâts.
 5. Meurs : réapparition à pied après 3 s. Vérifie KILLS / MORTS / K/D et le
    classement avec **Z**.
-6. En admin : `/endgame` termine la partie (podium puis map suivante),
-   `/nextmap` relance sur la map suivante.
+6. En admin, dans la console F8 : `endgame` termine la partie (podium puis map
+   suivante), `nextmap` relance sur la map suivante.
 
 Valeurs par défaut : `GameDuration=600` (10 min), `RespawnDelay=3`, véhicule
 `gstbisxl3`, le Bison XL Hellfire de la ressource `gf_vehicles` (`gf_redzone/config.lua`).
 
 ### Attaque de zone (seul ou à plusieurs)
 
-1. En admin, `/startround` force une manche avec les joueurs déjà dans le mode.
+1. En admin, `startround` dans la console F8 force une manche avec les joueurs
+   déjà dans le mode.
    En solo, la manche se termine au chrono : pour la laisser défiler, sors de
    la zone (le chrono se met en pause tant qu'un attaquant vivant est dedans).
 2. Déroulé : **10 s** de choix des armes (2 armes), **15 s** de placement,
    **180 s** de combat. Les camps s'inversent entre les manches ; la première
    équipe à **2 manches** gagne.
-3. Commandes utiles : `/endmatch` (arrêt, scores à zéro), `/nextzone` (zone
-   suivante hors match), `/setteam [id] [A|B]`, `/setmode [id] [lobby|attack|redzone]`.
+3. Commandes utiles dans la console F8 : `endmatch` (arrêt, scores à zéro),
+   `nextzone` (zone suivante hors match), `setteam [id] [A|B]`,
+   `setmode [id] [lobby|attack|redzone]`.
 4. Un match normal démarre à **20 joueurs** et en prend **30** au plus
-   (`gf_lobby/config.lua`, `gf_attack/config.lua`). `/startround` est le
-   contournement prévu pour tester seul.
+   (`gf_lobby/config.lua`, `gf_attack/config.lua`). `startround` dans la console
+   F8 est le contournement prévu pour tester seul.
 
 ### Cartes et éditeur
 
-1. `/editor` (admin) : choisis **Redzone** ou **Attaque de zone**, puis
+1. `editor` (admin, console F8) : choisis **Redzone** ou **Attaque de zone**, puis
    « Nouvelle… » ou « Modifier ».
 2. Place les éléments (cercle, apparitions, points véhicule pour la Redzone ;
    délimitation, départs attaquants/défenseurs pour l'Attaque), nomme et
    enregistre.
-3. `/maps` liste les maps et permet de les cocher/décocher. Une map cochée est
-   jouée à la prochaine partie ; une map décochée reste sauvegardée.
+3. `maps` dans la console F8 liste les maps et permet de les cocher/décocher.
+   Une map cochée est jouée à la prochaine partie ; une map décochée reste
+   sauvegardée.
 4. Le résultat est écrit dans `server-data/resources/[gunfight]/gf_maps/data/maps.json`.
    C'est un fichier **suivi par Git** : relis le diff avant de le committer, et
    évite de l'éditer à la main pendant que le serveur tourne.
@@ -329,8 +335,8 @@ pas été terminé : c'est attendu, pas une panne du jeu.
 | `service fxserver has neither an image nor a build context` | il manque la surcouche dev (ou prod) : garde les deux fichiers Compose |
 | `fxserver` reste `unhealthy` | normal en mode moniteur avant la configuration txAdmin ; sinon regarde `logs fxserver` |
 | Port 30120 déjà utilisé | un autre serveur FiveM tourne sur la machine |
-| Le mode ne démarre pas | 20 joueurs dans la recherche, ou `/startround` en admin |
-| L'interface du lobby ne s'affiche pas | `/lobbyui` ; vérifie que `gf_lobby` est démarrée et que `characters.json` est accessible |
+| Le mode ne démarre pas | 20 joueurs dans la recherche, ou `startround` dans la console F8 en admin |
+| L'interface du lobby ne s'affiche pas | `lobbyui` dans la console F8 ; vérifie que `gf_lobby` est démarrée et que `characters.json` est accessible |
 | Le personnage est invisible | attends la fin du fondu ; vérifie l'ordre `gf_core` puis `gf_lobby` |
 | `E2004 ... EACCES ... txData` | panne dev de txAdmin décrite en section 2 ; `TXADMIN=false` pour tester le jeu |
 | `denied` / `manifest unknown` au `pull` | image GHCR privée : `docker login ghcr.io` avec un token `read:packages` |
@@ -400,7 +406,7 @@ partie du serveur et n'ajoute aucune dépendance au projet.
 - [ ] Le serveur démarre et les six ressources `gf_*` sont lancées.
 - [ ] `http://127.0.0.1:30120/info.json` répond en 200.
 - [ ] Le lobby s'affiche, le personnage est visible, **JOUER** lance le mode.
-- [ ] Le scénario touché est reproduit : Redzone, Attaque `/startround`,
+- [ ] Le scénario touché est reproduit : Redzone, Attaque `startround` (console F8),
       éditeur de maps, commande admin…
 - [ ] Aucun secret dans le diff : `git diff --cached` ne contient ni `.env`, ni
       `secrets.cfg`, ni clé de licence.
