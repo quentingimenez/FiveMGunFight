@@ -228,11 +228,36 @@ titre "Secrets dans l'arbre (gitleaks)"
 if ! trouver gitleaks; then
   absent "gitleaks"
 else
-  if sortie="$(gitleaks dir --no-banner --redact --config .gitleaks.toml . 2>&1)"; then
-    ok "aucun secret détecté"
+  # gitleaks dir lit tout le dossier monté : .env, secrets/ et les autres
+  # fichiers ignorés par Git déclenchaient des faux positifs en local alors
+  # qu'ils n'entrent jamais dans l'historique. On analyse donc une copie de
+  # l'arbre tel que Git le voit, dans un dossier temporaire hors du dépôt.
+  if ! secrets_temporaire="$(mktemp -d)"; then
+    echec "gitleaks (dossier temporaire)"
   else
-    echec "gitleaks"
-    printf '%s\n' "$sortie" | details
+    trap 'rm -rf -- "$secrets_temporaire"' EXIT
+    bash scripts/arbre-suivi.sh "$secrets_temporaire"
+    code_arbre=$?
+    if [ "$code_arbre" -eq 0 ]; then
+      if sortie="$(gitleaks dir --no-banner --redact --config .gitleaks.toml "$secrets_temporaire" 2>&1)"; then
+        ok "aucun secret détecté (fichiers suivis par git)"
+      else
+        echec "gitleaks"
+        printf '%s\n' "$sortie" | details
+      fi
+    elif [ "$code_arbre" -eq 3 ]; then
+      # Dépôt Git illisible : repli sur l'ancien comportement, avec une note
+      # visible pour ne pas faire croire que les fichiers ignorés sont scannés.
+      printf '   note    dépôt git illisible : analyse de tout le dossier\n'
+      if sortie="$(gitleaks dir --no-banner --redact --config .gitleaks.toml . 2>&1)"; then
+        ok "aucun secret détecté (analyse de tout le dossier)"
+      else
+        echec "gitleaks"
+        printf '%s\n' "$sortie" | details
+      fi
+    else
+      echec "gitleaks (copie de l'arbre suivi, code $code_arbre)"
+    fi
   fi
 fi
 

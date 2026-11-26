@@ -904,6 +904,17 @@ class ChaineCI(unittest.TestCase):
         self.assertIn("GF_OUTILS_OBLIGATOIRES=1", texte)
         self.assertIn("unittest discover", texte)
 
+    def test_verifier_sh_analyse_l_arbre_suivi(self) -> None:
+        texte = lire(RACINE / "scripts" / "verifier.sh")
+        etape = texte.split("# --- 8. Secrets dans l'arbre (gitleaks)", 1)
+        self.assertEqual(len(etape), 2, "étape gitleaks introuvable")
+        bloc = etape[1].split("# --- 9.", 1)[0]
+        self.assertIn(
+            "scripts/arbre-suivi.sh",
+            bloc,
+            "l'étape gitleaks doit analyser une copie des fichiers vus par Git",
+        )
+
     def test_dependabot_suit_l_image_de_verification(self) -> None:
         texte = lire(self.DEPENDABOT)
         self.assertIn('directory: "/docker/verifier"', texte)
