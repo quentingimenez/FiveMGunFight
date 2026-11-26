@@ -7,6 +7,7 @@ description 'Gunfight : Attaque de zone (2 équipes, attaque / défense, derniè
 version '1.0.0'
 
 shared_script 'config.lua'
+server_script 'rules.lua'
 server_script 'server.lua'
 client_script 'client.lua'
 
