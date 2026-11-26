@@ -5,7 +5,7 @@
 
   var DASH = '—';
   var SOON_KEYS = {
-    loadout: 1, crosshair: 1, shop: 1, crates: 1,
+    crosshair: 1, shop: 1, crates: 1,
     battlepass: 1, contributor: 1, gameSettings: 1,
   };
   var MODE_LABELS = {
@@ -19,6 +19,7 @@
   var current = 0;
   var state = null;
   var visible = false;
+  var weaponScreen = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -114,6 +115,57 @@
     var panel = basePanel('BIENTÔT', title);
     addText(panel, 'Cette section arrive dans une prochaine mise à jour.');
     return panel;
+  }
+
+  function weaponPanel(kind, data, photos) {
+    var admin = kind === 'armory';
+    var panel = basePanel(admin ? 'ADMINISTRATION' : 'ÉQUIPEMENT', admin ? 'ARMES' : 'CASIER');
+    panel.classList.add('weapon-panel');
+    addText(panel, admin ? 'Sélectionne une arme pour l’ajouter à ton casier.' : 'Choisis une arme pour chaque emplacement.');
+    var weapons = admin ? data : data.weapons;
+    var grid = el('div', 'weapon-grid');
+    (Array.isArray(weapons) ? weapons : []).forEach(function (weapon) {
+      var card = el('div', 'weapon-card');
+      if (photos && photos[weapon.name]) {
+        var image = el('img', 'weapon-photo');
+        image.src = photos[weapon.name];
+        image.alt = '';
+        card.appendChild(image);
+      } else {
+        card.appendChild(el('div', 'weapon-placeholder', 'ARME'));
+      }
+      card.appendChild(el('strong', 'weapon-name', weapon.label));
+      card.appendChild(el('span', 'weapon-category', weapon.category));
+      var actions = el('div', 'weapon-actions');
+      if (admin) {
+        var give = el('button', 'btn', weapon.owned ? 'OBTENUE' : 'OBTENIR');
+        give.type = 'button';
+        give.disabled = weapon.owned;
+        give.addEventListener('click', function () { send('giveWeapon', { id: weapon.id }); });
+        actions.appendChild(give);
+      } else {
+        [1, 2].forEach(function (slot) {
+          var selected = data['slot' + slot] === weapon.id;
+          var equip = el('button', 'btn' + (selected ? ' is-equipped' : ''), selected ? 'ÉQUIPÉE ' + slot : 'EMPLACEMENT ' + slot);
+          equip.type = 'button';
+          equip.disabled = selected;
+          equip.addEventListener('click', function () { send('equipWeapon', { id: weapon.id, slot: slot }); });
+          actions.appendChild(equip);
+        });
+      }
+      card.appendChild(actions);
+      grid.appendChild(card);
+    });
+    panel.appendChild(grid);
+    return panel;
+  }
+
+  function showWeapons(kind, data, photos) {
+    var stage = $('stage');
+    if (!stage || !visible) return;
+    weaponScreen = kind;
+    put('section-label', kind === 'armory' ? 'ARMES ADMIN' : 'CASIER');
+    stage.replaceChildren(weaponPanel(kind, data, photos));
   }
 
   function chatPanel() {
@@ -277,7 +329,13 @@
     if (!stage) return;
     stage.replaceChildren();
     var panel;
-    if (SOON_KEYS[key]) panel = soonPanel(label);
+    weaponScreen = key === 'loadout' ? 'locker' : null;
+    if (key === 'loadout') {
+      panel = basePanel('ÉQUIPEMENT', 'CASIER');
+      addText(panel, 'Chargement des armes…');
+      send('locker', {});
+    }
+    else if (SOON_KEYS[key]) panel = soonPanel(label);
     else if (key === 'chat') panel = chatPanel();
     else if (key === 'rules') panel = rulesPanel();
     else if (key === 'discord') panel = discordPanel();
@@ -300,6 +358,7 @@
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
     }
+    weaponScreen = null;
     resetStage();
     setFocus(0);
   }
@@ -347,6 +406,14 @@
     var message = event && event.data;
     if (!message || typeof message !== 'object' || typeof message.type !== 'string') return;
     var data = message.data && typeof message.data === 'object' ? message.data : {};
+    if (message.type === 'armory' && visible) {
+      showWeapons('armory', message.data || [], message.photos || {});
+      return;
+    }
+    if (message.type === 'locker' && visible && weaponScreen === 'locker') {
+      showWeapons('locker', data, message.photos || {});
+      return;
+    }
     if (message.type === 'state') {
       state = data;
       if (visible) {
@@ -384,6 +451,7 @@
     }
     renderProfile();
     renderStatus();
+    weaponScreen = null;
     resetStage();
     setFocus(0);
     window.addEventListener('keydown', onKeyDown);

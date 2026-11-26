@@ -91,6 +91,9 @@ def main() -> int:
     if not weapons_meta:
         print("Pas de weapons.meta dans le pack : ce n'est pas une arme ajoutée (add-on).", file=sys.stderr)
         return 1
+    if len(weapons_meta) != 1:
+        print("Plusieurs weapons.meta : donne le dossier d'une seule arme.", file=sys.stderr)
+        return 1
     texte_armes = weapons_meta[0].read_text(encoding="utf-8", errors="replace")
     armes = [n for n in re.findall(r"<Name>\s*(WEAPON_[A-Z0-9_]+)\s*</Name>", texte_armes, re.I)]
     if not armes:
@@ -117,9 +120,6 @@ def main() -> int:
     dossier = RESSOURCE / "data" / arme
     declarer: list[str] = []
     for f in stream:
-        if not args.essai:
-            (RESSOURCE / "stream").mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(f, RESSOURCE / "stream" / f.name.lower())
         if f.suffix.lower() == ".ytd" and f.stat().st_size > 16 * 1024 * 1024:
             notes.append(f"{f.name} pèse {f.stat().st_size // (1024 * 1024)} Mo : textures lourdes")
     racine_meta = weapons_meta[0].parent
@@ -131,16 +131,9 @@ def main() -> int:
         relatif = Path(*[p.replace(" ", "_") for p in relatif.parts])
         chemin = f"data/{arme}/{relatif.as_posix()}"
         declarer.append(chemin)
-        if not args.essai:
-            (dossier / relatif).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(f, dossier / relatif)
     if noms:
         declarer.append(f"data/{arme}/names.json")
         notes.append(f"{len(noms)} nom(s) affiché(s) repris du pack")
-        if not args.essai:
-            dossier.mkdir(parents=True, exist_ok=True)
-            (dossier / "names.json").write_text(json.dumps(noms, ensure_ascii=False, indent=2, sort_keys=True) + NL,
-                                                encoding="utf-8", newline=NL)
 
     # Manifeste : fichiers déclarés
     manifeste = MANIFESTE.read_text(encoding="utf-8")
@@ -169,7 +162,30 @@ def main() -> int:
         ligne = f"{NL}    {ident} = {{ name = '{arme}', label = '{nom_lua}', category = '{cat_lua}', ammo = {munitions} }},"
         config = config[:f_] + ligne + config[f_:]
 
+    # Refuse les collisions avant toute écriture pour protéger les modèles existants.
+    for f in stream:
+        destination = RESSOURCE / "stream" / f.name.lower()
+        if destination.exists() and destination.read_bytes() != f.read_bytes():
+            print(f"Modèle déjà présent avec un contenu différent : {destination.name}", file=sys.stderr)
+            return 1
+
     if not args.essai:
+        (RESSOURCE / "stream").mkdir(parents=True, exist_ok=True)
+        for f in stream:
+            shutil.copyfile(f, RESSOURCE / "stream" / f.name.lower())
+        for f in metas:
+            try:
+                relatif = f.relative_to(racine_meta)
+            except ValueError:
+                relatif = Path(f.name)
+            relatif = Path(*[part.replace(" ", "_") for part in relatif.parts])
+            destination = dossier / relatif
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(f, destination)
+        if noms:
+            dossier.mkdir(parents=True, exist_ok=True)
+            (dossier / "names.json").write_text(json.dumps(noms, ensure_ascii=False, indent=2, sort_keys=True) + NL,
+                                                encoding="utf-8", newline=NL)
         MANIFESTE.write_text(manifeste, encoding="utf-8", newline=NL)
         INDEX.write_text(json.dumps(index, indent=2) + NL, encoding="utf-8", newline=NL)
         CONFIG_CORE.write_text(config, encoding="utf-8", newline=NL)
