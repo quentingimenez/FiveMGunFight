@@ -695,12 +695,13 @@ Si la NUI ne répond pas (page absente, erreur JS), le client ne doit pas laisse
 le joueur prisonnier :
 
 - pas de `ready` sous 15 s, ou plus de `heartbeat` depuis 15 s → le client
-  relâche le focus, détruit la caméra, rend le contrôle et affiche un message
-  dans le chat ;
-- commande `/lobbyui` : réouvre l'interface si le joueur est encore en mode
-  lobby ;
-- les commandes `/attack`, `/redzone` et `/lobby` de `gf_core` restent un
-  secours.
+  relâche le focus, détruit la caméra, rend le contrôle et affiche une
+  notification `gf_ui` (et non plus un message dans le chat) : « Interface lobby
+  suspendue (raison). Ouvre la console (F8) et tape `lobbyui` pour la rouvrir. » ;
+- commande `lobbyui` dans la console (F8), sans barre oblique : réouvre
+  l'interface si le joueur est encore en mode lobby ;
+- les commandes `attack`, `redzone` et `lobby` de `gf_core` restent un secours,
+  à taper dans la console (F8) sans barre oblique.
 
 ## 9. Persistance
 

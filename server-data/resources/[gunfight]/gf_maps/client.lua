@@ -526,5 +526,3 @@ end)
 AddEventHandler('onResourceStop', function(res)
     if res == GetCurrentResourceName() and E.open then closeEditor() end
 end)
-
-TriggerEvent('chat:addSuggestion', '/editor', 'Éditeur de maps (admin)')

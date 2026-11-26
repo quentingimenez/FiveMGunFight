@@ -212,7 +212,7 @@ local function spawn(src, opts)
 end
 
 local function notify(src, msg)
-    TriggerClientEvent('chat:addMessage', src, { color = { 255, 200, 0 }, args = { 'Gunfight', msg } })
+    TriggerClientEvent('gf_ui:notify', src, { text = msg })
 end
 
 local function spawnLobby(src)
@@ -223,7 +223,7 @@ local function spawnLobby(src)
     })
     TriggerClientEvent('gf_ui:hud', src, {
         title = 'Lobby',
-        subtitle = '/attack  →  Attaque de zone     •     /redzone  →  Redzone',
+        subtitle = 'Console F8 : attack → Attaque de zone • redzone → Redzone',
     })
 end
 

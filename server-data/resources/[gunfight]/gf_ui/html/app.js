@@ -4,6 +4,8 @@
 const TEAM_COLORS = { A: '#ff5a5f', B: '#4ea8ff' };
 const KILLFEED_MAX = 6;
 const KILLFEED_TIME = 6000;
+const NOTIFY_MAX = 5;
+const NOTIFY_FADE = 200;
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -80,6 +82,29 @@ function addKill(e) {
 
     setTimeout(() => row.classList.add('fade'), KILLFEED_TIME);
     setTimeout(() => row.remove(), KILLFEED_TIME + 500);
+}
+
+// ------------------------------------------------------------------ Notifications
+// Le texte vient du serveur : posé uniquement via textContent (jamais innerHTML).
+function addToast(d) {
+    if (!d || typeof d.text !== 'string' || d.text === '') return;
+
+    const box = $('#notify');
+    const level = (d.level === 'success' || d.level === 'error') ? d.level : 'info';
+    let duration = typeof d.duration === 'number' && isFinite(d.duration) ? d.duration : 5000;
+    duration = Math.max(1500, Math.min(15000, duration));
+
+    const toast = el('div', 'toast ' + level);
+    toast.appendChild(el('div', 't-title', typeof d.title === 'string' ? d.title : 'GUNFIGHT'));
+    toast.appendChild(el('div', 't-text', d.text));
+    box.appendChild(toast);
+
+    while (box.children.length > NOTIFY_MAX) box.firstChild.remove();
+
+    setTimeout(() => {
+        toast.classList.add('out');
+        setTimeout(() => toast.remove(), NOTIFY_FADE);
+    }, duration);
 }
 
 // ------------------------------------------------------------------ Annonces
@@ -474,6 +499,7 @@ window.addEventListener('message', (event) => {
         case 'hit': showHit(msg.data || {}); break;
         case 'kill': showKill(msg.data || {}); break;
         case 'announce': announce(msg.data); break;
+        case 'notify': addToast(msg.data); break;
         case 'scoreboard': renderScoreboard(msg.data); break;
         case 'match_results': renderMatchResults(msg.data); break;
         case 'scoreboard_visible': $('#scoreboard').classList.toggle('hidden', !msg.visible); break;
