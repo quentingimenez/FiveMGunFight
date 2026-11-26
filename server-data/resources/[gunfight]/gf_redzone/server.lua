@@ -139,6 +139,16 @@ local function startGame()
     S.phase = 'live'
     S.endsAt = now() + Config.GameDuration
     S.spawnCursor = 0
+    -- Journal local : début de match et entrée en phase live (S.map est connue).
+    -- Effectif présent au coup d'envoi, avant la remise à zéro des statistiques.
+    local joueurs = {}
+    for src in pairs(S.players) do
+        joueurs[#joueurs + 1] = { src = src }
+    end
+    TriggerEvent('gf:matchStarted', {
+        mode = 'redzone', map = S.map.name, joueurs = joueurs,
+    })
+    TriggerEvent('gf:phase', { mode = 'redzone', phase = 'live' })
     for src, p in pairs(S.players) do
         p.kills, p.deaths, p.streak, p.best = 0, 0, 0, 0
         sendMap(src)
@@ -151,6 +161,7 @@ end
 local function endGame()
     S.phase = 'ended'
     S.endsAt = now() + Config.EndDelay
+    TriggerEvent('gf:phase', { mode = 'redzone', phase = 'ended' }) -- journal local de la phase
 
     local r = ranking()
     local podium = {}
@@ -175,6 +186,12 @@ local function endGame()
         announce(src, ('Victoire de %s !'):format(winner), table.concat(podium, '   '), 8000)
         TriggerClientEvent('gf_ui:scoreboard_show', src, Config.EndDelay * 1000)
     end)
+    -- Journal local : après gf:matchEnded, dans l'ordre du classement calculé.
+    local rows = {}
+    for _, e in ipairs(r) do
+        rows[#rows + 1] = { name = GetPlayerName(e.src) or '?', kills = e.p.kills, deaths = e.p.deaths }
+    end
+    TriggerEvent('gf:matchResults', { mode = 'redzone', rows = rows })
     S.dirty = true
 end
 
@@ -182,6 +199,7 @@ local function goIdle()
     S.phase = 'idle'
     S.endsAt = 0
     S.map = nil
+    TriggerEvent('gf:phase', { mode = 'redzone', phase = 'idle' }) -- journal local de la phase
 end
 
 -- ---------------------------------------------------------------- HUD & classement

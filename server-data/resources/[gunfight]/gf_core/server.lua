@@ -526,6 +526,18 @@ local function playerFromEntity(entity)
     return nil
 end
 
+-- Journal local des touches : purement observatoire, aucun effet sur le jeu.
+-- Émet gf:hit avec le détail de la touche et le motif d'acceptation/refus.
+local function journaliserHit(sender, victim, data, accepted, reason)
+    TriggerEvent('gf:hit', {
+        sender = sender, victim = victim, weapon = data.weaponType,
+        damage = tonumber(data.weaponDamage) or 0,
+        willKill = data.willKill and true or false,
+        component = data.hitComponent,
+        accepted = accepted, reason = reason,
+    })
+end
+
 AddEventHandler('weaponDamageEvent', function(sender, data)
     local netId = data.hitGlobalId
     if (not netId or netId == 0) and data.hitGlobalIds then netId = data.hitGlobalIds[1] end
@@ -536,14 +548,17 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
 
     local sMode, vMode = Modes[sender], Modes[victim]
     if sMode ~= vMode or sMode == 'lobby' or not sMode then
+        journaliserHit(sender, victim, data, false, 'mode') -- refus : modes différents ou lobby
         CancelEvent() return
     end
 
     local vState, sState = Player(victim).state, Player(sender).state
     if vState.gf_protected or sState.gf_protected then
+        journaliserHit(sender, victim, data, false, 'protege') -- refus : joueur protégé
         CancelEvent() return
     end
     if sState.gf_team and sState.gf_team == vState.gf_team and sender ~= victim then
+        journaliserHit(sender, victim, data, false, 'equipe') -- refus : tir sur un coéquipier
         CancelEvent() return
     end
 
@@ -553,6 +568,7 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
     if res and GetResourceState(res) == 'started' then
         local ok, allowed = pcall(function() return exports[res]:AllowDamage(sender, victim) end)
         if ok and allowed == false then
+            journaliserHit(sender, victim, data, false, 'regle-mode') -- refus : règle propre au mode
             CancelEvent() return
         end
     end
@@ -576,6 +592,7 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
         }
         local ok, raison = ShotValidation.verifierTouche(etatTirs, sender, touche, regles)
         if not ok then
+            journaliserHit(sender, victim, data, false, raison) -- refus : motif renvoyé par ShotValidation
             CancelEvent()
             journaliserRefus(sender, 'weaponDamageEvent', raison)
             return
@@ -585,6 +602,7 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
     -- Dégât autorisé : c'est la seule preuve que le serveur gardera pour
     -- créditer un kill. `weaponType` est fourni par le serveur (data).
     if sender ~= victim then
+        journaliserHit(sender, victim, data, true, 'ok') -- touche acceptée, preuve de dégât enregistrée
         lastDamager[victim] = { src = sender, at = GetGameTimer(), weapon = data.weaponType }
 
         -- Marqueur de dégâts pour le tireur

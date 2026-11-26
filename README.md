@@ -267,6 +267,7 @@ server-data/
     gf_ui       interface : HUD, kill feed, dégâts, multi-kills, sons, classement
     gf_vehicles véhicules du serveur (stream/, data/<modèle>/*.meta, son) : Bison XL « gstbisxl3 », Trackhawk « keyhawk »
     gf_stats    statistiques persistantes (MariaDB via oxmysql)
+    gf_journal  journal JSON des événements de match (morts, tueurs, résultats)
     gf_menu     menu pause NUI (Échap) : profil, règlement, chat, Discord, quitter
 ```
 

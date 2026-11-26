@@ -6,4 +6,5 @@
 
 Migrations = {
     { version = 1, nom = 'gf_stats_players', fichier = 'migrations/0001_gf_stats_players.sql' },
+    { version = 2, nom = 'gf_match_events', fichier = 'migrations/0002_gf_match_events.sql' },
 }

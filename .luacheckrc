@@ -32,6 +32,7 @@ globals = {
   "GFMenuState",
   -- Globale fournie par le runtime FiveM (W112 sur les champs mutés).
   "GlobalState",
+  "Journal",
   "MigrationPlan",
   "Migrations",
   "MySQL",
