@@ -26,9 +26,9 @@ Config.Character = {
   maxTattoosPerZone = 4,
 }
 
--- Recherche serveur globale pour les modes 20-30 joueurs.
--- Un joueur seul peut lancer la recherche : la taille de l'escouade n'est pas
--- un critère. Tous les joueurs du lobby avec un personnage sont inscrits.
+-- File par escouade pour les modes 20-30 : le chef inscrit l'escouade, le
+-- compteur SIZE/MIN est visible par tous et la file persiste après un match ;
+-- une escouade part entière, jamais coupée pour le seuil ou le plafond.
 Config.Matchmaking = {
   attackMin = 20, -- seuil de lancement (montée jusqu'à 2 équipes de 15)
   attackMax = 30, -- plafond d'inscription, configuration documentaire

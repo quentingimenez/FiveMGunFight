@@ -126,20 +126,21 @@
     return selectedMode();
   }
 
+  /* La file existe toujours pour le mode attack, même hors inscription :
+     seule la présence de `joined` dit que le joueur est réellement en file. */
   function currentQueue() {
     var state = Lobby.state;
-    var queue = state && state.queue;
-    if (!queue || typeof queue !== 'object') return null;
-    return queue;
+    return state && state.queue ? state.queue : null;
   }
 
-  function canCancelQueue() {
+  function isJoined() {
     var queue = currentQueue();
-    var state = Lobby.state;
-    if (!queue || !state || !state.me) return false;
-    if (!isLeader()) return false;
-    if (queue.ownerId == null) return true;
-    return Number(queue.ownerId) === Number(state.me.id);
+    return !!(queue && queue.joined === true);
+  }
+
+  /* Le retrait est un droit du chef de l'escouade, sans cooldown serveur. */
+  function canCancelQueue() {
+    return isJoined() && isLeader();
   }
 
   function displayLabel(mode) {
@@ -356,10 +357,17 @@
 
   function updateStatus(list) {
     var queue = currentQueue();
-    if (queue) {
+    if (isJoined()) {
       var size = Number(queue.size) || 0;
       var min = Number(queue.min) || 20;
-      setText(ui.status, 'Recherche serveur · ' + size + '/' + min + ' joueurs');
+      setText(ui.status, 'En file · ' + size + '/' + min + ' joueurs');
+      return;
+    }
+    var view = viewMode() || selectedMode();
+    if (queue && view && view.id === 'attack') {
+      var s = Number(queue.size) || 0;
+      var m = Number(queue.min) || 20;
+      setText(ui.status, 'File Attaque · ' + s + '/' + m + ' joueurs');
       return;
     }
     var current = viewMode();
@@ -373,16 +381,23 @@
 
   function updatePlay() {
     var queue = currentQueue();
-    var queuing = !!queue;
+    var joined = isJoined();
     var leader = isLeader();
     var current = selectedMode();
     var view = viewMode();
-    var canCancel = queuing && canCancelQueue();
     var cooling = isCooldown();
     var canPlay;
+    var size = joined || queue ? Number(queue.size) || 0 : 0;
+    var min = joined || queue ? Number(queue.min) || 20 : 20;
 
-    if (queuing) {
-      canPlay = canCancel && !ui.playing && !ui.selecting && !ui.launching;
+    /* La classe suit uniquement l'inscription réelle, pas la simple
+       présence de `queue` (toujours fournie pour le mode attack). */
+    toggleClass(ui.play, 'is-queued', joined);
+
+    if (joined) {
+      /* Le chef peut quitter la file : ni cooldown ni sélection en vol ne
+         doivent bloquer le retrait, seul le jeu en cours ou le lancement. */
+      canPlay = canCancelQueue() && !ui.playing && !ui.selecting && !ui.launching;
     } else {
       canPlay = !!(
         leader &&
@@ -400,15 +415,20 @@
     ui.play.disabled = !canPlay;
     ui.play.setAttribute('aria-disabled', canPlay ? 'false' : 'true');
 
-    if (queuing) {
-      var size = Number(queue.size) || 0;
-      var min = Number(queue.min) || 20;
-      var queueMode = findMode(queue.mode);
-      setText(ui.playLabel, canCancel ? 'ANNULER' : 'RECHERCHE');
-      setText(ui.playSub, queueMode ? displayLabel(queueMode) : queue.mode || 'Attaque de zone');
-      ui.play.setAttribute('aria-label', canCancel ? 'Annuler la recherche' : 'Recherche en cours');
-      ui.play.title = canCancel ? 'Annuler la recherche' : 'Recherche en cours';
-      setText(ui.hint, 'Recherche ' + size + '/' + min);
+    if (joined) {
+      if (leader) {
+        setText(ui.playLabel, 'QUITTER LA FILE');
+        setText(ui.playSub, 'Attaque de zone');
+        ui.play.setAttribute('aria-label', 'Quitter la file');
+        ui.play.title = 'Quitter la file';
+        setText(ui.hint, 'En file · ' + size + '/' + min);
+      } else {
+        setText(ui.playLabel, 'EN FILE');
+        setText(ui.playSub, 'Attaque de zone');
+        ui.play.setAttribute('aria-label', 'En file');
+        ui.play.title = 'Le chef gère la file';
+        setText(ui.hint, 'Le chef gère la file');
+      }
       return;
     }
 
@@ -423,6 +443,7 @@
     else if (ui.selecting || ui.pendingModeId) hint = 'Sélection en cours…';
     else if (cooling) hint = 'Patiente une seconde…';
     else if (!current) hint = 'Aucun mode disponible';
+    else if (queue && view && view.id === 'attack') hint = 'File : ' + size + '/' + min + ' joueurs';
     setText(ui.hint, hint);
 
     if (!leader) ui.play.title = 'Le chef choisit le mode';
@@ -606,15 +627,23 @@
 
   function onPlay() {
     if (ui.play.disabled) return;
-    if (ui.launching || ui.selecting || ui.playing || ui.pendingModeId !== null || isCooldown()) return;
+    /* Le retrait de la file n'est pas soumis au cooldown de sélection : le
+       serveur ne l'applique pas non plus. Les autres actions le restent. */
+    if (
+      ui.launching ||
+      ui.selecting ||
+      ui.playing ||
+      ui.pendingModeId !== null ||
+      (isCooldown() && !isJoined())
+    ) return;
     if (!isLeader()) {
       Lobby.toast('Le chef choisit le mode.', 'info');
       return;
     }
 
-    var queue = currentQueue();
+    var joined = isJoined();
     var mode = selectedMode();
-    if (!queue && (!mode || !mode.available || mode.placeholder)) return;
+    if (!joined && (!mode || !mode.available || mode.placeholder)) return;
 
     var seq = ++ui.playSeq;
     ui.playing = true;
@@ -638,9 +667,11 @@
 
     var callback = 'play';
     var payload = { mode: mode && mode.id };
-    if (queue && canCancelQueue()) {
+    if (canCancelQueue()) {
+      /* Annulation de la file par le chef : le serveur n'applique aucun
+         cooldown au retrait. */
       callback = 'selectMode';
-      payload = { mode: queue.mode || (mode && mode.id), cancel: true };
+      payload = { mode: 'attack', cancel: true };
       ui.playCancel = true;
     }
 
@@ -708,9 +739,11 @@
       clearLaunchTimer();
     }
 
-    /* Une file visible ou un lancement confirme que `play` a été traité. Une
-       annulation attend sa réponse immédiate avant de relâcher le bouton. */
-    if (next && (next.queue || launching) && ui.playing && !ui.playCancel) {
+    /* Une inscription confirmée (`joined`) ou un lancement prouve que `play`
+       a été traité. La simple présence de `queue` ne suffit plus : elle est
+       désormais toujours fournie pour le mode attack. Une annulation attend
+       sa réponse immédiate avant de relâcher le bouton. */
+    if (next && ((next.queue && next.queue.joined === true) || launching) && ui.playing && !ui.playCancel) {
       ui.playing = false;
       ui.playSeq += 1;
       clearPlayTimer();

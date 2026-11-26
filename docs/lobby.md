@@ -77,12 +77,16 @@ statistiques : uniquement des données réelles.
 - le mode sélectionné est souligné par la couleur d'accent ;
 - le chef choisit le mode ; les autres membres voient la sélection mais les
   cartes sont verrouillées avec l'indication « Le chef choisit le mode » ;
-- bouton **JOUER** à droite : lance le mode. Pour **Attaque de zone**, il ouvre
-  une recherche serveur globale (aucune condition de taille d'escouade) et
-  devient **ANNULER** pour le chef qui l'a lancée, avec l'indice
-  « Recherche N/20 ». Pour Redzone, il lance l'escouade comme avant. Il est
-  désactivé si le joueur n'est pas chef, si le mode est indisponible ou pendant
-  un lancement.
+- bouton **JOUER** à droite : lance le mode. Pour **Attaque de zone**, le chef
+  inscrit **son escouade** dans la file (tous les membres doivent être dans le
+  lobby et avoir un personnage) ; le bouton devient **QUITTER LA FILE** pour le
+  chef inscrit et **EN FILE** désactivé avec l'indice « Le chef gère la file »
+  pour les autres membres. Le compteur « En file · N/20 joueurs » est visible
+  par **tous** les joueurs du lobby ; pour un joueur non inscrit, l'indice est
+  « File : N/20 joueurs ». L'inscription survit au lancement d'une partie :
+  au retour au lobby, l'escouade est recomptée et peut relancer. Pour Redzone,
+  il lance l'escouade comme avant (et la retire d'abord de la file). Le bouton
+  est désactivé si le mode est indisponible ou pendant un lancement.
 
 ### Modales et notifications
 
@@ -132,42 +136,65 @@ Le personnage existe : le lobby s'affiche directement, sans écran de création.
 ### 3.4 Lancement
 
 1. Le chef choisit un mode (`selectMode`), diffusé à l'escouade.
-2. **Attaque de zone** : `play` ouvre une **file serveur globale** au lieu de
-   lancer l'escouade. Le chef peut être seul. Tous les joueurs du lobby ayant un
-   personnage sont inscrits automatiquement. Le serveur diffuse `state.queue =
-   { mode = 'attack', size = N, min = 20, max = 30, ownerId = <src> }` et
-   l'indice « Recherche N/20 ». La NUI reste ouverte pendant l'attente.
-   - Un joueur qui quitte le lobby ou déconnecte est retiré de la file ; si la
-     file devient vide, la recherche s'arrête.
-   - Un joueur qui rejoint le lobby avec un personnage pendant la recherche est
-     ajouté automatiquement (`refreshQueue`).
-   - **Choix documenté** : une seule recherche serveur active à la fois ; un
-     nouveau `play` sur une recherche en cours est un simple rappel d'état, pas
-     une seconde file.
-   - Le chef annule avec `selectMode {mode='attack', cancel=true}` : ce
-     callback transmet la table telle quelle au serveur, contrairement à
-     `play` qui ne garde que `mode`. La file est vidée et l'état NUI restauré.
-     Le client ne ferme jamais la NUI pendant l'attente.
-   - À `size >= Config.Matchmaking.attackMin` (20, configurable), un thread
-     serveur fige la file et appelle `exports.gf_core:SetMode(member, 'attack')`
-     pour **tous** les membres. `gf_attack.Config.PlayersToStart = 20` empêche le
-     démarrage à 2 joueurs (garder `PlayersToStart = attackMin` et
-     `MaxPlayers = attackMax`). Si un match d'Attaque est déjà en cours ou
-     complet (`exports.gf_attack:CanJoin()` faux), la file attend sa fin.
-   - `/attack` ramène le joueur au lobby : la recherche se lance depuis la NUI.
+2. **Attaque de zone** : `play {mode='attack'}` inscrit l'escouade du chef dans
+   la file. Seul le chef peut inscrire son escouade ; les mêmes contrôles de mode
+   et de cooldown s'appliquent. Si l'escouade est déjà inscrite, le serveur ne
+   fait que notifier « Ton escouade est déjà dans la file (N/MIN joueurs). »
+   sans la retirer. Sinon, tous les membres doivent être dans le lobby et avoir
+   un personnage ; l'inscription est alors enregistrée avec la notification
+   « Escouade inscrite dans la file : N/MIN joueurs. ». Le serveur diffuse
+   `state.queue = { mode = 'attack', size = N, min = 20, max = 30,
+   joined = true|false, parties = <nombre d'escouades prêtes> }` à tout le
+   lobby. `size` est le total des joueurs des escouades prêtes ; une escouade est
+   prête si elle existe, a au moins un membre, n'est pas en cours de lancement
+   et que tous ses membres sont éligibles (dans le lobby + personnage). La file
+   est **par escouade**, persistante et visible par tous : il n'y a plus
+   d'inscription automatique des joueurs du lobby ni de propriétaire.
+   - Le chef retire son escouade avec
+     `selectMode {mode='attack', cancel=true}` : ce callback transmet la table
+     telle quelle au serveur, contrairement à `play` qui ne garde que `mode`.
+     Messages : « Seul le chef peut retirer l'escouade de la file. », « Ton
+     escouade n'est pas dans la file. » ou « Escouade retirée de la file. ».
+     L'état NUI est rediffusé, la NUI n'est jamais fermée pendant l'attente.
+   - L'inscription ne disparaît **que** par annulation du chef, lancement d'un
+     autre mode (Redzone retire d'abord l'escouade de la file) ou disparition de
+     l'escouade. Elle survit au lancement d'une partie : au retour au lobby,
+     l'escouade est recomptée automatiquement et peut relancer.
+   - Un thread serveur vérifie le seuil toutes les 500 ms. Le drapeau
+     `launchPending` garantit un seul lancement à la fois. Si un match d'Attaque
+     est déjà démarré et que `exports.gf_attack:CanJoin()` est faux, la file
+     attend sa fin. Sinon, `ready` + `pick` retiennent des escouades **entières**
+     dans l'ordre FIFO : `pick` saute une escouade qui dépasserait `max` et
+     continue, sans jamais en couper une, et renvoie `nil` si le total est
+     inférieur à `min` (20, configurable). Chaque escouade retenue est marquée
+     `launching = true`, reçoit `gf_lobby:launching`, puis un `SetTimeout(700)`
+     appelle `exports.gf_core:SetMode` pour chaque membre encore éligible, en
+     sautant ceux déjà dans le mode. `launching = false` est remis sur toutes
+     les escouades retenues, `launchPending = false`, et l'état est diffusé.
+     En cas d'échec partiel ou total, le chef concerné reçoit « Impossible de
+     lancer la partie. » ou « Partie lancée pour X/Y joueurs. ». Le nombre de
+     joueurs et d'escouades lancés est journalisé. `PlayersToStart = attackMin`
+     et `MaxPlayers = attackMax` restent alignés.
+   - `/attack` ramène le joueur au lobby : l'inscription à la file se fait
+     depuis la NUI.
 3. **Redzone** : comportement inchangé (`minPlayers = 1`), lancement pour
-   l'escouade via `play`.
+   l'escouade via `play` ; l'escouade est d'abord retirée de la file Attaque.
 4. Dans les deux cas, `party.launching = true` est posé côté serveur et diffusé.
-   Un échec de `SetMode` restaure `launching = false`, rediffuse l'état et
-   affiche un toast ; aucun `close` explicite n'est envoyé avant le spawn.
+   Un échec de `SetMode` restaure `launching = false` — y compris sur toutes les
+   escouades retenues quand il s'agit d'Attaque —, rediffuse l'état et affiche
+   un toast ; aucun `close` explicite n'est envoyé avant le spawn.
 5. `gf_core` change le bucket, le spawn et ferme la NUI (`modeChanged`).
 6. Le lobby CEF reste chargé mais masqué ; il réapparaîtra au retour.
 
 ### 3.5 Retour au lobby
 
 `/lobby`, `/attack`, `/redzone`, fin de partie ou redémarrage de ressource :
-`gf_core` resynchronise le joueur. `gf_lobby` recrée une escouade solo si
-nécessaire, réattribue le bucket, renvoie l'état et rouvre la NUI.
+`gf_core` resynchronise le joueur. `gf_lobby` réutilise l'escouade existante
+(elle est conservée pendant le match, `partyId` inclus), réattribue le bucket,
+renvoie l'état et rouvre la NUI. L'inscription à la file Attaque est
+automatiquement recomptée : l'escouade est de nouveau prête et peut relancer
+sans que le chef ait à s'inscrire à nouveau. Une escouade solo n'est recréée que
+si le joueur n'appartenait à aucune escouade.
 
 ## 4. Architecture technique
 
@@ -179,6 +206,7 @@ server-data/resources/[gunfight]/gf_lobby/
 ├── config.lua                 # partagé client/serveur (scène, escouade, modes)
 ├── appearance.lua             # client : génération/applica. apparence déterministe
 ├── client.lua                 # caméra, focus, placement, protocole NUI
+├── queue.lua                  # module pur de la file par escouade (LobbyQueue)
 ├── server.lua                 # escouades, invitations, persistance, autorité
 ├── data/
 │   ├── .gitkeep
@@ -198,6 +226,9 @@ server-data/resources/[gunfight]/gf_lobby/
     ├── js/customization.js    # onglets Armes (placeholder) et Personnage (éditeur)
     └── data/tattoos.json      # catalogue vanilla compact (généré par script)
 ```
+
+`queue.lua` est un module pur, testé hors jeu par
+`tests/lua/lobby_queue_test.lua`.
 
 Ordre de démarrage : `gf_ui`, `gf_core`, `gf_lobby`, `gf_maps`, `gf_attack`,
 `gf_redzone`. `gf_lobby` dépend de `gf_core` (manifeste + `server.cfg`).
@@ -229,8 +260,8 @@ Transport : `fetch('https://gf_lobby/<callback>', {method:'POST', body: JSON})`.
 | `leaveParty` | — | quitter l'escouade |
 | `kickMember` | `{id}` | exclure (chef) |
 | `selectMode` | `{mode}` | choisir le mode (chef) |
-| `selectMode` | `{mode, cancel=true}` | annuler la recherche Attaque (chef) |
-| `play` | `{mode}` | lancer le mode / ouvrir la file Attaque (chef) |
+| `selectMode` | `{mode, cancel=true}` | retirer l'escouade de la file Attaque (chef) |
+| `play` | `{mode}` | inscrire l'escouade à la file Attaque (chef) / lancer Redzone |
 
 Tous les callbacks répondent `{ok:true}` (ou `{ok:false, error}`) pour clore le
 `fetch`. Le serveur ne fait jamais confiance aux données du client.
@@ -275,8 +306,13 @@ Enveloppe unique : `{type = "...", data = {...}}`.
         character = { name = "Nova", gender = "female", seed = 999, skin = 1 } },
     },
   },
-  queue = nil,  -- ou { mode = "attack", size = 22, min = 20, max = 30,
-                --      ownerId = 12 } pendant une recherche serveur
+  queue = {              -- toujours présent quand attack est disponible,
+    mode = "attack",     -- même si l'escouade n'est pas inscrite
+    size = 22,           -- joueurs dans les escouades prêtes
+    min = 20, max = 30,
+    joined = true,       -- l'escouade du joueur est-elle dans la file ?
+    parties = 3,         -- nombre d'escouades prêtes
+  },
   modes = {
     { id = "attack", label = "Attaque de zone", short = "ATTAQUE",
       description = "2 équipes, dernière équipe en vie.", icon = "target",
@@ -292,8 +328,12 @@ Enveloppe unique : `{type = "...", data = {...}}`.
 ```
 
 `slot` est l'ordre dans la formation 3D, recalculé à chaque changement
-d'escouade. Une escouade est dissoute quand un membre quitte le lobby : tous les
-membres présents partagent le même lobby, donc `slot` est toujours présent.
+d'escouade. L'escouade est conservée pendant un match : `leaveLobby` met
+`inLobby = false`, met à jour la file et ferme la NUI, sans dissoudre l'escouade
+ni effacer `player.partyId` ; `joinLobby` réutilise l'escouade existante. Seuls
+`playerDropped`, `leaveParty` et `kickMember` retirent le joueur, et une escouade
+vidée est retirée de la file. Tous les membres présents partagent le même lobby,
+donc `slot` est toujours présent.
 
 #### `creatorCatalog`
 
@@ -373,8 +413,8 @@ serveur.
 | `gf_lobby:respondInvite` | partyId, accept | invitation existante et non expirée |
 | `gf_lobby:leaveParty` | — | membre, lobby |
 | `gf_lobby:kickMember` | id cible | chef, cible du groupe |
-| `gf_lobby:selectMode` | mode, `cancel?` | chef ; si `cancel`, annule la file dont il est propriétaire |
-| `gf_lobby:play` | mode | chef, mode disponible ; Attaque : file serveur sans condition d'escouade ; Redzone : tous les membres dans le lobby |
+| `gf_lobby:selectMode` | mode, `cancel?` | chef ; si `cancel`, retire l'escouade du chef de la file |
+| `gf_lobby:play` | mode | chef, mode disponible ; Attaque : inscrit l'escouade (lobby + personnage pour tous les membres) ; Redzone : tous les membres dans le lobby |
 | `gf_lobby:requestState` | — | réinscription si le joueur est en lobby |
 
 ### 5.4 Serveur → client
@@ -409,7 +449,7 @@ Le serveur tient :
 Players[src] = { character, partyId, inLobby, lastInvite, lastMode }
 Parties[id]  = { id, leader, members = {src...}, selectedMode, launching }
 Invites[src] = { partyId, from, expiresAt }
-Queue        = { active, mode, owner, members = {[src]=true} }
+Queue        = LobbyQueue.new()   -- module queue.lua, file par escouade
 ```
 
 Règles :
@@ -419,14 +459,19 @@ Règles :
 - 4 membres maximum ;
 - seul le chef choisit le mode, exclut et lance ;
 - n'importe quel membre peut inviter ;
-- quitter le lobby (mode, déconnexion) retire le joueur de l'escouade ;
+- quitter le lobby pour un match conserve l'escouade (`player.partyId` inclus) ;
+  déconnexion, `leaveParty` et `kickMember` retirent le joueur ; une escouade
+  vidée quitte la file ;
 - si le chef part, le premier membre restant devient chef ;
 - une invitation expirée est purgée ; accepter une invitation remplace
   l'escouade solo éventuelle ;
 - anti-spam : 2 s entre deux invitations, 1 s entre deux changements de mode ;
-- une seule file Attaque active : elle est alimentée par `refreshQueue()` à
-  chaque entrée/sortie du lobby et à la création de personnage ; le seuil est
-  vérifié par un thread serveur toutes les 500 ms.
+- la file Attaque est **par escouade** et persistante : le chef inscrit son
+  escouade, le compteur est visible par tout le lobby, et l'inscription survit à
+  un match. Le seuil est vérifié par un thread serveur toutes les 500 ms, avec
+  un drapeau `launchPending` pour un seul lancement à la fois et
+  `exports.gf_attack:CanJoin()` comme garde. `pick` retient des escouades entières
+  dans l'ordre FIFO, sans jamais en couper une.
 
 ### 6.2 Routing buckets
 
@@ -753,7 +798,9 @@ sont ajoutés par `addEventListener`, pas par attribut HTML.
 Statique (CI) :
 
 - `luac -p` sur `config.lua`, `appearance_schema.lua`, `appearance.lua`,
-  `client.lua`, `server.lua` ;
+  `client.lua`, `queue.lua`, `server.lua` ;
+- `tests/lua/lobby_queue_test.lua` : module pur `queue.lua` testé hors jeu
+  (new/join/leave/has/ready/count/pick, ordre FIFO, escouades jamais coupées) ;
 - `node --check` sur les scripts JS de la NUI ;
 - tests `tests/test_depot.py` : `gf_lobby` dans la liste des ressources, chaque
   fichier du manifeste existe, ressource citée dans `server.cfg` et `README`,
@@ -771,19 +818,29 @@ Manuel en jeu :
 4. invitation, acceptation, refus, expiration, escouade pleine ;
 5. changement de chef, exclusion, départ, retour au lobby ;
 6. sélection de mode (chef/membre), lancement, fermeture de la NUI ;
-7. file Attaque : lancement par un chef solo, montée à 20 joueurs, annulation,
-   départ d'un joueur, arrivée d'un nouveau joueur, seuil atteint ;
+7. file par escouade : inscription par un chef solo (notification
+   « Escouade inscrite dans la file : 1/20 joueurs. »), ajout d'un second membre
+   (compteur à 2/20), visibilité du compteur par un autre joueur du lobby,
+   bouton « EN FILE » pour le membre non chef, `QUITTER LA FILE` par le chef puis
+   nouvelle inscription, persistance après un match (retour au lobby :
+   l'escouade est recomptée et peut relancer), et seuil atteint avec deux
+   escouades : aucune escouade n'est coupée au lancement, l'attente se poursuit
+   avec la suivante ;
 8. caméra/formation à 1, 2, 3 et 4 joueurs ;
 9. `/lobbyui`, redémarrage de `gf_lobby`, passage Attaque → lobby ;
-10. deux escouades : aucun joueur visible d'un groupe à l'autre (hors file
-    Attaque, où les joueurs de toutes les escouades sont lancés ensemble).
+10. deux escouades : aucun joueur visible d'un groupe à l'autre dans le lobby ;
+    les deux escouades peuvent être inscrites dans la file et sont lancées
+    entières, dans l'ordre FIFO, sans jamais être coupées.
 
 ## 13. Limites et extensions
 
-- Escouade **propre au lobby** : elle est dissoute au lancement et lorsqu'un
-  membre quitte le lobby. Attaque de zone utilise désormais une file serveur
-  globale (20–30 joueurs), mais l'escouade reste le conteneur du lobby.
-  Extension : répartition équilibrée en deux équipes de 15 côté `gf_attack`.
+- Escouade **conservée pendant un match** : quitter le lobby ne la dissout pas
+  et ne change pas `partyId` ; elle est retirée seulement à la déconnexion, au
+  départ explicite (`leaveParty`, `kickMember`) ou si elle se vide. Attaque de
+  zone utilise une file **par escouade** persistante (20–30 joueurs) : le chef
+  inscrit son escouade, le compteur est visible par tous et l'inscription survit
+  au match. Extension : répartition équilibrée en deux équipes de 15 côté
+  `gf_attack`.
 - Pas de liste d'amis Cfx.re ni de présence hors ligne : invitations des joueurs
   présents dans le lobby uniquement. Extension : `txAdmin`/base de données,
   amis persistants.
