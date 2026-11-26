@@ -51,6 +51,8 @@ end)
 -- ---------------------------------------------------------------- Choix des armes
 -- data = { title, weapons = { {id,label,category} }, selected = {id,id}, count, seconds }
 local loadoutFocus = false
+local requestWeaponPhotos
+local currentLoadout
 
 local function releaseLoadoutFocus()
     if loadoutFocus then
@@ -63,11 +65,14 @@ RegisterNetEvent('gf_ui:loadout_open', function(d)
     loadoutFocus = true
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
+    currentLoadout = type(d) == 'table' and d.weapons or nil
     SendNUIMessage({ type = 'loadout_open', data = d })
+    requestWeaponPhotos(currentLoadout)
 end)
 
 RegisterNetEvent('gf_ui:loadout_close', function()
     releaseLoadoutFocus()
+    currentLoadout = nil
     SendNUIMessage({ type = 'loadout_close' })
 end)
 
@@ -130,8 +135,44 @@ end)
 
 -- HUD des armes en bas à droite (envoyé par gf_core)
 -- list = { { key, name, label, clip, clipMax, active }, ... } ou nil pour masquer
+local weaponPhotoRequests = {}
+local currentWeapons = nil
+
+requestWeaponPhotos = function(list)
+    if type(list) ~= 'table' or GetResourceState('gf_thumbs') ~= 'started' then return end
+    local names = {}
+    for _, weapon in ipairs(list) do
+        local name = weapon.name
+        if type(name) == 'string' and name:match('^[%w_]+$') and not weaponPhotoRequests[name] then
+            weaponPhotoRequests[name] = true
+            names[#names + 1] = name
+        end
+    end
+    if #names == 0 then return end
+    CreateThread(function()
+        local ok, photos = pcall(function() return exports.gf_thumbs:Get('weapons', names) end)
+        if not ok or type(photos) ~= 'table' then
+            for _, name in ipairs(names) do weaponPhotoRequests[name] = nil end
+            return
+        end
+        SendNUIMessage({ type = 'weapon_photos', data = photos })
+    end)
+end
+
 AddEventHandler('gf_ui:weapons', function(list)
+    currentWeapons = list
     SendNUIMessage({ type = 'weapons', data = list })
+    requestWeaponPhotos(list)
+end)
+
+RegisterNetEvent('gf_thumbs:updated', function(kind, name)
+    if kind ~= 'weapons' or type(name) ~= 'string' then return end
+    weaponPhotoRequests[name] = nil
+    -- L'autre ressource vide son cache pour ce même événement.
+    SetTimeout(50, function()
+        requestWeaponPhotos(currentWeapons)
+        requestWeaponPhotos(currentLoadout)
+    end)
 end)
 
 -- ---------------------------------------------------------------- Minimap sans barres GTA
