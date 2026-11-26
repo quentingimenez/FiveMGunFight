@@ -12,6 +12,18 @@ for _, v in ipairs(Config.Vehicles) do
     MODEL_BY_HASH[joaat(v.model)] = v.model
 end
 
+-- Noms des pièces et livrées fournis par le pack (data/<modèle>/names.json,
+-- écrit par scripts/ajouter_vehicule.py) : affichés dans l'onglet Pièces
+for _, v in ipairs(Config.Vehicles) do
+    local raw = LoadResourceFile(GetCurrentResourceName(), ('data/%s/names.json'):format(v.model))
+    local ok, names = pcall(json.decode, raw or '')
+    if ok and type(names) == 'table' then
+        for key, text in pairs(names) do
+            if type(key) == 'string' and type(text) == 'string' then AddTextEntry(key, text) end
+        end
+    end
+end
+
 -- ---------------------------------------------------------------- Application
 local function applyCustom(veh, p)
     if not p and veh and veh ~= 0 and DoesEntityExist(veh) then

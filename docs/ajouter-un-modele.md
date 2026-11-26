@@ -46,6 +46,9 @@ Le script :
 
 - trouve le nom du modèle dans `vehicles.meta` (`<modelName>`) ;
 - copie les modèles 3D, les réglages et le son ;
+- reprend les **noms affichés** du pack (pièces, livrées, déclarés par `AddTextEntry` dans ses
+  `.lua`, lus comme du texte) dans `data/<modèle>/names.json`, chargé par `gf_vehicles` : les
+  pièces ont leur vrai nom dans `/customveh` ; le nom du menu vient aussi de là si `--nom` est absent ;
 - **nettoie** les réglages : liens publicitaires dans `gameName` /
   `vehicleMakeName`, entrées de `carvariations.meta` pour des modèles absents
   du pack (elles font référence à des kits inexistants) ;
