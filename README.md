@@ -237,7 +237,7 @@ scripts/sauvegarder.sh  sauvegarde de la production (base, txdata, maps)
 scripts/restaurer.sh    vérifie et extrait une sauvegarde hors production
 scripts/deployer.sh     déploie un digest, contrôle la santé, rollback
 scripts/verifier-sante.sh  santé HTTP, conteneurs, base, disque, redémarrages
-scripts/appliquer-protection.sh  lit ou applique la protection de main (GitHub Pro requis)
+scripts/appliquer-protection.sh  ancien script de protection (voir docs/protection-branche.md)
 scripts/proteger-branche.sh  ancien nom du script de protection (conservé)
 scripts/native.py       signature d'un natif FiveM/GTA, hors ligne (docs/pieges-fivem.md)
 scripts/fivem_rcon.py   commande console en dev, ex. restart gf_lobby (TXADMIN=false)
@@ -395,17 +395,17 @@ MariaDB ≥ 11.5 sont volontairement ignorées et restent une décision manuelle
 
 ### Ces contrôles bloquent-ils le merge ?
 
-Oui, **dès que la protection de `main` est active** : les trois vérifications
-(« Qualité du dépôt », « Construire et publier l'image » et « Vérifier le démarrage des
-ressources ») sont déclarées comme *checks obligatoires*, avec une approbation et la
-résolution des conversations. Tant que le dépôt reste privé sur le plan gratuit de
-GitHub, la protection n'est pas disponible : c'est le seul point à activer, voir
+Oui, le ruleset actif « Protection de main » exige les **quatre checks**
+(« Qualité du dépôt », « Sécurité de l'historique », « Construire et publier
+l'image » et « Vérifier le démarrage des ressources ») et la résolution des
+conversations de revue. Aucune approbation n'est exigée : une revue reste
+bienvenue, mais GitHub ne la demande pas. Voir
 [docs/protection-branche.md](docs/protection-branche.md).
 
 ## 11. Contribuer au code
 
 Le dépôt n'accepte plus de modifications directes sur `main` : tout passe par une
-**branche** et une **pull request** relue par au moins une personne.
+**branche** et une **pull request** avec une CI verte.
 
 1. Crée ta branche depuis `main` : `git switch -c feat/ma-fonctionnalite`.
 2. Fais tes modifications, puis lance les contrôles en local :
@@ -415,8 +415,8 @@ Le dépôt n'accepte plus de modifications directes sur `main` : tout passe par 
    ```
 3. Commit avec un message conventionnel (`feat: …`, `fix: …`, `docs: …`).
 4. Envoie la branche et ouvre la pull request : `gh pr create --fill`.
-5. La CI doit être verte, une revue est approuvée, puis la PR est fusionnée en
-   *squash* et la branche supprimée.
+5. La CI doit être verte, puis la PR est fusionnée en *squash* et la branche
+   supprimée ; une revue reste bienvenue, sans être exigée.
 
 Un hook fourni refuse un envoi direct sur `main` :
 
@@ -610,7 +610,7 @@ runbooks courts, à suivre le jour de l'incident plutôt qu'à réinventer :
 | sauvegarder | `scripts/sauvegarder.sh` | [restauration](docs/runbooks/restauration.md) |
 | vérifier/extraire une sauvegarde | `scripts/restaurer.sh` | [restauration](docs/runbooks/restauration.md) |
 | remplacer un secret | procédures manuelles | [rotation](docs/runbooks/rotation-secrets.md) |
-| lire/appliquer la protection de `main` | `scripts/appliquer-protection.sh` | [protection](docs/protection-branche.md) |
+| vérifier la protection de `main` | `gh api repos/quentingimenez/FiveMGunFight/rulesets` | [protection](docs/protection-branche.md) |
 
 Structure cible :
 
@@ -627,7 +627,8 @@ et [ADR 0002 — FXServer épinglé](docs/adr/0002-fxserver-epingle.md).
 
 État réel à ne pas surinterpréter :
 
-- la protection GitHub de `main` est **toujours à activer** (plan gratuit) ;
+- la protection GitHub de `main` est **active** (ruleset « Protection de
+  main », dépôt public) ;
 - `cosign` est appelé s'il est présent au déploiement, mais la CI ne signe pas
   encore les images ; FXServer est en revanche épinglé par `.fxserver-version`
   (URL + SHA256) et l'image est scannée par Trivy sur les PR ;

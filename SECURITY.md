@@ -81,8 +81,9 @@ Règles générales :
 Deux collaborateurs disposent du droit d'écriture : `WardenPro` (propriétaire)
 et `Zhics`. Toute évolution passe par une pull request.
 
-La protection de branche GitHub de `main` est **préparée mais inactive** : le
-dépôt privé est sur un plan gratuit et GitHub refuse la règle (403). La
-discipline repose sur `AGENTS.md`, le hook `.githooks/pre-push` et la revue
-humaine. Voir [`docs/protection-branche.md`](docs/protection-branche.md) et
+La protection de branche GitHub de `main` est **active** : le ruleset
+« Protection de main » s'applique au dépôt public, sans approbation
+obligatoire et sans contournement. La discipline repose sur `AGENTS.md`, les
+checks requis et le hook `.githooks/pre-push` ; une revue humaine reste
+bienvenue. Voir [`docs/protection-branche.md`](docs/protection-branche.md) et
 [`docs/adr/0001-protection-branche.md`](docs/adr/0001-protection-branche.md).

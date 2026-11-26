@@ -1,6 +1,10 @@
 # ADR 0001 — Protection de la branche `main`
 
-- **Statut** : proposé, décision en attente
+**Suite (26/11/2026)** — L'option finalement retenue est le **dépôt public** :
+le ruleset « Protection de main » est actif, sans approbation exigée. L'ADR
+recommandait GitHub Pro ; cette recommandation n'a pas été suivie.
+
+- **Statut** : accepté le 26/11/2026 (dépôt public, voir « Suite »)
 - **Date** : 2026-11-25
 - **Décideurs** : `@WardenPro`, `@Zhics`
 

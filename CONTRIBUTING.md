@@ -145,7 +145,8 @@ Au-delà de ~400 lignes modifiées, découpe.
 
 ## 7. Revue de code
 
-- **1 approbation** est requise (`CODEOWNERS` : `@WardenPro` ou `@Zhics`).
+- **Aucune approbation** n'est exigée par le ruleset. Une revue de `@WardenPro`
+  ou `@Zhics` (`CODEOWNERS`) reste bienvenue sur les fichiers à fort impact.
 - L'auteur ne peut pas approuver sa propre pull request.
 - Le relecteur vérifie :
   - la logique côté **serveur** (le client ne décide jamais du score ni des tirs
@@ -155,7 +156,7 @@ Au-delà de ~400 lignes modifiées, découpe.
   - la mise à jour de la documentation si le comportement change ;
   - la checklist de [`docs/regles-de-code.md`](docs/regles-de-code.md) § 11.
 - Un commentaire bloquant doit être résolu avant la fusion (la résolution des
-  conversations est exigée par la protection de branche).
+  conversations est exigée par le ruleset).
 
 ## 8. Fusionner
 
