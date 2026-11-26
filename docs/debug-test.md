@@ -36,6 +36,60 @@ dernières lignes de journal ; c'est le premier réflexe avant de chercher.
 
 ## 2. Démarrer une session de test
 
+### Prérequis : `TXADMIN` et `MAX_PLAYERS`, à vérifier à chaque lancement
+
+Deux variables d'environnement font échouer un test local, souvent sans
+message clair. **Avant chaque** `docker compose up` de test (humain ou agent),
+les fixer explicitement :
+
+| Variable | Valeur pour un test local | Si elle est fausse |
+|---|---|---|
+| `TXADMIN` | `false` | `true`, ou absente (le défaut est `true`) : txAdmin redémarre en boucle sur `EACCES` (voir plus bas) et le serveur de jeu ne démarre jamais |
+| `MAX_PLAYERS` | `48` | au-delà de 48 avec la clé gratuite, FiveM refuse les connexions (« more slots than allowed by the current subscription ») |
+
+Le `.env` du poste peut contenir d'autres valeurs (réglages de production,
+ancienne copie de `.env.example`) : ne pas s'y fier, et ne pas le modifier pour
+un test. Dans Compose, **les variables du shell priment sur `.env`** : il suffit
+de les fixer dans la session courante, puis de **recréer** le conteneur.
+
+```powershell
+# Windows PowerShell
+$env:TXADMIN='false'
+$env:MAX_PLAYERS='48'
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate fxserver
+```
+
+```bash
+# bash / WSL
+TXADMIN=false MAX_PLAYERS=48 \
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate fxserver
+```
+
+- `docker compose restart fxserver` **ne relit pas** les variables : le
+  conteneur garde celles de sa création. Après un changement de variable,
+  toujours `up -d --force-recreate fxserver`.
+- `start.bat` lit `.env` tel quel : pour un test, préférer les commandes
+  ci-dessus.
+- Les variables `$env:` ne valent que pour la fenêtre PowerShell courante :
+  dans une nouvelle fenêtre (ou un nouvel appel d'outil d'agent), les refixer.
+
+**Vérifier** que le conteneur en cours les a bien prises, avant de lancer le
+jeu :
+
+```powershell
+docker logs gunfight-fxserver 2>&1 | Select-String 'txAdmin          :|joueurs max'
+```
+
+Résultat attendu :
+
+```text
+secrets.cfg généré (joueurs max : 48)
+txAdmin          : désactivé (TXADMIN=false)
+```
+
+Ce réglage vaut pour les **tests locaux** uniquement : en production, txAdmin
+reste utile (section 9 du README) et `MAX_PLAYERS` suit l'abonnement Cfx.re.
+
 ### Démarrage normal
 
 ```powershell
@@ -56,20 +110,8 @@ Attends les lignes `Server license key authentication succeeded` puis
 ### Démarrage direct, sans txAdmin (test rapide)
 
 Le panneau txAdmin est utile pour la production, mais il ajoute un mode
-« moniteur » et peut gêner un test local. Pour démarrer directement le serveur
-de jeu :
-
-```powershell
-$env:TXADMIN='false'
-$env:MAX_PLAYERS='48'
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-```
-
-```bash
-# bash / WSL
-TXADMIN=false MAX_PLAYERS=48 \
-  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-```
+« moniteur » et peut gêner un test local. C'est le mode attendu pour les tests
+locaux : commandes et vérification dans les **prérequis** ci-dessus.
 
 `MAX_PLAYERS=48` correspond à la limite de la clé gratuite ; au-delà,
 l'entrypoint affiche un avertissement et la clé peut refuser des joueurs.

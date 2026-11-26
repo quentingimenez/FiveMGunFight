@@ -122,9 +122,15 @@ bash scripts/verifier.sh
 Toute modification doit être **lancée en local** avant d'être proposée. Lancer
 le composant concerné et observer le résultat :
 
-- ressource Lua / serveur : `docker compose up -d`, attendre « Started resource
-  gf_… » dans `docker compose logs -f fxserver`, puis reproduire le scénario en
-  jeu ou par commande ;
+- ressource Lua / serveur : **avant chaque lancement**, fixer `TXADMIN=false`
+  et `MAX_PLAYERS=48` dans le shell (le `.env` du poste peut valoir
+  `TXADMIN=true` et plus de 48 joueurs : txAdmin redémarre alors en boucle, ou
+  FiveM refuse les connexions), lancer
+  `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate fxserver`
+  (`restart` ne relit pas les variables), vérifier dans les logs
+  « txAdmin : désactivé » et « joueurs max : 48 », attendre « Started resource
+  gf_… », puis reproduire le scénario en jeu ou par commande. Détail et
+  commandes : [`docs/debug-test.md`](docs/debug-test.md) § 2, « Prérequis » ;
 - interface NUI : ouvrir l'écran concerné, vérifier le rendu et les actions ;
 - script / outillage : l'exécuter sur un cas nominal **et** sur le cas d'erreur
   qu'il doit traiter ;
@@ -374,8 +380,9 @@ contraire de l'utilisateur.
    `feat/vehicule-<modele>` (§ 4.1).
 4. **Contrôles** (§ 4.2) : `python -m unittest discover -s tests -v` (la classe
    `VehiculesDeclares` doit passer) et `bash scripts/verifier.sh`.
-5. **Exécution locale** (§ 4.3) : redémarrer le serveur de développement
-   (`docker compose -f docker-compose.yml -f docker-compose.dev.yml restart fxserver`),
+5. **Exécution locale** (§ 4.3) : recréer le serveur de développement avec
+   `TXADMIN=false` et `MAX_PLAYERS=48` fixés dans le shell
+   (`docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate fxserver`),
    vérifier « Started resource gf_vehicles » sans `SCRIPT ERROR`, et relever les
    avertissements « oversized » éventuels.
 6. **Photo** : rien à faire ni à demander. Elle se prend à la prochaine
