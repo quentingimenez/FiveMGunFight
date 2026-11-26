@@ -141,8 +141,11 @@ Config.Loadouts = {
 -- ---------------------------------------------------------------------------
 -- Validation des tirs (côté serveur, module pur shot_validation.lua)
 -- enabled : active la vérification des dégâts reçus par weaponDamageEvent.
--- alwaysAllowed : armes toujours autorisées, même hors loadout (armes
---   environnementales, explosions). Liste à confirmer en jeu.
+-- alwaysAllowed : armes toujours autorisées, même hors loadout (poings).
+-- forbidden : dégâts toujours refusés entre joueurs, loadout ou non :
+--   explosions (arme donnée par un tricheur, véhicule qui saute) et chocs de
+--   véhicule (écrasement, percussion). Les explosions elles-mêmes sont aussi
+--   annulées par explosionEvent.
 -- damageCaps : par nom d'arme, plafonds de dégâts { body = n, head = n }.
 --   LAISSE VIDE tant que le chantier C6 n'a pas extrait les valeurs de
 --   weapons.meta : ne jamais inventer de chiffre.
@@ -154,7 +157,8 @@ Config.Loadouts = {
 -- ---------------------------------------------------------------------------
 Config.ShotValidation = {
     enabled = true,
-    alwaysAllowed = { 'WEAPON_UNARMED', 'WEAPON_RUN_OVER_BY_CAR', 'WEAPON_RAMMED_BY_CAR', 'WEAPON_EXPLOSION' },
+    alwaysAllowed = { 'WEAPON_UNARMED' },
+    forbidden = { 'WEAPON_EXPLOSION', 'WEAPON_RUN_OVER_BY_CAR', 'WEAPON_RAMMED_BY_CAR' },
     damageCaps = {},
     fireIntervals = {},
     headComponents = { 20 },
