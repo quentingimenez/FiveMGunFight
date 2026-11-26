@@ -61,6 +61,21 @@ exports('Get', get)
 
 -- ---------------------------------------------------------------- Studio
 local capturing = false
+
+-- Protection contre les modèles cassés : un marqueur est posé avant chaque photo
+-- et retiré après. S'il est encore là au démarrage, ce modèle a fait planter le
+-- jeu : il est mis de côté (plus de photo automatique) et signalé au serveur.
+local INFLIGHT = 'gf_thumbs:inflight'
+local function badKey(kind, id) return ('gf_thumbs:bad:%s/%s'):format(kind, id) end
+do
+    local crashed = GetResourceKvpString(INFLIGHT)
+    if crashed and crashed ~= '' then
+        SetResourceKvpInt('gf_thumbs:bad:' .. crashed, 1)
+        DeleteResourceKvp(INFLIGHT)
+        print(('^1[gf_thumbs] %s a fait planter le jeu pendant sa photo : ignoré désormais^0'):format(crashed))
+        TriggerServerEvent('gf_thumbs:broken', crashed)
+    end
+end
 local captureWaiter = nil -- promesse de la photo en cours
 
 -- Réponse de la page NUI après capture (enregistré une seule fois)
@@ -159,6 +174,7 @@ local function shoot(kind, id)
     local subject = Subjects[def.subject]
     local s = Config.Studio
     local pos = vector3(s.x, s.y, s.z)
+    SetResourceKvp(INFLIGHT, kind .. '/' .. id)
     local ent = subject.spawn(id, pos)
     if not ent then
         print(('[gf_thumbs] %s/%s : modèle introuvable, ignoré'):format(kind, id))
@@ -260,7 +276,11 @@ local function runBatch(jobs, why)
     for i, job in ipairs(jobs) do
         SendNUIMessage({ type = 'progress', text = ('Préparation des photos des menus… %d/%d'):format(i, #jobs) })
         print(('[gf_thumbs] Photo %d/%d : %s/%s (%s)'):format(i, #jobs, job.kind, job.id, why))
-        if shoot(job.kind, job.id) then ok = ok + 1 end
+        if shoot(job.kind, job.id) then
+            ok = ok + 1
+            DeleteResourceKvp(badKey(job.kind, job.id)) -- refait avec succès : plus « cassé »
+        end
+        DeleteResourceKvp(INFLIGHT)
         Wait(300)
     end
 
@@ -303,7 +323,9 @@ RegisterNetEvent('gf_thumbs:autoCapture', function()
             if #ids > 0 then
                 local have = get(kind, ids)
                 for _, id in ipairs(ids) do
-                    if not have[id] then jobs[#jobs + 1] = { kind = kind, id = id } end
+                    if not have[id] and GetResourceKvpInt(badKey(kind, id)) ~= 1 then
+                        jobs[#jobs + 1] = { kind = kind, id = id }
+                    end
                 end
             end
         end

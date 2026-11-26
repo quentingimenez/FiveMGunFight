@@ -741,3 +741,16 @@ RegisterCommand('setmode', function(src, args)
     end
     setMode(target, mode)
 end, false)
+
+-- Un client signale qu'un modèle de véhicule l'a fait planter au chargement
+-- (marqueur KVP resté posé) : il ne l'utilisera plus. Alerte console pour
+-- l'équipe : le modèle est sans doute corrompu et doit être retiré.
+local crashReported = {}
+RegisterNetEvent('gf_core:vehicleCrashed', function(model)
+    local src = source
+    if crashReported[src] or type(model) ~= 'string' or #model > 64 or not model:match('^[%w_]+$') then return end
+    crashReported[src] = true
+    print(('^1[gf_core] %s : le véhicule %s a fait planter son jeu (modèle corrompu ?)^0')
+        :format(GetPlayerName(src) or src, model))
+end)
+AddEventHandler('playerDropped', function() crashReported[source] = nil end)
