@@ -26,8 +26,8 @@ faire · ✅ fait · ❓ hypothèse à vérifier avant tout correctif.
 
 | # | Chantier | Priorité | État | Dépend de | Règles |
 |---|---|---|---|---|---|
-| C1 | Validation des tirs | haute | 🧪 | — | S4, S9 |
-| C2 | Journal brut des matchs | haute | 🧪 | — | D2, S9, P3 |
+| C1 | Validation des tirs | haute | 🟡 | — | S4, S9 |
+| C2 | Journal brut des matchs | haute | ✅ | — | D2, S9, P3 |
 | C3 | Vie et soins contrôlés par le serveur | haute | 🧪 | C2 | S1 |
 | C4 | State bags lus comme vérité | haute | 🧪 | — | S3 |
 | C5 | Verrous FXServer et véhicules créés par le serveur | haute | ⬜ | — | S5, S8 |
@@ -43,7 +43,7 @@ faire · ✅ fait · ❓ hypothèse à vérifier avant tout correctif.
 | C15 | Documentation contradictoire | basse | ✅ | — | — |
 | C16 | Délais, boucles par image et taille des fichiers | basse | 🟡 | C7 | A4, A6, P1 |
 
-## Avancement (26 novembre 2026)
+## Avancement (27 novembre 2026)
 
 Ce qui est fusionné et ce qu'il reste à prouver. « En jeu » veut dire avec de
 vrais clients FiveM (`FiveM.exe -cl2` pour un second client) sur le serveur
@@ -51,19 +51,39 @@ de développement.
 
 | # | PR | Fait | Reste à faire |
 |---|---|---|---|
-| C1 | #55 | Module `ShotValidation` : arme hors loadout, plafond de dégât, cadence ; refus journalisés | En jeu, deux clients : une manche sans tir légitime refusé, puis une arme hors loadout annulée et journalisée. Remplir `damageCaps` et `fireIntervals` à partir de C6, une fois C6 mesuré |
-| C2 | #59 | Ressource `gf_journal` (table `gf_match_events`), `scripts/recalculer_match.py`, `scripts/exporter_journal.sh` | En jeu : un match complet dont le tableau de fin est recalculé à l'identique |
-| C3 | #62 | Ressource `gf_audit` : anomalies `soin-sans-objet` et `touche-mortelle-sans-mort`, sans sanction | En jeu, deux clients : aucune anomalie sur une manche normale ; une anomalie quand une ressource de test force un soin. Puis mesurer le taux de fausses alertes avant toute sanction |
+| C1 | #55 | Module `ShotValidation` : arme hors loadout, plafond de dégât, cadence ; refus journalisés | Remplir `damageCaps` et `fireIntervals` à partir de C6, avec exemption des touches mortelles ou plafond au-dessus de 750 |
+| C2 | #59 | Ressource `gf_journal` (table `gf_match_events`), `scripts/recalculer_match.py`, `scripts/exporter_journal.sh` | — |
+| C3 | #62 | Ressource `gf_audit` : anomalies `soin-sans-objet` et `touche-mortelle-sans-mort`, sans sanction | Une anomalie quand une ressource de test force un soin ; mesurer le taux de fausses alertes sur plus de parties avant toute sanction |
 | C4 | #61 | Le serveur décide depuis ses tables (`Proteges`, `Equipes`, `Modes`) ; un garde rétablit les state bags réécrits par un client et journalise l'anomalie | En jeu, un client : `LocalPlayer.state:set('gf_protected', true, true)` doit produire une ligne `anomalie` et la valeur revenir à `false` |
 | C5 | — | Rien | Tout, avec une partie de test : le véhicule de mode devient créé par le serveur |
-| C6 | #64 | Tableau des tirs et du temps pour tuer : [`equilibrage-armes.md`](equilibrage-armes.md) (build 1.0.3889.0) | En jeu : compter les tirs sur une cible à 10, 25 et 50 m et comparer au tableau ; puis la part des kills de chaque arme (C2) avant tout réglage |
-| C7 | #58 | Module `AttackRules` (machine à états, 26 tests, 500 suites aléatoires) | En jeu, deux clients : une manche avec un départ volontaire à chaque phase |
-| C12 | #56 | Ressource `gf_db` : migrations numérotées et table `gf_schema_version`, prouvées sur la base de développement | Preuve en CI d'une base de la version précédente migrée, puis sauvegarde et restauration du runbook après migration |
+| C6 | #64 | Tableau des tirs et du temps pour tuer : [`equilibrage-armes.md`](equilibrage-armes.md) (build 1.0.3889.0) | Compter les tirs pour tuer en jeu, à 10, 25 et 50 m, et comparer au tableau ; puis la part des kills de chaque arme (C2) avant tout réglage |
+| C7 | #58 | Module `AttackRules` (machine à états, 26 tests, 500 suites aléatoires) ; défaut du départ en sélection ou en placement vidant une équipe corrigé (branche `fix/attack-empty-team-at-live`) | Voir le correctif en jeu à deux clients |
+| C12 | #56 | Ressource `gf_db` : migrations numérotées et table `gf_schema_version`, prouvées sur la base de développement | Sauvegarde puis restauration du runbook après migration |
 | C13 | #57 | `vendorise.json` et `scripts/suivre_vendorise.py`, testés | — |
 | C16 | #58 | Délais de `gf_attack` passés à `GetGameTimer()` | Mesurer chaque `Wait(0)` avec `resmon` ; découper `gf_lobby/server.lua`, `gf_lobby/client.lua` et `gf_attack/server.lua` (644 lignes) |
 
 Le smoke de la CI vérifie aussi le démarrage de `gf_db`, `gf_journal` et
 `gf_stats` (#60), mais pas encore celui de `gf_audit`.
+
+### Preuves tirées du journal de production (26 novembre 2026)
+
+Le 26 novembre 2026, trois joueurs ont joué en production, en Redzone et en
+Attaque : le journal `gf_match_events`, lu par des requêtes en lecture seule,
+contient 896 événements de 16 h 31 à 23 h 27.
+
+| # | Résultat | Ce que montre le journal |
+|---|---|---|
+| C1 | 486 touches acceptées, aucun tir légitime refusé ; 39 refus `arme-hors-loadout` et 31 refus `regle-mode` | Les 39 refus viennent d'un même joueur entre 17 h 59 et 18 h 05, avec des armes que le serveur ne donne jamais : annulées et journalisées ; les 31 refus sont des tirs hors de la zone Redzone, attendus. Les plafonds et les cadences restent à remplir |
+| C2 | 6 matchs terminés (4 Redzone, 2 Attaque), jusqu'à 3 joueurs et 26 morts | `scripts/recalculer_match.py` recalcule les 6 matchs à l'identique de la ligne `resultats` |
+| C3 | 3 anomalies `touche-mortelle-sans-mort` entre 18 h 00 et 18 h 10, vie vue par le serveur à 200 ; aucune anomalie `soin-sans-objet` sur les 52 kills | Vrais positifs, pendant le bug de la Redzone où les joueurs ne pouvaient pas mourir, corrigé depuis. Restent la ressource de test qui force un soin et le taux de fausses alertes sur plus de parties |
+| C6 | Dégât maximal au corps 31 pour `WEAPON_SPECIALCARBINE` (32 au tableau) et 50 pour `WEAPON_PISTOL50` (51 au tableau) | Premier relevé en jeu cohérent avec le tableau ; le nombre de tirs pour tuer reste à compter |
+| C7 | Les manches d'Attaque ont enchaîné leurs phases normalement : scores, raisons de fin, départs en placement et en live | Un départ pendant la sélection ou le placement vidant une équipe laissait la manche passer en live et durer tout le chrono sans adversaire ; corrigé par la branche `fix/attack-empty-team-at-live`, à voir en jeu à deux clients |
+| C12 | Migrations 1 et 2 le 26/11 à 16 h 30, puis migration 3 à chaud à 18 h 55 sur une base en version 2 | Preuve d'une base de la version précédente migrée, en production plutôt qu'en CI ; restent la sauvegarde et la restauration du runbook après migration |
+
+Une touche mortelle à la tête annonce un dégât très supérieur à celui de
+l'arme : jusqu'à 730 relevé, contre 31 à 50 pour une touche normale. Un
+plafond tiré du tableau de C6 refuserait ces kills légitimes : il faut
+exempter les touches mortelles ou fixer le plafond au-dessus de 750.
 
 ## C1 — Validation des tirs
 
