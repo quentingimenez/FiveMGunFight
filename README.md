@@ -225,7 +225,7 @@ docker-compose.prod.yml surcouche prod : image GHCR, volumes gunfight-prod-*
 docker-compose.staging.yml préproduction autonome : projet gunfight-staging, ports 30121/40121
 docker/entrypoint.sh    démarrage : secrets.cfg, amorçage de maps.json en prod
 docker/mariadb.cnf      réglages MariaDB (cache, connexions, encodage)
-docker/db/init/         scripts SQL exécutés au tout premier démarrage
+docker/db/init/         encore monté dans MariaDB (scripts exécutés sur volume vide), schéma géré par gf_db
 .env.example            modèle de configuration (.env = ta vraie config, secrète)
 start.bat / stop.bat / status.bat / console.bat
 .editorconfig           conventions d'indentation et de fins de ligne
@@ -258,6 +258,7 @@ server-data/
   server.cfg            configuration FiveM
   resources/[cfx-default]/   ressources officielles Cfx.re (spawn, events)
   resources/[gunfight]/
+    gf_db       migrations du schéma MariaDB au démarrage (gf_schema_version)
     gf_core     modes, apparition, armes, morts, anti-tir sur coéquipier
     gf_lobby    création de personnage, caméra fixe, escouade, invitations, choix du mode
     gf_attack   mode Attaque de zone
@@ -277,8 +278,8 @@ côté serveur.
 ## 8. Base de données MariaDB
 
 Le serveur démarre sans base, mais les statistiques persistantes (`gf_stats` via
-`oxmysql`) en dépendent. Le schéma est créé au premier démarrage sur base vide.
-Ce qui est déjà en place :
+`oxmysql`) en dépendent. Le schéma est créé et mis à jour par la ressource
+`gf_db` au démarrage de FXServer, même sur une base existante. Ce qui est déjà en place :
 
 - Base `gunfight`, utilisateur `gunfight` et mot de passe root créés au premier démarrage
   à partir des valeurs `MARIADB_*` de `.env`.
@@ -287,7 +288,11 @@ Ce qui est déjà en place :
 - Réglages dans `docker/mariadb.cnf` : 1 Go de cache InnoDB, 200 connexions, `utf8mb4`.
 - Le serveur attend que la base soit **saine** avant de démarrer, et non simplement
   que le conteneur existe : plus de course au démarrage.
-- Scripts SQL ajoutés dans `docker/db/init/` : exécutés **une seule fois**, sur une base vide.
+- `gf_db` applique les migrations listées dans `gf_db/migrations.lua` et enregistre
+  leur version et leur somme dans `gf_schema_version`. Les logs `[gf_db]` signalent
+  chaque migration appliquée puis `[gf_db] schéma à jour (version N)`.
+- `docker/db/init/` reste monté dans MariaDB, mais ses scripts ne s'exécutent que sur
+  un volume vide : le schéma du jeu ne vient plus de là.
 
 Ouvrir la console SQL :
 
@@ -452,7 +457,7 @@ contient que :
 
 - `docker-compose.yml` et `docker-compose.prod.yml` ;
 - `.env.example` (modèle) et `.env` (configuration, dont `IMAGE_REF`) ;
-- `docker/` (`mariadb.cnf` et `db/init/`, montés par le socle) ;
+- `docker/` (`mariadb.cnf` et `db/init/`, montés par le socle ; le schéma vient des migrations de `gf_db`, pas de `db/init/`) ;
 - `scripts/` (`deployer.sh`, `verifier-sante.sh`, `sauvegarder.sh`,
   `restaurer.sh`) et, pour consultation, `docs/runbooks/`.
 

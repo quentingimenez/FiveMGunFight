@@ -428,8 +428,9 @@ class GabaritUnraid(unittest.TestCase):
         self.assertEqual(personnages[0].get("Mode"), "rw")
         self.assertEqual(personnages[0].get("Required"), "true")
         runbook = lire(RACINE / "docs" / "runbooks" / "deploiement-unraid.md")
-        self.assertIn("01-schema.sql", runbook)
+        self.assertIn("gf_db", runbook)
         self.assertIn("gf_stats_players", runbook)
+        self.assertIn("gf_schema_version", runbook)
 
     def test_amorcage_des_maps_et_heritage(self) -> None:
         racine = self.racine()

@@ -7,5 +7,6 @@ description 'Statistiques persistantes des joueurs (kills, morts, parties, victo
 version '1.0.0'
 
 dependency 'oxmysql'
+dependency 'gf_db'
 
 server_script 'server.lua'

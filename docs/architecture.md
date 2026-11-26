@@ -106,7 +106,7 @@ et que le fichier manque, il copie le modèle de l'image depuis
 | Fichier | Rôle |
 |---|---|
 | `Dockerfile` | Debian `bookworm-slim` épinglé par digest, télécharge FXServer épinglé par `.fxserver-version` (la CI passe `FX_URL` et `FX_SHA256` ; le mode `FX_CHANNEL` reste un repli local), vérifie l'empreinte, copie `server-data/` dans `/opt/fivem/server-data/` **et** dans `/opt/fivem/defaults/`, expose 30120/TCP-UDP et 40120/TCP, puis s'exécute en utilisateur non-root `fivem` (uid 10001) |
-| `docker-compose.yml` | `name: gunfight` fige le préfixe des volumes du dev quel que soit le nom du dossier ; deux services : `fxserver` (sans `build` ni `image`, sans `env_file` : les secrets sont montés dans `/run/secrets`, `cap_drop: ALL`, `no-new-privileges`, volume `txdata`, healthcheck HTTP sur `30120/dynamic.json`, plafond mémoire `${FXSERVER_MEMORY_LIMIT:-4g}`) et `mariadb:11.4` épinglée par digest (volume `dbdata`, secrets `_FILE`, `docker/mariadb.cnf`, scripts de `docker/db/init/`, réseau interne `backend`, plafond mémoire `${MARIADB_MEMORY_LIMIT:-2g}`) ; le serveur attend que la base soit `healthy` |
+| `docker-compose.yml` | `name: gunfight` fige le préfixe des volumes du dev quel que soit le nom du dossier ; deux services : `fxserver` (sans `build` ni `image`, sans `env_file` : les secrets sont montés dans `/run/secrets`, `cap_drop: ALL`, `no-new-privileges`, volume `txdata`, healthcheck HTTP sur `30120/dynamic.json`, plafond mémoire `${FXSERVER_MEMORY_LIMIT:-4g}`) et `mariadb:11.4` épinglée par digest (volume `dbdata`, secrets `_FILE`, `docker/mariadb.cnf`, montage `docker/db/init/` (scripts exécutés seulement sur volume vide ; le schéma vient des migrations de `gf_db`), réseau interne `backend`, plafond mémoire `${MARIADB_MEMORY_LIMIT:-2g}`) ; le serveur attend que la base soit `healthy` |
 | `docker-compose.dev.yml` | ajoute `build: .`, le bind mount `./server-data` et conserve l'utilisateur root pour que le montage Windows reste inscriptible |
 | `docker-compose.prod.yml` | utilise `${IMAGE_REF}` par digest, monte les quatre secrets, active l'amorçage des maps et renomme les volumes en `gunfight-prod-*` |
 | `docker/entrypoint.sh` | lit les secrets dans `/run/secrets` (repli sur les variables en développement), valide `LICENSE_KEY`, génère `server-data/secrets.cfg` sous `umask 077`, remet le fichier en `chmod 600`, retire les variables secrètes de l'environnement, amorce `maps.json` si demandé, puis lance FXServer |
@@ -173,6 +173,7 @@ modifiées, démarrées avant nos ressources.
 | `gf_maps` | éditeur de maps en jeu (`/editor`), liste (`/maps`), stockage `data/maps.json` | `html/`, `server.lua`, `client.lua` |
 | `gf_attack` | mode Attaque de zone : deux équipes, manches en 3 phases (choix des armes, placement, combat), voitures, spectateur sur les alliés | `config.lua`, `server.lua`, `client.lua` |
 | `gf_redzone` | mode Redzone : zone libre, prise de véhicule, podium | `config.lua`, `server.lua`, `client.lua` |
+| `gf_db` | migrations du schéma MariaDB au démarrage via `oxmysql`, sommes enregistrées dans `gf_schema_version` | `server.lua`, `migrations.lua`, `migrations/` |
 | `gf_stats` | statistiques persistantes (MariaDB via `oxmysql`), export `GetPlayerStats` | `server.lua` |
 | `gf_menu` | menu pause NUI (Échap) remplaçant le frontend natif : profil, règlement, chat, Discord, déconnexion | `html/` (page `ui_page`), `config.lua`, `menu_state.lua`, `server.lua`, `client.lua` ; dépend de `gf_core` et `gf_stats` |
 
@@ -185,7 +186,7 @@ Ordre de démarrage imposé par `server.cfg` (les dépendances vont dans ce sens
 
 ```text
 chat · mapmanager · spawnmanager · baseevents
-gf_ui · gf_core · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu
+oxmysql · gf_db · gf_thumbs · gf_vehicles · gf_ui · gf_core · gf_lobby · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu
 ```
 
 Les interfaces NUI sont portées par `gf_ui` (HUD, classement, choix des armes)
@@ -252,10 +253,12 @@ Tant qu'aucune map n'est cochée pour un mode, les zones de secours des
 Base `gunfight`, utilisateur `gunfight`, réglages InnoDB/`utf8mb4` dans
 `docker/mariadb.cnf`. Le jeu utilise désormais cette base : les ressources
 `oxmysql` et `gf_stats` enregistrent kills, morts, parties et victoires dans la
-table `gf_stats_players`, créée par `docker/db/init/01-schema.sql` au premier
-démarrage sur base vide. La chaîne `mysql_connection_string` est générée dans
-`secrets.cfg`. Les personnages du lobby sont conservés dans le volume
-`gf_lobby/data` (`characters`).
+table `gf_stats_players`. Les tables sont créées et mises à jour par les
+migrations de `gf_db` au démarrage de FXServer, même sur une base existante ;
+`gf_schema_version` y enregistre la version et la somme de chaque migration
+appliquée. La chaîne `mysql_connection_string` est générée dans `secrets.cfg`.
+Les personnages du lobby sont conservés dans le volume `gf_lobby/data`
+(`characters`).
 
 ### Sauvegarde et restauration
 

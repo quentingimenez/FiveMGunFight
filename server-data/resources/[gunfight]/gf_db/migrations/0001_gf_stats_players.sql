@@ -1,9 +1,3 @@
--- =============================================================================
---  Schéma des statistiques persistantes (gf_stats)
---  Exécuté une seule fois par MariaDB, au premier démarrage du volume vide.
---  Voir docker/db/init/README.md.
--- =============================================================================
-
 CREATE TABLE IF NOT EXISTS gf_stats_players (
     identifier   VARCHAR(64)  NOT NULL,
     display_name VARCHAR(64)  NOT NULL DEFAULT '',
