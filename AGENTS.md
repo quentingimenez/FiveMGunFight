@@ -31,15 +31,6 @@ documentation). Il découpe la demande, lance des sous-agents
 - Cette règle s'applique à **toute demande de correction**, y compris quand
   l'utilisateur décrit lui-même le correctif à appliquer.
 
-## 0. Échanges avec l'utilisateur
-
-- Répondre à l'utilisateur **en français** ; code, commentaires et noms de
-  variables restent dans la langue du fichier modifié.
-- Aucun agent ne se déclare co-auteur : pas de ligne `Co-Authored-By` dans les
-  commits, pas de mention « Generated with … » (Claude Code, Codex ou autre)
-  dans les PR.
-- Dire clairement ce qui n'a pas été vérifié.
-
 ## 1. Règle cardinale
 
 `main` est la branche de production. **Aucun agent ne commit ni ne pousse
@@ -144,9 +135,11 @@ c'est la preuve qui accompagne l'avant/après.
 
 ```bash
 git add <fichiers du sujet>
-git commit -m "type(scope): sujet à l'impératif" -m "Pourquoi ce changement (contexte, bug, contrainte)."
+git commit -m "type(scope): imperative subject" -m "Why this change (context, bug, constraint)."
 ```
 
+- Les messages de commit sont **en anglais** (en-tête et corps), comme le titre
+  de la PR, qui devient le message du commit de fusion en squash.
 - Un commit = un changement cohérent ; message utile dans six mois.
 - Vérifier qu'aucun secret n'entre dans l'index : `.env`,
   `server-data/secrets.cfg`, `server-data/cache/`, clé `CFX_LICENSE_KEY`.
@@ -180,6 +173,9 @@ Une fois l'accord obtenu (§ 4.5), pousser la branche et ouvrir la PR :
 git push -u origin "$(git branch --show-current)"
 gh pr create --base main --title "type(scope): sujet" --body-file "$env:TEMP\pr.md"   # PowerShell
 ```
+
+La documentation du dépôt et la description de la PR sont rédigées **en
+français** ; seul le titre de la PR reste en anglais (§ 4.4).
 
 Le corps de la PR reprend [`.github/pull_request_template.md`](.github/pull_request_template.md) :
 **Résumé**, **Pourquoi**, **Comment tester**, **Checklist** avec les cases

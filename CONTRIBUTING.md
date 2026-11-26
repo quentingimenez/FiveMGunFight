@@ -45,13 +45,16 @@ Format : `type/sujet-en-kebab-case`, avec éventuellement le numéro d'issue.
 ## 4. Rédiger les commits
 
 ```text
-type(scope): sujet à l'impératif, 72 caractères max
+type(scope): imperative subject, 72 characters max
 
-Pourquoi ce changement (le contexte, le bug, la contrainte).
-Ce que ça change pour les joueurs ou pour les autres développeurs.
+Why this change (context, bug, constraint).
+What it changes for players or for other developers.
 
-Réf : #12
+Refs: #12
 ```
+
+- Les messages de commit sont **en anglais**, en-tête et corps (le titre de la
+  PR aussi : il devient le message du commit de fusion en squash).
 
 - `type` : `feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `perf`, `test`.
 - `scope` : la ressource concernée (`gf_redzone`, `gf_maps`, `docker`, …).
@@ -115,6 +118,9 @@ couvrent ces invariants : si ton changement les casse, corrige le changement,
 pas le test.
 
 ## 6. Ouvrir la pull request
+
+La documentation du dépôt et la description de la PR sont rédigées **en
+français**.
 
 1. Pousse la branche :
 

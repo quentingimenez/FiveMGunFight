@@ -575,10 +575,15 @@ class Documentation(unittest.TestCase):
             r"seul `--force-with-lease` sur la branche de la\s+PR est permis",
             "les interdits doivent réserver le force-push avec bail à la branche de la PR",
         )
-        # Règles de l'utilisateur qui ne vivaient que dans ses CLAUDE.md.
-        self.assertIn("Co-Authored-By", texte, "l'interdiction du co-auteur IA doit viser tous les agents")
-        self.assertIn("en français", texte, "la langue des réponses doit viser tous les agents")
         self.assertNotIn("(privé)", texte, "le dépôt est public : contexte périmé")
+
+    def test_langues_du_projet_fixees_pour_tout_agent(self) -> None:
+        # Documentation et descriptions de PR en français, commits en anglais.
+        for document in ("AGENTS.md", "CONTRIBUTING.md"):
+            with self.subTest(document=document):
+                texte = " ".join(lire(RACINE / document).split())
+                self.assertRegex(texte, r"messages de commit sont \*\*en anglais\*\*")
+                self.assertRegex(texte, r"description de la PR sont rédigées \*\*en français\*\*")
 
     def test_readme_cite_chaque_ressource(self) -> None:
         texte = lire(RACINE / "README.md")
