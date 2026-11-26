@@ -9,6 +9,7 @@ version '1.0.0'
 shared_script 'config.lua'
 server_script 'validation.lua'
 server_script 'rate_limit.lua'
+server_script 'shot_validation.lua'
 server_script 'server.lua'
 client_script 'client.lua'
 

@@ -31,6 +31,7 @@ globals = {
   "GFMenuState",
   "RateLimit",
   "Validation",
+  "ShotValidation",
 }
 
 -- Le code vendorisé de [cfx-default] provient des ressources Cfx par défaut.

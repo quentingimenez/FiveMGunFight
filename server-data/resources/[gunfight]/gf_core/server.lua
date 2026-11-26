@@ -11,6 +11,7 @@
 
 local Validation = _G.Validation
 local RateLimit = _G.RateLimit
+local ShotValidation = _G.ShotValidation
 
 local Modes = {}        -- [src] = 'lobby' | 'attack' | 'redzone'
 local Spawning = {}     -- [src] = true tant qu'un spawn vient d'être envoyé (anti doublon)
@@ -19,6 +20,29 @@ local lastDeath = {}    -- [src] = GetGameTimer() de la dernière mort (anti dou
 local Multi = {}        -- [src] = { count, last } pour les multi-kills
 local Vehicles = {}     -- [src] = netId du véhicule de mode (redzone)
 local lastDamager = {}  -- [victime] = { src = tireur, at, weapon } (dégât serveur autorisé)
+local Armes = {}        -- [src] = ensemble de hash d'armes autorisées (loadout)
+local etatTirs = {}     -- [src] = historique des tirs (cadence), géré par ShotValidation
+
+-- Règles statiques construites une seule fois au démarrage à partir de Config.
+-- Elles sont partagées par tous les tirs : aucun ensemble n'est reconstruit
+-- à chaque weaponDamageEvent.
+local plafondsTirs, cadencesTirs, composantsTete = {}, {}, {}
+for nom, plafond in pairs(Config.ShotValidation.damageCaps) do
+    plafondsTirs[ShotValidation.joaat(nom)] = { corps = plafond.body, tete = plafond.head }
+end
+for nom, ms in pairs(Config.ShotValidation.fireIntervals) do
+    cadencesTirs[ShotValidation.joaat(nom)] = ms
+end
+for _, composant in ipairs(Config.ShotValidation.headComponents) do
+    composantsTete[composant] = true
+end
+local REGLES_TIRS = {
+    toujoursAutorisees = ShotValidation.ensembleArmes(Config.ShotValidation.alwaysAllowed),
+    plafonds = plafondsTirs,
+    cadences = cadencesTirs,
+    composantsTete = composantsTete,
+    toleranceMs = Config.ShotValidation.networkToleranceMs,
+}
 
 -- Rate-limits par joueur (voir rate_limit.lua et config.lua)
 local rateVehicle = {}
@@ -132,6 +156,27 @@ end
 ---          keepVehicle = bool (ne pas supprimer le véhicule précédent),
 ---          weapons = liste de BuildWeaponList (armes au choix), armour = 0..100 }
 local function spawn(src, opts)
+    -- Armes autorisées pour ce spawn : un spectateur n'a aucune arme, sinon
+    -- on reprend le loadout du mode et/ou les armes au choix fournies.
+    if opts.spectator then
+        Armes[src] = {}
+    else
+        local noms = {}
+        local loadout = Config.Loadouts[opts.loadout]
+        if loadout and loadout.weapons then
+            for _, entree in ipairs(loadout.weapons) do
+                if entree[1] then noms[#noms + 1] = entree[1] end
+            end
+        end
+        if opts.weapons then
+            for _, entree in ipairs(opts.weapons) do
+                if entree.name then noms[#noms + 1] = entree.name end
+            end
+        end
+        Armes[src] = ShotValidation.ensembleArmes(noms)
+    end
+    ShotValidation.oublier(etatTirs, src)
+
     -- L'ancien véhicule disparaît à chaque réapparition, sauf si keepVehicle
     -- (ex. un joueur mort qui passe spectateur : sa voiture reste dans la manche)
     if not opts.keepVehicle then deleteVehicle(src) end
@@ -179,6 +224,9 @@ local function setMode(src, mode)
     if old then TriggerEvent('gf:modeLeft', src, old) end
     deleteVehicle(src)
     Multi[src] = nil
+    -- Le spawn éventuel ci-dessous reprend la main sur les armes autorisées.
+    Armes[src] = nil
+    ShotValidation.oublier(etatTirs, src)
 
     Modes[src] = mode
     local state = Player(src).state
@@ -266,7 +314,13 @@ end
 
 -- Donne les armes choisies (ids) à un joueur déjà apparu
 local function giveWeapons(src, ids, armour)
-    TriggerClientEvent('gf_core:giveWeapons', src, buildWeaponList(ids), armour or Config.SelectionArmour)
+    local liste = buildWeaponList(ids)
+    local noms = {}
+    for _, entree in ipairs(liste) do
+        if entree.name then noms[#noms + 1] = entree.name end
+    end
+    Armes[src] = ShotValidation.ensembleArmes(noms)
+    TriggerClientEvent('gf_core:giveWeapons', src, liste, armour or Config.SelectionArmour)
 end
 
 exports('GetOwnedWeapons', ownedWeapons)
@@ -342,6 +396,8 @@ AddEventHandler('playerDropped', function()
     end
     Multi[src] = nil
     deleteVehicle(src)
+    Armes[src] = nil
+    ShotValidation.oublier(etatTirs, src)
     RateLimit.oublier(rateVehicle, src)
     RateLimit.oublier(rateVehicleGone, src)
     RateLimit.oublier(rateReady, src)
@@ -498,6 +554,31 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
         local ok, allowed = pcall(function() return exports[res]:AllowDamage(sender, victim) end)
         if ok and allowed == false then
             CancelEvent() return
+        end
+    end
+
+    -- Validation des tirs : arme du loadout, plafonds de dégâts et cadence.
+    -- Inséré après les contrôles existants et avant la preuve de dégât.
+    if Config.ShotValidation.enabled and sender ~= victim then
+        local touche = {
+            arme = data.weaponType,
+            degat = data.weaponDamage,
+            composant = data.hitComponent,
+            instant = data.damageTime or GetGameTimer(),
+        }
+        local regles = {
+            autorisees = Armes[sender],
+            toujoursAutorisees = REGLES_TIRS.toujoursAutorisees,
+            plafonds = REGLES_TIRS.plafonds,
+            composantsTete = REGLES_TIRS.composantsTete,
+            cadences = REGLES_TIRS.cadences,
+            toleranceMs = REGLES_TIRS.toleranceMs,
+        }
+        local ok, raison = ShotValidation.verifierTouche(etatTirs, sender, touche, regles)
+        if not ok then
+            CancelEvent()
+            journaliserRefus(sender, 'weaponDamageEvent', raison)
+            return
         end
     end
 
