@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  Sauvegarde de la production : base MariaDB, données txAdmin et maps.
+#  Sauvegarde de la production : base MariaDB, données txAdmin, maps et
+#  données de jeu (personnages, photos des menus, véhicules).
 #
 #  Usage : bash scripts/sauvegarder.sh [dossier_de_destination]
 #          (défaut : backups/, ignoré par Git)
@@ -45,6 +46,7 @@ Contenu :
   base.sql.gz     dump MariaDB (mariadb-dump, cohérent, routines, triggers)
   txdata.tar.gz   /opt/fivem/txData
   maps.tar.gz     gf_maps/data
+  jeu.tar.gz      gf_lobby/data, gf_thumbs/thumbs, gf_vehicles/custom
   manifeste.sha256  empreintes SHA256 des archives finales
 
 Conservation : 14 quotidiennes + 4 hebdomadaires. Une sauvegarde plus ancienne
@@ -113,7 +115,10 @@ echo " - maps de l'éditeur"
 docker compose "${compose[@]}" exec -T fxserver \
   tar -czf - -C "/opt/fivem/server-data/resources/[gunfight]/gf_maps/data" . > "$destination/maps.tar.gz"
 
-for fichier in base.sql.gz txdata.tar.gz maps.tar.gz; do
+echo " - données de jeu (personnages, photos, véhicules)"
+docker compose "${compose[@]}" exec -T fxserver   tar -czf - -C "/opt/fivem/server-data/resources/[gunfight]"   gf_lobby/data gf_thumbs/thumbs gf_vehicles/custom > "$destination/jeu.tar.gz"
+
+for fichier in base.sql.gz txdata.tar.gz maps.tar.gz jeu.tar.gz; do
   if [ ! -s "$destination/$fichier" ]; then
     echo "ECHEC : $destination/$fichier est vide (serveur arrêté ?)" >&2
     exit 1
@@ -127,7 +132,7 @@ if [ -n "${AGE_RECIPIENT:-}" ]; then
     exit 1
   fi
   echo " - chiffrement age"
-  for fichier in base.sql.gz txdata.tar.gz maps.tar.gz; do
+  for fichier in base.sql.gz txdata.tar.gz maps.tar.gz jeu.tar.gz; do
     age --encrypt --recipient "$AGE_RECIPIENT" -o "$destination/$fichier.age" "$destination/$fichier"
     if [ ! -s "$destination/$fichier.age" ]; then
       echo "ECHEC : $destination/$fichier.age est vide." >&2

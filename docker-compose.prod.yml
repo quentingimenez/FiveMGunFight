@@ -13,9 +13,10 @@
 #  les droits 600 et un propriétaire root : liste des noms dans
 #  docker/secrets.exemple/README.md.
 #
-#  server-data vient de l'image ; seuls gf_maps/data et gf_lobby/data sont des
-#  volumes, pour que les maps créées avec l'éditeur et les personnages survivent
-#  aux mises à jour.
+#  server-data vient de l'image ; seules les données créées en jeu sont des
+#  volumes, pour survivre aux mises à jour : maps (gf_maps/data), personnages
+#  (gf_lobby/data), photos des menus (gf_thumbs/thumbs) et véhicule de base +
+#  customs (gf_vehicles/custom).
 # =============================================================================
 services:
   fxserver:
@@ -24,6 +25,9 @@ services:
       # Volume maps vide au premier démarrage : on le remplit avec le maps.json
       # de l'image (voir docker/entrypoint.sh).
       GF_SEED_MAPS: "true"
+      # Photos et customs de véhicules : complétés depuis l'image sans écraser
+      # ce qui a été créé en jeu (voir docker/entrypoint.sh).
+      GF_SEED_DATA: "true"
       # Neutralisation explicite : même si une variable de ce nom traînait dans
       # l'exécution (surcouche de développement combinée par erreur), aucune
       # valeur secrète ne doit entrer dans l'environnement de production.
@@ -39,6 +43,8 @@ services:
     volumes:
       - maps:/opt/fivem/server-data/resources/[gunfight]/gf_maps/data
       - characters:/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data
+      - thumbs:/opt/fivem/server-data/resources/[gunfight]/gf_thumbs/thumbs
+      - vehicles:/opt/fivem/server-data/resources/[gunfight]/gf_vehicles/custom
 
   mariadb:
     environment:
@@ -63,6 +69,10 @@ volumes:
     name: gunfight-prod-maps
   characters:
     name: gunfight-prod-characters
+  thumbs:
+    name: gunfight-prod-thumbs
+  vehicles:
+    name: gunfight-prod-vehicles
 
 secrets:
   # Chaque entrée est un fichier local lu par Compose au démarrage. Le chemin

@@ -267,7 +267,7 @@ class Restauration(unittest.TestCase):
             ecrire_archives(dossier)
             resultat = lancer("scripts/restaurer.sh", "--verifier", chemin_relatif(dossier))
             self.assertEqual(resultat.returncode, 0, resultat.stderr)
-            self.assertIn("Les trois archives sont valides.", resultat.stdout)
+            self.assertIn("Les archives sont valides.", resultat.stdout)
 
     def test_verifier_refuse_une_archive_manquante(self) -> None:
         with tempfile.TemporaryDirectory(prefix=".tmp-ops-", dir=RACINE) as temporaire:
@@ -408,6 +408,8 @@ class GabaritUnraid(unittest.TestCase):
             {
                 "/opt/fivem/server-data/resources/[gunfight]/gf_maps/data",
                 "/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data",
+                "/opt/fivem/server-data/resources/[gunfight]/gf_thumbs/thumbs",
+                "/opt/fivem/server-data/resources/[gunfight]/gf_vehicles/custom",
                 "/opt/fivem/txData",
             },
         )
@@ -434,6 +436,7 @@ class GabaritUnraid(unittest.TestCase):
         racine = self.racine()
         configs = self.configs()
         self.assertEqual(configs["GF_SEED_MAPS"].text, "true")
+        self.assertEqual(configs["GF_SEED_DATA"].text, "true")
         self.assertEqual(configs["TXADMIN"].text, "false")
         self.assertEqual(racine.findtext("Network"), "fivem-net")
         self.assertIsNone(racine.find("DateInstalled"))

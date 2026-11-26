@@ -186,11 +186,17 @@ verifier_tout() {
   verifier_une_archive "base.sql.gz" || echecs=$((echecs + 1))
   verifier_une_archive "txdata.tar.gz" || echecs=$((echecs + 1))
   verifier_une_archive "maps.tar.gz" || echecs=$((echecs + 1))
+  # jeu.tar.gz : absente des sauvegardes antérieures, donc facultative
+  if fichier_archive "jeu.tar.gz" >/dev/null; then
+    verifier_une_archive "jeu.tar.gz" || echecs=$((echecs + 1))
+  else
+    echo "absente    jeu.tar.gz (sauvegarde antérieure aux données de jeu)"
+  fi
   if [ "$echecs" -ne 0 ]; then
     echo "$echecs archive(s) manquante(s) ou invalide(s)." >&2
     return 1
   fi
-  echo "Les trois archives sont valides."
+  echo "Les archives sont valides."
 }
 
 if [ "$VERIFIER" -eq 1 ]; then
@@ -272,12 +278,20 @@ tar -xzf "$txdata" -C "$DESTINATION/txdata"
 echo "Extraction de maps.tar.gz…"
 tar -xzf "$maps" -C "$DESTINATION/maps"
 
+if source_jeu="$(fichier_archive jeu.tar.gz)"; then
+  mkdir -p "$DESTINATION/jeu"
+  jeu="$(preparer_lisible "$source_jeu")"
+  echo "Extraction de jeu.tar.gz…"
+  tar -xzf "$jeu" -C "$DESTINATION/jeu"
+fi
+
 cat <<EOF
 
 Restauration extraite dans : $DESTINATION
   - $DESTINATION/base.sql
   - $DESTINATION/txdata/
   - $DESTINATION/maps/
+  - $DESTINATION/jeu/ (personnages, photos, véhicules ; si la sauvegarde en contient)
 
 Aucune pile de production n'a été touchée. Pour tester l'import dans une pile
 jetable (projet « gunfight-restore », volumes séparés) :

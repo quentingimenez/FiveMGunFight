@@ -35,5 +35,6 @@ Config.Fov = 30.0
 -- Taille maximale d'une image reçue (octets du PNG décodé)
 Config.MaxImageBytes = 1024 * 1024
 
--- Dossier de stockage dans la ressource : thumbs/<famille>/<id>.png + thumbs/index.json
+-- Dossier de stockage dans la ressource : thumbs/<famille>/<id>.png
+-- (en production : volume « thumbs », complété depuis l'image au démarrage)
 Config.Folder = 'thumbs'

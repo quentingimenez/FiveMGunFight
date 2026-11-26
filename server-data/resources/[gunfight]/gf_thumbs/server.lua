@@ -1,7 +1,9 @@
 -- =============================================================================
 --  gf_thumbs - SERVEUR
---  Stocke les photos (thumbs/<famille>/<id>.png + thumbs/index.json) et les
---  envoie aux clients en data URL, à la demande.
+--  Stocke les photos (thumbs/<famille>/<id>.png) et les envoie aux clients en
+--  data URL, à la demande. Pas d'index : le serveur lit directement le fichier,
+--  ce qui reste juste quand le volume de production mélange les photos de
+--  l'image et celles prises en jeu.
 --
 --  Commande admin : /thumbs <famille> [id]  -> le client de l'admin prend les photos
 --  Événements client -> serveur :
@@ -11,32 +13,14 @@
 
 local RES = GetCurrentResourceName()
 local core = exports.gf_core
-local INDEX = Config.Folder .. '/index.json'
 local PNG_PREFIX = 'data:image/png;base64,'
 local PNG_MAGIC = '\137PNG\r\n\26\n'
 
-local Index = {}       -- [famille] = { [id] = version }
-local Cache = {}       -- [famille] = { [id] = dataURL }
+local Cache = {}       -- [famille] = { [id] = dataURL | false (pas de photo) }
 local lastRequest = {} -- [src] = GetGameTimer()
 
 local function validId(id)
     return type(id) == 'string' and #id >= 1 and #id <= 64 and id:match('^[%w_]+$') ~= nil
-end
-
-local function loadIndex()
-    local raw = LoadResourceFile(RES, INDEX)
-    local ok, data = pcall(json.decode, raw or '')
-    Index = {}
-    if ok and type(data) == 'table' then
-        for kind, ids in pairs(data) do
-            if Config.Kinds[kind] and type(ids) == 'table' then
-                Index[kind] = {}
-                for id, v in pairs(ids) do
-                    if validId(id) then Index[kind][id] = tonumber(v) or 1 end
-                end
-            end
-        end
-    end
 end
 
 local function photoPath(kind, id)
@@ -45,15 +29,17 @@ end
 
 local function dataURL(kind, id)
     Cache[kind] = Cache[kind] or {}
-    if Cache[kind][id] then return Cache[kind][id] end
+    local cached = Cache[kind][id]
+    if cached ~= nil then return cached or nil end
     local raw = LoadResourceFile(RES, photoPath(kind, id))
-    if not raw or raw:sub(1, 8) ~= PNG_MAGIC then return nil end
+    if not raw or raw:sub(1, 8) ~= PNG_MAGIC then
+        Cache[kind][id] = false
+        return nil
+    end
     local url = PNG_PREFIX .. Base64.encode(raw)
     Cache[kind][id] = url
     return url
 end
-
-loadIndex()
 
 -- ---------------------------------------------------------------- Prise de photos
 RegisterCommand('thumbs', function(src, args)
@@ -82,9 +68,6 @@ RegisterNetEvent('gf_thumbs:save', function(kind, id, url)
         print(('^1[gf_thumbs] Impossible d\'écrire %s (dossier %s/%s manquant ?)^0'):format(photoPath(kind, id), Config.Folder, kind))
         return core:Notify(src, ('Photo %s/%s non enregistrée (voir la console serveur).'):format(kind, id))
     end
-    Index[kind] = Index[kind] or {}
-    Index[kind][id] = (Index[kind][id] or 0) + 1
-    SaveResourceFile(RES, INDEX, json.encode(Index), -1)
     if Cache[kind] then Cache[kind][id] = nil end
     TriggerClientEvent('gf_thumbs:updated', -1, kind, id)
     print(('[gf_thumbs] Photo %s/%s enregistrée (%d Ko)'):format(kind, id, math.ceil(#raw / 1024)))
@@ -103,9 +86,7 @@ RegisterNetEvent('gf_thumbs:request', function(reqId, kind, ids)
     for _, id in ipairs(ids) do
         count = count + 1
         if count > 100 then break end
-        if validId(id) and Index[kind] and Index[kind][id] then
-            result[id] = dataURL(kind, id)
-        end
+        if validId(id) then result[id] = dataURL(kind, id) end
     end
     -- Envoi « latent » : étalé dans le temps pour ne pas saturer la connexion
     TriggerLatentClientEvent('gf_thumbs:data', src, 512 * 1024, reqId, kind, result)
