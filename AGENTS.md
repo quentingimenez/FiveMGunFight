@@ -57,7 +57,9 @@ Une session qui a modifié le dépôt n'est terminée que lorsque, dans cet ordr
 7. on est revenu sur `main`, à jour de `origin/main` ;
 8. l'arbre ne contient plus aucun fichier modifié ou non suivi **appartenant à
    la session**, captures et fichiers de travail compris (§ 5) ; les
-   changements préexistants laissés par l'utilisateur restent intacts ;
+   changements préexistants laissés par l'utilisateur restent intacts ; le
+   client FiveM est **fermé** si l'agent l'a lancé sans que l'utilisateur ait
+   demandé de l'ouvrir (§ 5) ;
 9. l'utilisateur reçoit le **lien de la pull request**, le **sha du commit de
    fusion** et le **résultat de la CI de `main`** sur ce commit.
 
@@ -309,6 +311,13 @@ vert.
   session sans l'avoir signalé à l'utilisateur.
 - « Réparer » `main` par un commit direct : un problème sur `main` se corrige
   par une PR (revert `git revert -m 1 <sha>` sur une branche dédiée si besoin).
+- Laisser tourner en fin de tâche un client FiveM que l'agent a lancé de
+  lui-même (pour un test, une capture, la lecture du journal) alors que
+  l'utilisateur n'avait pas demandé de l'ouvrir. Le fermer une fois la tâche
+  terminée, avant le compte rendu :
+  `Get-Process -Name 'FiveM*' -ErrorAction SilentlyContinue | Stop-Process -Force`.
+  Si l'utilisateur a demandé d'ouvrir ou de relancer le jeu, ou s'il l'avait
+  déjà ouvert lui-même, le laisser ouvert.
 - Écrire un fichier de travail dans l'arbre du dépôt : captures d'écran,
   journaux copiés, sorties de commande, notes, scripts d'essai. Ils vont dans
   un dossier temporaire hors du dépôt (`$env:TEMP`, le dossier de travail de
