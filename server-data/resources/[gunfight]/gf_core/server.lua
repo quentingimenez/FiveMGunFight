@@ -12,8 +12,18 @@
 local Validation = _G.Validation
 local RateLimit = _G.RateLimit
 local ShotValidation = _G.ShotValidation
+local GardeEtat = _G.GardeEtat
 
 local Modes = {}        -- [src] = 'lobby' | 'attack' | 'redzone'
+-- Vérités serveur pour les state bags : aucune décision ne lit Player(src).state.
+-- Règle d'ordre absolue : affecter la table AVANT le state:set correspondant,
+-- sinon le garde verrait un écart entre la valeur reçue et la valeur serveur.
+local Proteges = {}     -- [src] = true|false
+local Equipes = {}      -- [src] = identifiant d'équipe ('A'|'B') ou nil
+-- État du garde pour le signalement des anomalies : [src][cle] = { dernier, ignores }.
+-- Table passée à GardeEtat.signalable ; elle ne limite que le journal, jamais
+-- le rétablissement de la valeur serveur (toujours immédiat).
+local Anomalies = {}
 local Spawning = {}     -- [src] = true tant qu'un spawn vient d'être envoyé (anti doublon)
 local SpawnOpts = {}    -- [src] = dernier spawn envoyé (rejouable si le client l'a raté)
 local lastDeath = {}    -- [src] = GetGameTimer() de la dernière mort (anti doublon)
@@ -141,6 +151,8 @@ end
 
 local function setProtected(src, on)
     on = on and true or false
+    -- La table est la vérité : elle est posée avant le state:set (voir garde).
+    Proteges[src] = on
     Player(src).state:set('gf_protected', on, true)
     TriggerClientEvent('gf_core:setProtected', src, on)
 end
@@ -180,7 +192,9 @@ local function spawn(src, opts)
     -- L'ancien véhicule disparaît à chaque réapparition, sauf si keepVehicle
     -- (ex. un joueur mort qui passe spectateur : sa voiture reste dans la manche)
     if not opts.keepVehicle then deleteVehicle(src) end
-    Player(src).state:set('gf_protected', (opts.protected or opts.spectator) and true or false, true)
+    -- Même booléen pour la table et pour le state bag, table affectée en premier.
+    Proteges[src] = (opts.protected or opts.spectator) and true or false
+    Player(src).state:set('gf_protected', Proteges[src], true)
     print(('[gf_core] spawn %s mode=%s'):format(src, tostring(Modes[src])))
     -- Fenêtre courte : un ready qui arrive juste après le spawn en cours ne
     -- doit pas renvoyer un second gf_core:spawn (le client n'a pas encore
@@ -230,7 +244,9 @@ local function setMode(src, mode)
 
     Modes[src] = mode
     local state = Player(src).state
-    state:set('gf_mode', mode, true)
+    state:set('gf_mode', mode, true)  -- Modes[src] est déjà affecté juste au-dessus
+    -- L'équipe n'existe plus quand on change de mode : table vidée avant l'état.
+    Equipes[src] = nil
     state:set('gf_team', nil, true)
     SetPlayerRoutingBucket(src, def.bucket)
 
@@ -247,12 +263,81 @@ local function setMode(src, mode)
     return true
 end
 
+-- ---------------------------------------------------------------- Équipe
+-- Change l'équipe tenue par le serveur. Les ressources de mode appellent
+-- désormais cet export au lieu d'écrire directement dans le state bag.
+local function setTeam(src, equipe)
+    Equipes[src] = equipe
+    Player(src).state:set('gf_team', equipe, true)
+end
+
+local function getTeam(src)
+    return Equipes[src]
+end
+
+local function isProtected(src)
+    return Proteges[src] == true
+end
+
+-- ---------------------------------------------------------------- Garde des state bags
+-- AddStateBagChangeHandler ne peut pas REFUSER un changement : le handler est
+-- appelé après coup. On compare donc la valeur reçue à la table serveur qui
+-- fait foi et, en cas d'écart, on rétablit la valeur serveur au tick suivant.
+-- Aucune décision du serveur ne lit le state bag : le rétablissement ne sert
+-- qu'à remettre les clients à la vérité, jamais à déterminer une règle de jeu.
+AddStateBagChangeHandler(nil, nil, function(bagName, key, value)
+    -- Clé non surveillée : aucun travail à faire.
+    if GardeEtat.CLES[key] == nil then return end
+
+    -- Seuls les sacs des joueurs nous intéressent ( forme 'player:N' ).
+    local src = GardeEtat.joueurDuSac(bagName)
+    if not src then return end
+
+    local valeurServeur
+    if key == 'gf_protected' then
+        valeurServeur = Proteges[src]
+    elseif key == 'gf_team' then
+        valeurServeur = Equipes[src]
+    else -- gf_mode
+        valeurServeur = Modes[src]
+    end
+
+    if GardeEtat.decider(key, value, valeurServeur) ~= 'retablir' then return end
+
+    -- On rétablit au tick suivant et seulement si le joueur est encore là.
+    -- IMPORTANT : ce rétablissement est systématique et immédiat, que le
+    -- signalement ci-dessous soit autorisé ou non (le rate-limit ne s'applique
+    -- qu'au journal, pour ne pas donner de fenêtre au client qui insiste).
+    SetTimeout(0, function()
+        if GetPlayerName(src) then
+            Player(src).state:set(key, GardeEtat.normaliser(key, valeurServeur), true)
+        end
+    end)
+
+    -- Journal de l'anomalie limité en débit (Config.StateGuard.reportIntervalMs) :
+    -- ni nom de joueur ni licence (règle D5). `ignores` restitue les
+    -- rétablissements non signalés depuis le dernier signalement de ce couple.
+    local signaler, ignores = GardeEtat.signalable(
+        Anomalies, src, key, GetGameTimer(), Config.StateGuard.reportIntervalMs)
+    if not signaler then return end
+
+    TriggerEvent('gf:anomalie', {
+        src = src, type = 'state-bag', cle = key, recu = value, serveur = valeurServeur,
+        ignores = ignores,
+    })
+    print(('[gf_core] anomalie state-bag src=%s cle=%s recu=%s'):format(
+        tostring(src), tostring(key), tostring(value)))
+end)
+
 -- ---------------------------------------------------------------- Exports
 exports('SetMode', setMode)
 exports('GetMode', getMode)
 exports('GetPlayersInMode', playersInMode)
 exports('Spawn', spawn)
 exports('SetProtected', setProtected)
+exports('SetTeam', setTeam)
+exports('GetTeam', getTeam)
+exports('IsProtected', isProtected)
 exports('Freeze', freeze)
 exports('IsAdmin', isAdmin)
 exports('Notify', notify)
@@ -387,6 +472,9 @@ AddEventHandler('playerDropped', function()
     local src = source
     local old = Modes[src]
     Modes[src] = nil
+    Proteges[src] = nil
+    Equipes[src] = nil
+    GardeEtat.oublier(Anomalies, src)
     Spawning[src] = nil
     SpawnOpts[src] = nil
     lastDeath[src] = nil
@@ -490,12 +578,13 @@ local function handleDeath(victim, weapon)
         TriggerClientEvent('gf_ui:kill', killer, { victim = GetPlayerName(victim), count = m.count })
     end
 
-    -- Kill feed pour tous les joueurs du même mode
+    -- Kill feed pour tous les joueurs du même mode : équipes lues dans la
+    -- table serveur, pas dans un state bag que le client peut réécrire.
     local entry = {
         victim = GetPlayerName(victim),
-        victimTeam = Player(victim).state.gf_team,
+        victimTeam = Equipes[victim],
         killer = killer and GetPlayerName(killer) or nil,
-        killerTeam = killer and Player(killer).state.gf_team or nil,
+        killerTeam = killer and Equipes[killer] or nil,
         weapon = weapon,
     }
     for _, p in ipairs(playersInMode(mode)) do
@@ -552,12 +641,13 @@ AddEventHandler('weaponDamageEvent', function(sender, data)
         CancelEvent() return
     end
 
-    local vState, sState = Player(victim).state, Player(sender).state
-    if vState.gf_protected or sState.gf_protected then
+    -- Protection et équipe lues dans les tables du serveur (S3), mêmes
+    -- conditions et mêmes motifs qu'avant l'utilisation des state bags.
+    if Proteges[victim] or Proteges[sender] then
         journaliserHit(sender, victim, data, false, 'protege') -- refus : joueur protégé
         CancelEvent() return
     end
-    if sState.gf_team and sState.gf_team == vState.gf_team and sender ~= victim then
+    if Equipes[sender] and Equipes[sender] == Equipes[victim] and sender ~= victim then
         journaliserHit(sender, victim, data, false, 'equipe') -- refus : tir sur un coéquipier
         CancelEvent() return
     end

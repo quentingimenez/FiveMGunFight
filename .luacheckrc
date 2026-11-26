@@ -30,6 +30,7 @@ globals = {
   "GFLobbyAppearanceSchema",
   "GFLobbyBackdrop",
   "GFMenuState",
+  "GardeEtat",
   -- Globale fournie par le runtime FiveM (W112 sur les champs mutés).
   "GlobalState",
   "Journal",

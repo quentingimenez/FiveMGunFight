@@ -57,8 +57,7 @@ end
 local function equipeDe(src)
     if type(src) ~= 'number' then return nil end
     local ok, equipe = pcall(function()
-        local joueurCoteServeur = Player(src)
-        return joueurCoteServeur and joueurCoteServeur.state.gf_team or nil
+        return exports.gf_core:GetTeam(src)
     end)
     if not ok then return nil end
     return equipe
@@ -371,5 +370,27 @@ AddEventHandler('gf:modeKill', function(data)
         tueur = data.killer and joueur(data.killer) or false,
         equipe_victime = equipeDe(data.victim),
         equipe_tueur = data.killer and equipeDe(data.killer) or nil,
+    }, nil)
+end)
+
+-- Anomalies génériques : handler ouvert à tous les chantiers (C4 state bags,
+-- C3 vie/soins...). On ne garde dans `detail` que des champs simples, pour ne
+-- jamais écrire de table imbriquée ni de donnée non sérialisable dans la base.
+AddEventHandler('gf:anomalie', function(data)
+    if type(data) ~= 'table' or type(data.src) ~= 'number' then return end
+
+    local mode = modeDe(data.src) or 'aucun'
+    local detail = {}
+    for cle, valeur in pairs(data) do
+        local t = type(valeur)
+        if cle ~= 'src' and (t == 'string' or t == 'number' or t == 'boolean') then
+            detail[cle] = valeur
+        end
+    end
+
+    ajouter('anomalie', mode, {
+        joueur = joueur(data.src) or false,
+        type = tostring(data.type),
+        detail = detail,
     }, nil)
 end)
