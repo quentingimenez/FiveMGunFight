@@ -109,6 +109,7 @@ local function applyLoadout(ped, name)
     if not lo then return end
     for _, w in ipairs(lo.weapons) do
         GiveWeaponToPed(ped, joaat(w[1]), w[2], false, false)
+        SetPedInfiniteAmmo(ped, true, joaat(w[1]))
         slots[#slots + 1] = joaat(w[1])
     end
     if slots[1] then SetCurrentPedWeapon(ped, slots[1], true) end
@@ -122,6 +123,7 @@ local function applyWeapons(ped, list, armour)
     for _, w in ipairs(list or {}) do
         local hash = joaat(w.name)
         GiveWeaponToPed(ped, hash, w.ammo or 250, false, false)
+        SetPedInfiniteAmmo(ped, true, hash) -- réserve illimitée, il faut quand même recharger
         for _, comp in ipairs(w.components or {}) do
             GiveWeaponComponentToPed(ped, hash, joaat(comp))
         end
@@ -145,6 +147,54 @@ for i = 1, Config.WeaponSlots do
     RegisterCommand('-gf_slot' .. i, function() end, false)
     RegisterKeyMapping('+gf_slot' .. i, ('Gunfight : arme %d'):format(i), 'keyboard', tostring(i))
 end
+
+-- ---------------------------------------------------------------- HUD des armes
+-- Envoie à gf_ui les armes des emplacements (touche, nom, chargeur) et celle en main.
+-- Nom affiché : label du catalogue, sinon le nom GTA sans « WEAPON_ ».
+local WEAPON_INFO = {}
+for _, w in pairs(Config.Weapons) do
+    WEAPON_INFO[joaat(w.name)] = { name = w.name, label = w.label }
+end
+for _, lo in pairs(Config.Loadouts or {}) do
+    for _, w in ipairs(lo.weapons or {}) do
+        local hash = joaat(w[1])
+        WEAPON_INFO[hash] = WEAPON_INFO[hash] or { name = w[1], label = w[1]:gsub('^WEAPON_', '') }
+    end
+end
+
+CreateThread(function()
+    local last = nil
+    while true do
+        local ped = PlayerPedId()
+        local mode = LocalPlayer.state.gf_mode
+        local data = nil
+        if #slots > 0 and mode and mode ~= 'lobby' and not IsEntityDead(ped) and IsEntityVisible(ped) then
+            local current = GetSelectedPedWeapon(ped)
+            local list = {}
+            for i, hash in ipairs(slots) do
+                if HasPedGotWeapon(ped, hash, false) then
+                    local info = WEAPON_INFO[hash] or { name = tostring(hash), label = '?' }
+                    local _, clip = GetAmmoInClip(ped, hash)
+                    list[#list + 1] = {
+                        key = tostring(i),
+                        name = info.name,
+                        label = info.label,
+                        clip = clip,
+                        clipMax = GetMaxAmmoInClip(ped, hash, true),
+                        active = hash == current,
+                    }
+                end
+            end
+            if #list > 0 then data = list end
+        end
+        local encoded = data and json.encode(data) or 'null'
+        if encoded ~= last then
+            TriggerEvent('gf_ui:weapons', data)
+            last = encoded
+        end
+        Wait(100)
+    end
+end)
 
 -- Contrôles GTA désactivés : roue des armes (TAB), molette, touches de
 -- catégories d'armes (1 à 9 de GTA) et changement d'arme en véhicule.
