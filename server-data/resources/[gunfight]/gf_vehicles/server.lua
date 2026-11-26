@@ -62,7 +62,7 @@ end
 
 -- ---------------------------------------------------------------- Fichier
 local function publish()
-    GlobalState.gf_vehicle_custom = Custom.default
+    GlobalState:set('gf_vehicle_custom', Custom.default, true) -- répliqué à tous les clients
 end
 
 local function load()
