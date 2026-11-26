@@ -303,6 +303,9 @@ pas été terminé : c'est attendu, pas une panne du jeu.
 - En mode moniteur (`TXADMIN=true`), `console.bat` parle au **mode moniteur**,
   pas au serveur de jeu : utilise la console de txAdmin pour les commandes de
   jeu (voir section 9 du README).
+- Sans console : `python scripts/fivem_rcon.py restart gf_<nom>` envoie la
+  commande par rcon (surcouche dev et `TXADMIN=false` seulement ; détail et
+  autres outils d'essai dans [`pieges-fivem.md`](pieges-fivem.md) § 1).
 - Après une modification Lua ou NUI sous `server-data/`, `restart gf_<nom>`
   suffit le plus souvent. Si l'interface NUI garde l'ancien fichier,
   reconnecte-toi ou redémarre `gf_lobby`.

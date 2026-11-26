@@ -132,6 +132,15 @@ le composant concerné et observer le résultat :
   gf_… », puis reproduire le scénario en jeu ou par commande. Détail et
   commandes : [`docs/debug-test.md`](docs/debug-test.md) § 2, « Prérequis » ;
 - interface NUI : ouvrir l'écran concerné, vérifier le rendu et les actions ;
+- rendu, caméra, ped ou natif jamais appelé : lire d'abord
+  [`docs/pieges-fivem.md`](docs/pieges-fivem.md). Signature d'un natif :
+  `python scripts/native.py <nom ou hash>` (docs.fivem.net n'est pas lisible
+  par un outil web) ; un natif n'est jamais déclaré « cassé » sans un test
+  minimal qui l'appelle seul. Boucle d'essai : `scripts/fivem_rcon.py restart
+  <ressource>`, `scripts/journal_client.py --ressource <ressource>`,
+  `scripts/capturer-jeu.ps1`, **un changement par essai**, critère mesurable,
+  arrêt et compte rendu après trois essais ratés sur la même piste ; calculs
+  (géométrie, caméra) dans un module pur testé par `tests/lua/` ;
 - script / outillage : l'exécuter sur un cas nominal **et** sur le cas d'erreur
   qu'il doit traiter ;
 - documentation seule : le déclarer explicitement (« sans exécution :
