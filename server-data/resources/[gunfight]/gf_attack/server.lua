@@ -352,6 +352,14 @@ local function sendMatchResults(winner, participants, partis, score)
         if a.deaths ~= b.deaths then return a.deaths < b.deaths end
         return a.name < b.name
     end)
+    -- Journal local : mêmes lignes triées que celles envoyées aux clients.
+    local journalRows = {}
+    for _, player in ipairs(players) do
+        journalRows[#journalRows + 1] = {
+            name = player.name, team = player.team, kills = player.kills, deaths = player.deaths,
+        }
+    end
+    TriggerEvent('gf:matchResults', { mode = 'attack', rows = journalRows })
     local best = players[1] and players[1].kills or 0
     local scoreText = ('%s %d - %d %s'):format(
         Config.Teams.A.label, score.A, score.B, Config.Teams.B.label)
@@ -377,6 +385,18 @@ local executer
 executer = function(effets)
     for _, e in ipairs(effets) do
         if e.type == 'phase' then
+            -- Journal local des phases : la première manche marque le début du match.
+            if e.phase == 'select' and etat.manche == 1 then
+                -- Effectif présent au coup d'envoi (équilibrage déjà appliqué par les règles).
+                local joueurs = {}
+                for src, equipe in pairs(etat.equipes) do
+                    joueurs[#joueurs + 1] = { src = src, equipe = equipe }
+                end
+                TriggerEvent('gf:matchStarted', {
+                    mode = 'attack', map = zone().name, joueurs = joueurs,
+                })
+            end
+            TriggerEvent('gf:phase', { mode = 'attack', phase = e.phase, manche = etat.manche })
             -- L'état a déjà été muté par les règles : on diffuse la zone complète.
             sendZoneAll()
         elseif e.type == 'equipe' then
@@ -443,6 +463,11 @@ executer = function(effets)
             end
             -- Pas de modèle 'matchArrete' : c'est l'effet matchArrete qui parle.
         elseif e.type == 'finManche' then
+            -- Journal local de la fin de manche (même en cas de fin de match).
+            TriggerEvent('gf:roundEnded', {
+                mode = 'attack', manche = etat.manche, gagnant = e.gagnant, raison = e.raison,
+                score = { A = e.score.A, B = e.score.B }, map = zone().name,
+            })
             if not e.matchOver then
                 local scoreText = ('%s %d - %d %s'):format(
                     Config.Teams.A.label, e.score.A, e.score.B, Config.Teams.B.label)
@@ -515,6 +540,7 @@ executer = function(effets)
             classementSale = true
         elseif e.type == 'matchArrete' then
             announceAll('Match arrêté', 'Par un administrateur', 4000)
+            TriggerEvent('gf:matchAborted', { mode = 'attack' }) -- journal local de l'arrêt
         end
     end
 end
