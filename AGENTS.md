@@ -315,6 +315,13 @@ serveur (« ajoute ce véhicule », un dossier de pack, un `dlc.rpf`…). Le dé
 technique est dans [`docs/ajouter-un-modele.md`](docs/ajouter-un-modele.md) ;
 cette section fixe ce que l'agent fait lui-même, sans qu'on le lui redemande.
 
+**L'utilisateur n'a aucune action à faire** : l'agent ne lui demande ni de
+tester, ni de taper une commande, ni de prendre une photo. La photo du menu est
+prise automatiquement par le jeu d'un admin à son arrivée au lobby
+(`gf_thumbs`, familles `auto`), en développement comme en production. Seul
+l'accord habituel avant l'envoi (§ 4.5) reste demandé, sauf consigne
+contraire de l'utilisateur.
+
 ### 9.1 Véhicule
 
 1. **Localiser le pack** fourni par l'utilisateur (dossier extrait ou
@@ -323,9 +330,10 @@ cette section fixe ce que l'agent fait lui-même, sans qu'on le lui redemande.
    script qu'il contient (`.lua`, `.bat`…), ne jamais commiter l'archive.
 2. **Essai** : `py scripts/ajouter_vehicule.py <pack> --nom "<Nom>" --essai`.
    Lire chaque ligne `!` du résultat :
-   - « Modèle 3D … absent du pack » : il manque `stream/` ; demander le pack
-     complet à l'utilisateur, ne rien ajouter ;
-   - « archive chiffrée » : demander une extraction OpenIV/CodeWalker ;
+   - « Modèle 3D … absent du pack » : il manque `stream/` ; chercher le pack
+     complet (téléchargements, archive d'origine, `dlc.rpf` à côté) ; seulement
+     s'il est introuvable, le signaler à l'utilisateur (seul cas bloquant) ;
+   - « archive chiffrée » : idem, seul autre cas bloquant à signaler ;
    - « pas de son fourni » : relancer avec `--son lg247hemi57` (son du Bison,
      livré avec le serveur), sauf si l'utilisateur veut un autre son ;
    - textures lourdes (> 16 Mo) : continuer, mais le signaler dans la PR et à
@@ -339,28 +347,31 @@ cette section fixe ce que l'agent fait lui-même, sans qu'on le lui redemande.
    (`docker compose -f docker-compose.yml -f docker-compose.dev.yml restart fxserver`),
    vérifier « Started resource gf_vehicles » sans `SCRIPT ERROR`, et relever les
    avertissements « oversized » éventuels.
-6. **Photo** : l'agent ne peut pas jouer. Il demande à l'utilisateur, en une
-   fois : quitter complètement FiveM, se reconnecter, taper
-   `/thumbs vehicles <modele>` en admin, vérifier le véhicule dans `/customveh`
-   (onglet Véhicule). Puis il vérifie que
-   `gf_thumbs/thumbs/vehicles/<modele>.png` existe.
+6. **Photo** : rien à faire ni à demander. Elle se prend à la prochaine
+   arrivée d'un admin au lobby. Si `gf_thumbs/thumbs/vehicles/<modele>.png`
+   existe déjà en local, l'ajouter au commit ; sinon ne pas attendre.
 7. **Commit** : `gf_vehicles/` (stream, data, audio, `config.lua`,
-   `fxmanifest.lua`) **et** la photo. Jamais `gf_vehicles/custom/custom.json`
-   (custom réglée en jeu par l'admin) sans demande explicite.
+   `fxmanifest.lua`). Jamais `gf_vehicles/custom/custom.json` (custom réglée en
+   jeu par l'admin) sans demande explicite.
 8. **PR** (§ 4.5 à 4.8) : titre `feat(gf_vehicles): ajouter <Nom>` ; le corps
    reprend le résultat du script (nombre de fichiers, notes `!`), le poids des
-   textures et ce que l'utilisateur a vérifié en jeu.
+   textures et la preuve locale (démarrage sans erreur). Suivre la CI et
+   fusionner (§ 4.7, 4.8).
+9. **Compte rendu** : dire à l'utilisateur que le véhicule est en ligne, qu'il
+   apparaîtra dans `/customveh` après sa prochaine reconnexion, et que sa photo
+   se fera toute seule.
 
 ### 9.2 Autre famille de photos (armes, tenues…)
 
-- Les **armes** ont déjà leur famille : après un ajout au catalogue
-  `Config.Weapons` (`gf_core/config.lua`), demander `/thumbs weapons <NOM>` puis
-  commiter `gf_thumbs/thumbs/weapons/<NOM>.png`.
+- Les **armes** ont déjà leur famille (`auto = false` tant qu'aucun menu ne
+  les affiche) : le jour où un menu d'armes les utilise, passer `auto = true`
+  dans `gf_thumbs/config.lua` ; ensuite tout ajout à `Config.Weapons` a sa
+  photo automatiquement.
 - Une **nouvelle famille** (tenues, objets…) suit la section « Ajouter une
   nouvelle famille » du guide : export de liste dans la ressource concernée,
   entrée `Config.Kinds`, « subject » dans `gf_thumbs/client.lua`, dossier
-  `thumbs/<famille>/.gitkeep`. Rien à changer côté production : le volume
-  `thumbs` contient toutes les familles.
+  `thumbs/<famille>/.gitkeep`, `auto = true`. Rien à changer côté production : le
+  volume `thumbs` contient toutes les familles.
 
 ### 9.3 Production
 
