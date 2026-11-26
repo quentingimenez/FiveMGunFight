@@ -165,3 +165,4 @@ familles.
 | Photo absente dans le menu | elle se prend à la prochaine arrivée d'un admin au lobby ; sinon `/thumbs vehicles <modèle>` et regarde la console F8 (`[gf_thumbs] …`) |
 | Bord vert autour de la photo | véhicule peint en vert vif : prends la photo avec une autre custom |
 | `Photo … non enregistrée` | dossier `thumbs/<famille>/` manquant ou volume en lecture seule (`chown -R 10001:10001` sur Unraid) |
+| Le jeu plante : « Loaded corrupted game asset … » | fichier du modèle refusé par FiveM (souvent un modèle extrait d'un pack chiffré/escrow, ex. Gabz) : **retirer le véhicule** (fichiers de `stream/`, `data/<modèle>/`, son, lignes du manifeste et de `Config.Vehicles`) et demander une version propre du pack. Protection : le jeu qui a planté met ce modèle de côté (plus de photo auto, plus utilisé comme véhicule de base) et la console serveur affiche `gf_core` / `gf_thumbs` « a fait planter son jeu » |

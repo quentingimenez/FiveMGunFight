@@ -25,16 +25,6 @@ files {
     'audioconfig/lg247hemi57_sounds.dat54.rel',
     'sfx/dlc_lg247hemi57/lg247hemi57.awc',
     'sfx/dlc_lg247hemi57/lg247hemi57_npc.awc',
-    'data/gbbisonhf/carcols.meta',
-    'data/gbbisonhf/carvariations.meta',
-    'data/gbbisonhf/handling.meta',
-    'data/gbbisonhf/vehicles.meta',
-    'data/gbbisonhf/names.json',
-    'audioconfig/gbbisonhf_amp.dat10.rel',
-    'audioconfig/gbbisonhf_game.dat151.rel',
-    'audioconfig/gbbisonhf_sounds.dat54.rel',
-    'sfx/dlc_gbbisonhf/gbbisonhf.awc',
-    'sfx/dlc_gbbisonhf/gbbisonhf_npc.awc',
     'html/index.html',
     'html/style.css',
     'html/app.js',
@@ -47,9 +37,6 @@ data_file 'VEHICLE_VARIATION_FILE' 'data/**/carvariations.meta'
 data_file 'AUDIO_GAMEDATA' 'audioconfig/lg247hemi57_game.dat'
 data_file 'AUDIO_SOUNDDATA' 'audioconfig/lg247hemi57_sounds.dat'
 data_file 'AUDIO_WAVEPACK' 'sfx/dlc_lg247hemi57'
-data_file 'AUDIO_GAMEDATA' 'audioconfig/gbbisonhf_game.dat'
-data_file 'AUDIO_SOUNDDATA' 'audioconfig/gbbisonhf_sounds.dat'
-data_file 'AUDIO_WAVEPACK' 'sfx/dlc_gbbisonhf'
 
 shared_script 'config.lua'
 server_script 'server.lua'

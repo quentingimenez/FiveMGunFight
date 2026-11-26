@@ -25,24 +25,47 @@ end
 exports('DeleteModeVehicle', deleteModeVehicle)
 exports('GetModeVehicle', function() return modeVehicle end)
 
+-- Modèles qui ont fait planter ce client au chargement (marqueur KVP posé avant
+-- le chargement, retiré après : s'il est encore là au démarrage, le jeu a planté).
+-- Un tel modèle n'est plus jamais utilisé comme véhicule de base sur ce PC : on
+-- reprend le véhicule du mode, pour ne pas replanter en boucle.
+local VEH_LOADING = 'gf_core:vehicleLoading'
+local function badVehicle(model)
+    return GetResourceKvpInt('gf_core:badVehicle:' .. model) == 1
+end
+do
+    local crashed = GetResourceKvpString(VEH_LOADING)
+    if crashed and crashed ~= '' then
+        SetResourceKvpInt('gf_core:badVehicle:' .. crashed, 1)
+        DeleteResourceKvp(VEH_LOADING)
+        print(('^1[gf_core] Le modèle %s a fait planter le jeu : il ne sera plus utilisé sur ce PC^0'):format(crashed))
+        TriggerServerEvent('gf_core:vehicleCrashed', crashed)
+    end
+end
+
 local function giveVehicle(model, x, y, z, heading)
-    -- Véhicule de base choisi par un admin (/customveh, ressource gf_vehicles)
-    if GetResourceState('gf_vehicles') == 'started' and type(GlobalState.gf_vehicle_base) == 'string' then
-        model = GlobalState.gf_vehicle_base
+    -- Véhicule de base choisi par un admin (/customveh, ressource gf_vehicles),
+    -- sauf s'il a déjà fait planter ce client
+    local base = GlobalState.gf_vehicle_base
+    if GetResourceState('gf_vehicles') == 'started' and type(base) == 'string' and not badVehicle(base) then
+        model = base
     end
     local hash = joaat(model)
     if not IsModelInCdimage(hash) or not IsModelAVehicle(hash) then
         print(('[gf_core] Modèle de véhicule inconnu : %s'):format(model))
         return
     end
+    SetResourceKvp(VEH_LOADING, model)
     RequestModel(hash)
     local timeout = GetGameTimer() + 10000
     while not HasModelLoaded(hash) and GetGameTimer() < timeout do Wait(0) end
-    if not HasModelLoaded(hash) then return end
+    if not HasModelLoaded(hash) then DeleteResourceKvp(VEH_LOADING) return end
 
     local ped = PlayerPedId()
     local veh = CreateVehicle(hash, x, y, z, heading, true, false)
     SetModelAsNoLongerNeeded(hash)
+    -- quelques images pour que le rendu du modèle ait eu lieu avant de lever le marqueur
+    CreateThread(function() Wait(3000) DeleteResourceKvp(VEH_LOADING) end)
     if veh == 0 then return end
 
     SetVehicleOnGroundProperly(veh)

@@ -108,3 +108,16 @@ AddEventHandler('playerDropped', function()
     lastRequest[source] = nil
     autoDone[source] = nil
 end)
+
+-- Un client signale qu'un modèle l'a fait planter pendant sa photo (marqueur KVP
+-- resté posé). Simple alerte dans la console : le modèle est sans doute corrompu
+-- et doit être retiré (voir docs/ajouter-un-modele.md, « Dépannage »).
+local brokenSeen = {}
+RegisterNetEvent('gf_thumbs:broken', function(ref)
+    local src = source
+    if brokenSeen[src] or type(ref) ~= 'string' or #ref > 80 or not ref:match('^[%w_]+/[%w_]+$') then return end
+    brokenSeen[src] = true
+    print(('^1[gf_thumbs] %s : le modèle %s a fait planter son jeu pendant la photo (modèle corrompu ?)^0')
+        :format(GetPlayerName(src) or src, ref))
+end)
+AddEventHandler('playerDropped', function() brokenSeen[source] = nil end)
