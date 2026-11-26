@@ -583,6 +583,8 @@ class Documentation(unittest.TestCase):
         "docs/lobby.md",
         "docs/qualite.md",
         "docs/protection-branche.md",
+        "docs/regles-de-code.md",
+        "docs/chantiers-techniques.md",
         ".github/pull_request_template.md",
         ".github/CODEOWNERS",
     )
@@ -593,6 +595,22 @@ class Documentation(unittest.TestCase):
                 chemin = RACINE / document
                 self.assertTrue(chemin.is_file(), "document manquant")
                 self.assertGreater(len(lire(chemin).strip()), 200, "document vide ou presque")
+
+    def test_regles_de_code_referencees_et_citees_juste(self) -> None:
+        # Les règles ne s'appliquent que si CONTRIBUTING.md (la référence pour
+        # le fond) y renvoie, et un chantier ne peut citer qu'une règle définie.
+        self.assertIn("docs/regles-de-code.md", lire(RACINE / "CONTRIBUTING.md"))
+        index = lire(RACINE / "docs" / "README.md")
+        for document in ("regles-de-code.md", "chantiers-techniques.md"):
+            with self.subTest(index=document):
+                self.assertIn(f"]({document})", index, "document absent de docs/README.md")
+        regles = lire(RACINE / "docs" / "regles-de-code.md")
+        chantiers = lire(RACINE / "docs" / "chantiers-techniques.md")
+        citees = sorted(set(re.findall(r"\b[SAPNDUEV]\d+\b", chantiers)))
+        self.assertTrue(citees, "aucun chantier ne cite de règle")
+        for regle in citees:
+            with self.subTest(regle=regle):
+                self.assertRegex(regles, rf"\*\*{regle} — ", "règle citée mais non définie")
 
     def test_claude_md_importe_agents_md_et_impose_la_fusion(self) -> None:
         # Claude Code ne lit que CLAUDE.md : sans import explicite, il ignore

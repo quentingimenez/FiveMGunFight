@@ -20,7 +20,11 @@ Lis au minimum :
 - [`docs/qualite.md`](docs/qualite.md) — ce que la CI vérifie et comment la
   lancer en local ;
 - [`docs/protection-branche.md`](docs/protection-branche.md) — ce qui est
-  interdit et ce que la protection couvre vraiment.
+  interdit et ce que la protection couvre vraiment ;
+- [`docs/regles-de-code.md`](docs/regles-de-code.md) — les règles que tout
+  changement respecte : autorité du serveur, architecture, performance, NUI,
+  données, tests et preuve. Les écarts connus du code actuel sont dans
+  [`docs/chantiers-techniques.md`](docs/chantiers-techniques.md).
 
 Récupère la dernière version de `main`, puis crée ta branche :
 
@@ -148,7 +152,8 @@ Au-delà de ~400 lignes modifiées, découpe.
     touchés) ;
   - l'absence de secret, de clé de licence ou de mot de passe ;
   - la cohérence avec les `config.lua` (pas de valeur codée en dur) ;
-  - la mise à jour de la documentation si le comportement change.
+  - la mise à jour de la documentation si le comportement change ;
+  - la checklist de [`docs/regles-de-code.md`](docs/regles-de-code.md) § 11.
 - Un commentaire bloquant doit être résolu avant la fusion (la résolution des
   conversations est exigée par la protection de branche).
 

@@ -11,6 +11,8 @@ décrivent le fonctionnement interne et l'exploitation.
 | [`architecture.md`](architecture.md) | tu veux comprendre comment le serveur est assemblé (Docker, ressources, données) |
 | [`lobby.md`](lobby.md) | tu travailles sur le lobby, l'escouade ou la création de personnage |
 | [`must-have.md`](must-have.md) | tu veux connaître les fonctionnalités prévues et l'ordre dans lequel les construire |
+| [`regles-de-code.md`](regles-de-code.md) | tu écris ou relis du code : les règles à respecter (autorité du serveur, performance, données, tests et preuve) |
+| [`chantiers-techniques.md`](chantiers-techniques.md) | tu cherches ce qui doit être revu, corrigé ou ajouté pour que le code existant respecte ces règles |
 | [`qualite.md`](qualite.md) | tu modifies du code et tu veux savoir ce que la CI vérifie |
 | [`debug-test.md`](debug-test.md) | tu veux les accès (ports, logs, console, admin) et les scénarios de test local |
 | [`pieges-fivem.md`](pieges-fivem.md) | tu touches au rendu, à la caméra, au ped ou à un natif, ou tu dois tester en jeu vite (outils d'essai, pièges mesurés) |
