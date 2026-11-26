@@ -22,7 +22,7 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[1]
 RESSOURCES = RACINE / "server-data" / "resources"
-RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone", "gf_lobby")
+RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone", "gf_lobby", "gf_vehicles")
 MAPS_JSON = RESSOURCES / "[gunfight]" / "gf_maps" / "data" / "maps.json"
 
 MOTS_SCRIPTS = (

@@ -53,7 +53,7 @@ local function takeVehicle(g)
     if GetGameTimer() - lastVehicleRequest < 2000 then return end
     lastVehicleRequest = GetGameTimer()
     CreateThread(function()
-        local veh = exports.gf_core:GiveModeVehicle(map.vehicle or 'sultan', g.x, g.y, g.z + 0.5, g.h or 0.0)
+        local veh = exports.gf_core:GiveModeVehicle(map.vehicle or Config.Vehicle, g.x, g.y, g.z + 0.5, g.h or 0.0)
         if veh and veh ~= 0 then myVehicle = veh end
     end)
 end

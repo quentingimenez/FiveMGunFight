@@ -176,7 +176,7 @@ la documentation et les exemples.
    `/nextmap` relance sur la map suivante.
 
 Valeurs par défaut : `GameDuration=600` (10 min), `RespawnDelay=3`, véhicule
-`sultan` (`gf_redzone/config.lua`).
+`theramtrx21`, la Dodge Ram TRX de la ressource `gf_vehicles` (`gf_redzone/config.lua`).
 
 ### Attaque de zone (seul ou à plusieurs)
 

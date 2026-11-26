@@ -33,9 +33,16 @@ Deux modes de jeu :
 
 Les véhicules ne se percutent pas entre eux (pas de « pit »), seuls les piétons peuvent être renversés.
 
-Sur tous les modes : **barre de vie** (blanche) et **barre de kevlar** (bleue, au-dessus) en bas au
-centre de l'écran, avec la valeur sur 100 écrite à droite de chaque barre (ex. 70 après 30 de dégâts) ; chiffre de dégâts + son à chaque touche, son de kill, messages
-**DOUBLÉ / TRIPLÉ / QUADRUPLÉ / QUINTUPLÉ…** et kill feed propre au mode (en haut à droite).
+Le véhicule de base (attaquants et point véhicule de la Redzone) est une **Dodge Ram TRX**
+(ressource `gf_vehicles`).
+
+Sur tous les modes : en bas au centre, un gros chiffre de **vie** (« + VIE », barre blanche en
+segments) et de **kevlar** (bouclier, barre bleue) ; sous 25, la vie passe en rouge. En bas à
+droite, le **HUD des armes** : l'arme en main dans un grand cercle (image, chargeur « 30 / ∞ », nom),
+l'autre arme dans un petit cercle, avec la touche 1 ou 2. Munitions illimitées : il faut juste
+recharger. Les barres vie/armure de GTA sous la minimap sont masquées. Chiffre de dégâts + son à
+chaque touche, son de kill, messages **DOUBLÉ / TRIPLÉ / QUADRUPLÉ / QUINTUPLÉ…** et kill feed propre
+au mode (en haut à droite).
 
 Les maps (redzones et zones d'attaque) se créent **en jeu** avec l'éditeur `/editor`.
 
@@ -183,6 +190,7 @@ Les autres réglages sont dans les fichiers `config.lua` :
 | `server-data/resources/[gunfight]/gf_lobby/config.lua` | scène et caméra du lobby, taille d'escouade, catalogue des modes, apparence |
 | `server-data/resources/[gunfight]/gf_attack/config.lua` | durées (choix, placement, combat), voiture, manches gagnantes, couleurs d'équipes, opacité de la zone sur la carte, zones de secours |
 | `server-data/resources/[gunfight]/gf_redzone/config.lua` | durée de partie, véhicule, délai de réapparition, zones de secours |
+| `server-data/resources/[gunfight]/gf_vehicles/` | modèles 3D (`stream/`) et réglages (`data/*.meta`) des véhicules ajoutés ; changer de véhicule de base = `Config.Vehicle` dans `gf_attack` et `gf_redzone` (un véhicule ajouté demande un redémarrage complet du serveur) |
 
 Le volume des sons de touche et de kill se règle en haut de
 `gf_ui/html/app.js` (`const VOLUME = 0.35`).
@@ -232,6 +240,7 @@ server-data/
     gf_redzone  mode Redzone
     gf_maps     éditeur de maps en jeu (/editor) + sauvegarde data/maps.json
     gf_ui       interface : HUD, kill feed, dégâts, multi-kills, sons, classement
+    gf_vehicles véhicules ajoutés (stream/ + data/*.meta) : Dodge Ram TRX « theramtrx21 »
 ```
 
 Chaque mode a son propre « monde » (routing bucket) : les joueurs du lobby, de
