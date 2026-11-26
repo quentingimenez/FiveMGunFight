@@ -281,6 +281,7 @@ local function runBatch(jobs, why)
 
     local ok = 0
     for i, job in ipairs(jobs) do
+        if why == 'automatique' and LocalPlayer.state.gf_mode ~= 'lobby' then break end
         SendNUIMessage({ type = 'progress', text = ('Préparation des photos des menus… %d/%d'):format(i, #jobs) })
         print(('[gf_thumbs] Photo %d/%d : %s/%s (%s)'):format(i, #jobs, job.kind, job.id, why))
         if shoot(job.kind, job.id, job.version) then
@@ -341,10 +342,28 @@ RegisterNetEvent('gf_thumbs:autoCapture', function()
     if #jobs > 0 and LocalPlayer.state.gf_mode == 'lobby' then runBatch(jobs, 'automatique') end
 end)
 
--- Arrivée au lobby : on se signale une fois par session (le serveur vérifie l'admin)
+-- Chaque retour au lobby peut relancer une capture interrompue ou pas encore lancée.
+local lobbyGeneration = 0
+local function planAutoCapture()
+    if not Config.AutoCapture then return end
+    lobbyGeneration = lobbyGeneration + 1
+    local generation = lobbyGeneration
+    CreateThread(function()
+        Wait(Config.AutoCaptureDelay)
+        if generation == lobbyGeneration and LocalPlayer.state.gf_mode == 'lobby'
+            and NetworkIsPlayerActive(PlayerId()) then
+            TriggerServerEvent('gf_thumbs:lobbyReady')
+        end
+    end)
+end
+
+RegisterNetEvent('gf_core:modeChanged', function(mode)
+    if mode == 'lobby' then planAutoCapture()
+    else lobbyGeneration = lobbyGeneration + 1 end
+end)
+
 CreateThread(function()
     if not Config.AutoCapture then return end
     while LocalPlayer.state.gf_mode ~= 'lobby' or not NetworkIsPlayerActive(PlayerId()) do Wait(1000) end
-    Wait(Config.AutoCaptureDelay)
-    if LocalPlayer.state.gf_mode == 'lobby' then TriggerServerEvent('gf_thumbs:lobbyReady') end
+    planAutoCapture()
 end)
