@@ -19,29 +19,51 @@ selon [`AGENTS.md`](../AGENTS.md). Les noms de convars, de natives et de
 champs cités ici se confirment avant usage (`scripts/native.py`, code source
 de FiveM) : la revue les donne de mémoire.
 
-Légende : ⬜ à faire · 🟡 commencé · ✅ fait · ❓ hypothèse à vérifier avant
-tout correctif.
+Légende : ⬜ à faire · 🟡 commencé · 🧪 code fusionné, preuve en jeu à
+faire · ✅ fait · ❓ hypothèse à vérifier avant tout correctif.
 
 ## Vue d'ensemble
 
 | # | Chantier | Priorité | État | Dépend de | Règles |
 |---|---|---|---|---|---|
-| C1 | Validation des tirs | haute | ⬜ | — | S4, S9 |
-| C2 | Journal brut des matchs | haute | ⬜ | — | D2, S9, P3 |
-| C3 | Vie et soins contrôlés par le serveur | haute | ⬜ | C2 | S1 |
-| C4 | State bags lus comme vérité | haute | ❓ | — | S3 |
+| C1 | Validation des tirs | haute | 🧪 | — | S4, S9 |
+| C2 | Journal brut des matchs | haute | 🧪 | — | D2, S9, P3 |
+| C3 | Vie et soins contrôlés par le serveur | haute | 🧪 | C2 | S1 |
+| C4 | State bags lus comme vérité | haute | 🧪 | — | S3 |
 | C5 | Verrous FXServer et véhicules créés par le serveur | haute | ⬜ | — | S5, S8 |
-| C6 | Équilibrage tiré des fichiers du jeu | moyenne | ⬜ | C2 | A3, V8 |
-| C7 | Manche d'Attaque en machine à états testée | moyenne | ⬜ | — | A1, V5 |
+| C6 | Équilibrage tiré des fichiers du jeu | moyenne | 🟡 | C2 | A3, V8 |
+| C7 | Manche d'Attaque en machine à états testée | moyenne | 🧪 | — | A1, V5 |
 | C8 | Charge et réseau mesurés | moyenne | ⬜ | C2 | P5, V7 |
 | C9 | Playtests et équilibre des maps | moyenne | ⬜ | C2 | V8 |
 | C10 | Une seule commande de vérification | moyenne | ✅ | — | V1 |
 | C11 | Mutation, propriétés et fuzzing | moyenne | ⬜ | C10 | V4, U2, U3 |
-| C12 | Migrations de schéma | haute avant [`must-have.md`](must-have.md) § 1 | ⬜ | — | D4 |
-| C13 | Suivi d'oxmysql | basse | ⬜ | — | E3 |
+| C12 | Migrations de schéma | haute avant [`must-have.md`](must-have.md) § 1 | 🟡 | — | D4 |
+| C13 | Suivi d'oxmysql | basse | ✅ | — | E3 |
 | C14 | Rendu du lobby comparé à une référence | basse | ⬜ | — | V6 |
 | C15 | Documentation contradictoire | basse | ✅ | — | — |
-| C16 | Délais, boucles par image et taille des fichiers | basse | ⬜ | C7 | A4, A6, P1 |
+| C16 | Délais, boucles par image et taille des fichiers | basse | 🟡 | C7 | A4, A6, P1 |
+
+## Avancement (26 novembre 2026)
+
+Ce qui est fusionné et ce qu'il reste à prouver. « En jeu » veut dire avec de
+vrais clients FiveM (`FiveM.exe -cl2` pour un second client) sur le serveur
+de développement.
+
+| # | PR | Fait | Reste à faire |
+|---|---|---|---|
+| C1 | #55 | Module `ShotValidation` : arme hors loadout, plafond de dégât, cadence ; refus journalisés | En jeu, deux clients : une manche sans tir légitime refusé, puis une arme hors loadout annulée et journalisée. Remplir `damageCaps` et `fireIntervals` à partir de C6, une fois C6 mesuré |
+| C2 | #59 | Ressource `gf_journal` (table `gf_match_events`), `scripts/recalculer_match.py`, `scripts/exporter_journal.sh` | En jeu : un match complet dont le tableau de fin est recalculé à l'identique |
+| C3 | #62 | Ressource `gf_audit` : anomalies `soin-sans-objet` et `touche-mortelle-sans-mort`, sans sanction | En jeu, deux clients : aucune anomalie sur une manche normale ; une anomalie quand une ressource de test force un soin. Puis mesurer le taux de fausses alertes avant toute sanction |
+| C4 | #61 | Le serveur décide depuis ses tables (`Proteges`, `Equipes`, `Modes`) ; un garde rétablit les state bags réécrits par un client et journalise l'anomalie | En jeu, un client : `LocalPlayer.state:set('gf_protected', true, true)` doit produire une ligne `anomalie` et la valeur revenir à `false` |
+| C5 | — | Rien | Tout, avec une partie de test : le véhicule de mode devient créé par le serveur |
+| C6 | #64 | Tableau des tirs et du temps pour tuer : [`equilibrage-armes.md`](equilibrage-armes.md) (build 1.0.3889.0) | En jeu : compter les tirs sur une cible à 10, 25 et 50 m et comparer au tableau ; puis la part des kills de chaque arme (C2) avant tout réglage |
+| C7 | #58 | Module `AttackRules` (machine à états, 26 tests, 500 suites aléatoires) | En jeu, deux clients : une manche avec un départ volontaire à chaque phase |
+| C12 | #56 | Ressource `gf_db` : migrations numérotées et table `gf_schema_version`, prouvées sur la base de développement | Preuve en CI d'une base de la version précédente migrée, puis sauvegarde et restauration du runbook après migration |
+| C13 | #57 | `vendorise.json` et `scripts/suivre_vendorise.py`, testés | — |
+| C16 | #58 | Délais de `gf_attack` passés à `GetGameTimer()` | Mesurer chaque `Wait(0)` avec `resmon` ; découper `gf_lobby/server.lua`, `gf_lobby/client.lua` et `gf_attack/server.lua` (644 lignes) |
+
+Le smoke de la CI vérifie aussi le démarrage de `gf_db`, `gf_journal` et
+`gf_stats` (#60), mais pas encore celui de `gf_audit`.
 
 ## C1 — Validation des tirs
 
