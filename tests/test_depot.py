@@ -282,6 +282,14 @@ class InfraDocker(unittest.TestCase):
             with self.subTest(nom=nom):
                 self.assertIn(nom, texte, "amorçage de maps.json incomplet")
 
+    def test_entrypoint_complete_les_donnees_sans_ecraser(self) -> None:
+        texte = lire(self.ENTRYPOINT)
+        self.assertIn("GF_SEED_DATA", texte)
+        self.assertIn("cp -Rn", texte, "le complément depuis l'image ne doit pas écraser")
+        for dossier in ("gf_thumbs/thumbs", "gf_vehicles/custom"):
+            with self.subTest(dossier=dossier):
+                self.assertIn(dossier, texte)
+
 
 class EnvironnementsCompose(unittest.TestCase):
     """Le découpage socle / dev / prod reste utilisable sans ambiguïté.
@@ -360,11 +368,25 @@ class EnvironnementsCompose(unittest.TestCase):
             ("dbdata", "gunfight-prod-dbdata"),
             ("maps", "gunfight-prod-maps"),
             ("characters", "gunfight-prod-characters"),
+            ("thumbs", "gunfight-prod-thumbs"),
+            ("vehicles", "gunfight-prod-vehicles"),
         ):
             with self.subTest(volume=volume):
                 self.assertEqual(prod.get(volume), nom, "volume de production mal nommé")
                 self.assertNotIn(nom, dev, "volume de production présent dans le dev")
                 self.assertNotIn(nom, socle, "volume de production présent dans le socle")
+
+    def test_prod_persiste_les_donnees_creees_en_jeu(self) -> None:
+        # Photos des menus (/thumbs) et véhicule de base + customs (/customveh) :
+        # sans volume, une mise à jour de l'image les effacerait.
+        bloc = self.bloc(self.PROD, "fxserver")
+        for montage in (
+            "thumbs:/opt/fivem/server-data/resources/[gunfight]/gf_thumbs/thumbs",
+            "vehicles:/opt/fivem/server-data/resources/[gunfight]/gf_vehicles/custom",
+        ):
+            with self.subTest(montage=montage):
+                self.assertIn(montage, bloc, "donnée de jeu non persistée en production")
+        self.assertRegex(bloc, r'GF_SEED_DATA: *"?true"?', "GF_SEED_DATA doit valoir true")
 
     def test_socle_n_a_pas_de_build_ni_d_image_pour_fxserver(self) -> None:
         bloc = self.bloc(self.SOCLE, "fxserver")
@@ -410,6 +432,55 @@ class StatistiquesPersistantes(unittest.TestCase):
             texte,
             "volume characters absent de la production",
         )
+
+
+class VehiculesDeclares(unittest.TestCase):
+    """Chaque véhicule de Config.Vehicles est complet et déclaré.
+
+    Garde-fou de scripts/ajouter_vehicule.py (voir docs/ajouter-un-modele.md) :
+    un véhicule listé dans le menu sans modèle 3D ou sans réglages ne
+    s'afficherait pas en jeu.
+    """
+
+    BASE = RESSOURCES / "[gunfight]" / "gf_vehicles"
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        config = lire(cls.BASE / "config.lua")
+        bloc = config[config.index("Config.Vehicles = {"):]
+        bloc = bloc[: bloc.index("\n}")]
+        cls.modeles = re.findall(r"model\s*=\s*'([^']+)'", bloc)
+        cls.manifeste = lire(cls.BASE / "fxmanifest.lua")
+        cls.defaut = re.search(r"Config\.DefaultModel\s*=\s*'([^']+)'", config).group(1)
+
+    def test_au_moins_un_vehicule_et_defaut_connu(self) -> None:
+        self.assertTrue(self.modeles, "Config.Vehicles est vide")
+        self.assertEqual(len(self.modeles), len(set(self.modeles)), "modèle listé deux fois")
+        self.assertIn(self.defaut, self.modeles, "Config.DefaultModel absent de Config.Vehicles")
+
+    def test_chaque_vehicule_a_son_modele_3d(self) -> None:
+        for modele in self.modeles:
+            with self.subTest(modele=modele):
+                self.assertTrue((self.BASE / "stream" / f"{modele}.yft").is_file(), "stream/<modèle>.yft manquant")
+                self.assertTrue((self.BASE / "stream" / f"{modele}.ytd").is_file(), "stream/<modèle>.ytd manquant")
+
+    def test_chaque_vehicule_a_ses_reglages_declares(self) -> None:
+        for modele in self.modeles:
+            with self.subTest(modele=modele):
+                meta = self.BASE / "data" / modele / "vehicles.meta"
+                self.assertTrue(meta.is_file(), "data/<modèle>/vehicles.meta manquant")
+                self.assertIn(f"<modelName>{modele}</modelName>", lire(meta).replace(" ", ""))
+                for fichier in sorted((self.BASE / "data" / modele).glob("*.meta")):
+                    self.assertIn(f"'data/{modele}/{fichier.name}'", self.manifeste,
+                                  f"{fichier.name} n'est pas déclaré dans files {{}}")
+
+    def test_pas_de_lien_publicitaire_dans_les_noms(self) -> None:
+        for meta in sorted((self.BASE / "data").glob("*/vehicles.meta")):
+            texte = lire(meta)
+            for balise in ("gameName", "vehicleMakeName"):
+                with self.subTest(fichier=meta.parent.name, balise=balise):
+                    for valeur in re.findall(rf"<{balise}>([^<]*)</{balise}>", texte):
+                        self.assertNotRegex(valeur, r"(?i)https?://|discord|\.gg/")
 
 
 class MapsEnJeu(unittest.TestCase):

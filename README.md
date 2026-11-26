@@ -39,10 +39,16 @@ customise avec **`/customveh`** : onglet **Véhicule** (photo et nom de chaque v
 peinture, pièces, jantes, xénons, néons, vitres, plaque. **Enregistrer** fait du véhicule affiché le
 véhicule de base de tous les joueurs, avec sa custom (fichier `gf_vehicles/custom/custom.json`).
 
-**Photos des menus** : un admin tape **`/thumbs vehicles`** (ou `/thumbs weapons`, ou `/thumbs vehicles
-<modèle>` pour un seul) : chaque objet est posé dans un studio (fond vert détouré), photographié à
-partir de son modèle 3D et enregistré dans `gf_thumbs/thumbs/<famille>/<id>.png`. Les menus (onglet
+**Photos des menus** : **automatiques**. Quand un admin arrive au lobby, son jeu photographie les
+modèles qui n'ont pas encore de photo (écran « Préparation des photos des menus… » quelques
+secondes, jamais pendant une partie) : chaque objet est posé dans un studio (fond vert détouré),
+photographié à partir de son modèle 3D et enregistré dans `gf_thumbs/thumbs/<famille>/<id>.png`.
+Pour refaire une photo à la main : **`/thumbs vehicles [modèle]`** (ou `/thumbs weapons`). Les menus (onglet
 **Véhicule**…) affichent ces photos ; le même mécanisme servira aux armes et aux tenues.
+
+**Ajouter un véhicule** : `py scripts/ajouter_vehicule.py <dossier du pack ou dlc.rpf> --nom "Nom"`
+copie, nettoie et déclare tout ; sa photo se prend toute seule quand un admin arrive au lobby. Guide complet
+(et ajout d'une nouvelle famille de photos) : [docs/ajouter-un-modele.md](docs/ajouter-un-modele.md).
 
 Sur tous les modes : en bas au centre, un gros chiffre de **vie** (« + VIE », barre blanche en
 segments) et de **kevlar** (bouclier, barre bleue) ; sous 25, la vie passe en rouge. En bas à
@@ -54,10 +60,11 @@ au mode (en haut à droite).
 
 Les maps (redzones et zones d'attaque) se créent **en jeu** avec l'éditeur `/editor`.
 
-À sa première connexion, le joueur crée son personnage puis arrive dans un **lobby
-statique** : caméra fixe, personnage visible, escouade de 4 joueurs maximum avec
-invitations, barre de modes et bouton **Jouer**. Les onglets **Armes** et
-**Personnage** sont déjà présents mais réservés aux prochaines versions. Le détail
+À sa première connexion, le joueur compose son personnage (visage, cheveux,
+tenue, accessoires et tatouages) puis arrive dans un **lobby statique** : caméra
+fixe, personnage visible, escouade de 4 joueurs maximum avec invitations, barre
+de modes et bouton **Jouer**. L'onglet **Personnage** rouvre l'éditeur
+d'apparence ; l'onglet **Armes** reste réservé aux prochaines versions. Le détail
 de l'interface, du protocole NUI et des règles d'escouade est dans
 [docs/lobby.md](docs/lobby.md).
 
@@ -470,7 +477,9 @@ conservé séparément pour que les maps créées en jeu survivent aux mises à 
 8. Les joueurs se connectent avec `connect IP_DU_VPS` (ou via la liste des serveurs FiveM).
 
 Les volumes de production s'appellent **`gunfight-prod-txdata`** (comptes txAdmin),
-**`gunfight-prod-dbdata`** (base MariaDB) et **`gunfight-prod-maps`** (`maps.json`). Ils
+**`gunfight-prod-dbdata`** (base MariaDB), **`gunfight-prod-maps`** (`maps.json`),
+**`gunfight-prod-characters`** (personnages), **`gunfight-prod-thumbs`** (photos des menus,
+`/thumbs`) et **`gunfight-prod-vehicles`** (véhicule de base et customs, `/customveh`). Ils
 sont distincts de ceux du développement (`gunfight_txdata`, `gunfight_dbdata`) : lancer
 le mauvais fichier Compose ne peut donc pas écrire dans l'autre environnement.
 
@@ -478,7 +487,10 @@ Au premier démarrage, la base est initialisée par MariaDB et Docker recopie le
 de l'image dans le volume `maps` neuf. Si le volume existait déjà mais sans `maps.json`
 (volume préparé à la main, ancien déploiement), `docker/entrypoint.sh` copie le modèle
 fourni par l'image (amorçage automatique, activé par `GF_SEED_MAPS: "true"` dans la
-surcouche prod). Ne supprime pas ces volumes : `down -v` efface la base, txAdmin et les
+surcouche prod). Les photos et les customs de véhicules sont **complétées** à chaque
+démarrage (`GF_SEED_DATA: "true"`) : ce que l'image apporte de nouveau (une photo ajoutée au
+dépôt, par exemple) est copié dans le volume, sans jamais écraser ce qui a été fait en jeu.
+Ne supprime pas ces volumes : `down -v` efface la base, txAdmin et les
 maps. Si tu reprends des données d'un ancien déploiement, copie-les dans les volumes,
 conteneurs arrêtés, **avant** le premier démarrage.
 
@@ -528,7 +540,7 @@ bash scripts/sauvegarder.sh
 
 Le script crée `backups/<horodatage>/` avec trois archives : `base.sql.gz` (dump
 MariaDB), `txdata.tar.gz` (volume txAdmin) et `maps.tar.gz` (données `gf_maps`),
-plus un `manifeste.sha256`. Il utilise la surcouche prod et exige `IMAGE_REF`.
+plus `jeu.tar.gz` (personnages, photos des menus, véhicules) et un `manifeste.sha256`. Il utilise la surcouche prod et exige `IMAGE_REF`.
 
 Options facultatives :
 
@@ -632,8 +644,12 @@ et [ADR 0002 — FXServer épinglé](docs/adr/0002-fxserver-epingle.md).
 - **Escouade persistante** : le lobby regroupe déjà jusqu'à 4 joueurs et lance le mode pour
   tous, mais l'escouade est dissoute au lancement. La prochaine étape est de la conserver
   entre les parties et de placer ses membres dans la même équipe en Attaque de zone.
-- **Personnalisation** : les onglets Armes et Personnage du lobby sont des placeholders.
-  L'onglet Personnage remplacera la génération actuelle (nom, genre, carnation, style) par
-  un vrai éditeur de vêtements et de visage ; l'onglet Armes ajoutera les finitions et
-  accessoires. Les points d'extension sont décrits dans [docs/lobby.md](docs/lobby.md).
+- **Personnalisation** : l'onglet **Personnage** ouvre l'éditeur d'apparence
+  (visage, cheveux, tenue, accessoires, tatouages vanilla) et enregistre les
+  changements sans recréer le personnage. L'onglet **Armes** reste un placeholder
+  pour les finitions et accessoires. Les points d'extension et les limites des
+  assets add-on sont décrits dans [docs/lobby.md](docs/lobby.md).
+- `gf_stats` : statistiques permanentes (kills, victoires) dans MariaDB avec **oxmysql**
+  — la base est déjà prête dans `docker-compose.yml`, la chaîne de connexion
+  (`mysql_connection_string`) est déjà générée par `docker/entrypoint.sh`.
 - Un anti-cheat dédié est conseillé avant d'ouvrir au grand public.

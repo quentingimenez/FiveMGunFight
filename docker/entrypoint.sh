@@ -155,6 +155,30 @@ if [ "${GF_SEED_MAPS:-false}" = "true" ] && [ ! -f "$MAPS_DATA/maps.json" ]; the
   fi
 fi
 
+# Données créées en jeu (photos des menus, véhicule de base et customs) : en
+# production ce sont des volumes. On y complète ce que l'image fournit SANS
+# écraser l'existant (cp -n) : une photo ajoutée au dépôt arrive au prochain
+# déploiement, une photo refaite en jeu (/thumbs) est conservée.
+# GF_SEED_DATA vaut "true" en production/préproduction ; en dev, le dossier du
+# dépôt est monté.
+DEFAUTS_RES="/opt/fivem/defaults/resources/[gunfight]"
+completer_depuis_image() {
+  local relatif="$1"
+  local source="$DEFAUTS_RES/$relatif"
+  local cible="$DATA/resources/[gunfight]/$relatif"
+  [ -d "$source" ] || return 0
+  mkdir -p "$cible"
+  if cp -Rn "$source/." "$cible/" 2>/dev/null; then
+    echo "$relatif complété depuis l'image"
+  else
+    echo "AVERTISSEMENT : impossible de compléter $relatif (droits du volume ?)" >&2
+  fi
+}
+if [ "${GF_SEED_DATA:-false}" = "true" ]; then
+  completer_depuis_image "gf_thumbs/thumbs"
+  completer_depuis_image "gf_vehicles/custom"
+fi
+
 echo "secrets.cfg généré (joueurs max : $MAX_PLAYERS)"
 echo "Build            : $BUILD_SHA"
 echo "Version FXServer : $(cat "$SERVER/FX_VERSION.txt" 2>/dev/null)"

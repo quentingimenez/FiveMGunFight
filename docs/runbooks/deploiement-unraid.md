@@ -103,6 +103,11 @@ les crochets dans `resources/[gunfight]/...` exigent des guillemets doubles.
    fi
    chown -R 10001:10001 /mnt/user/appdata/fivemgunfight/characters
    ls -l /mnt/user/appdata/fivemgunfight/characters/
+
+   # Photos des menus et véhicules : dossiers vides, remplis au démarrage
+   # depuis l'image (GF_SEED_DATA=true), puis par /thumbs et /customveh.
+   mkdir -p /mnt/user/appdata/fivemgunfight/thumbs /mnt/user/appdata/fivemgunfight/vehicles
+   chown -R 10001:10001 /mnt/user/appdata/fivemgunfight/thumbs /mnt/user/appdata/fivemgunfight/vehicles
    ```
 
    La copie est conditionnelle : si le `maps.json` source est absent, le
@@ -121,7 +126,11 @@ les crochets dans `resources/[gunfight]/...` exigent des guillemets doubles.
      `/opt/fivem/server-data/resources/[gunfight]/gf_maps/data`, en lecture-écriture ;
    - ajoute `/mnt/user/appdata/fivemgunfight/characters` →
      `/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data`, en lecture-écriture ;
-   - ajoute la variable `GF_SEED_MAPS=true` ;
+   - ajoute `/mnt/user/appdata/fivemgunfight/thumbs` →
+     `/opt/fivem/server-data/resources/[gunfight]/gf_thumbs/thumbs`, en lecture-écriture ;
+   - ajoute `/mnt/user/appdata/fivemgunfight/vehicles` →
+     `/opt/fivem/server-data/resources/[gunfight]/gf_vehicles/custom`, en lecture-écriture ;
+   - ajoute les variables `GF_SEED_MAPS=true` et `GF_SEED_DATA=true` ;
    - conserve le montage txdata, le réseau `fivem-net`, les ports 30120 TCP et
      UDP, le port 40120 TCP et toutes les variables déjà présentes (licence,
      nom du serveur, joueurs max, identifiants admin, base MariaDB).

@@ -1,9 +1,9 @@
 Config = {}
 
 -- Véhicules disponibles sur le serveur (onglet « Véhicule » de /customveh).
--- Pour en ajouter un : modèles dans stream/, réglages dans data/<modèle>/*.meta,
--- puis une ligne ici. Photo facultative : html/img/vehicles/<modèle>.png
--- (déclarée dans files {} du fxmanifest) ; sans photo, une silhouette s'affiche.
+-- Pour en ajouter un : py scripts/ajouter_vehicule.py <pack> --nom "Nom" (voir
+-- docs/ajouter-un-modele.md) : il copie les fichiers, les déclare et ajoute la ligne ici.
+-- Photo du menu : /thumbs vehicles <modèle> en jeu (gf_thumbs) ; sans photo, une silhouette.
 Config.Vehicles = {
     { model = 'gstbisxl3', label = 'Bison XL Hellfire' },
     { model = 'keyhawk',   label = 'Jeep Trackhawk' },

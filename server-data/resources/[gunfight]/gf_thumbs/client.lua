@@ -5,10 +5,13 @@
 --       exports.gf_thumbs:Get(kind, ids) -> { [id] = 'data:image/png;base64,...' }
 --     (bloquant, à appeler dans un thread ; résultat mis en cache)
 --
---  2) Studio photo (admin, /thumbs <famille> [id]) : pose l'objet au milieu
+--  2) Studio photo : pose l'objet au milieu
 --     d'une boîte verte, cadre la caméra selon la taille du modèle, la page
 --     NUI capture l'image du jeu, détoure le vert et recadre, puis la photo
---     est envoyée au serveur.
+--     est envoyée au serveur. Lancé :
+--       - automatiquement quand un admin arrive au lobby : photos manquantes des
+--         familles « auto » (aucune action à faire après l'ajout d'un modèle) ;
+--       - à la main : /thumbs <famille> [id] (refaire une photo).
 -- =============================================================================
 
 -- ---------------------------------------------------------------- API (cache)
@@ -206,6 +209,7 @@ local function shoot(kind, id)
             DrawLightWithRange(camPos.x, camPos.y, camPos.z + 1.0, 255, 255, 255, radius * 6.0, 1.2)
             HideHudAndRadarThisFrame()
             HideHudComponentThisFrame(14) -- réticule
+            DisableAllControlActions(0)
             Wait(0)
         end
     end)
@@ -217,7 +221,6 @@ local function shoot(kind, id)
     local data = Citizen.Await(p)
     active = false
 
-    RenderScriptCams(false, false, 0, true, true)
     DestroyCam(cam, false)
     SetEntityAsMissionEntity(ent, true, true)
     DeleteEntity(ent)
@@ -238,22 +241,14 @@ local function listOf(kind)
     return ok and type(list) == 'table' and list or {}
 end
 
-RegisterNetEvent('gf_thumbs:capture', function(kind, onlyId)
-    if capturing or not Config.Kinds[kind] then return end
+-- Prend une série de photos : jobs = { { kind = ..., id = ... }, ... }.
+-- La caméra en cours (celle du lobby, par ex.) est rétablie à la fin ; un
+-- message s'affiche dans la page NUI (jamais capturée, contrairement au texte du jeu).
+local function runBatch(jobs, why)
+    if capturing or #jobs == 0 then return end
     capturing = true
-    local ids = {}
-    for _, item in ipairs(listOf(kind)) do
-        if not onlyId or item.id == onlyId then ids[#ids + 1] = item.id end
-    end
-    if #ids == 0 then
-        capturing = false
-        return print(('[gf_thumbs] Rien à photographier pour %s%s'):format(kind, onlyId and ('/' .. onlyId) or ''))
-    end
-
-    -- Studio : midi, grand soleil, chargement du décor autour du studio
-    local ped = PlayerPedId()
+    local prevCam = GetRenderingCam()
     local s = Config.Studio
-    FreezeEntityPosition(ped, true)
     SetFocusPosAndVel(s.x, s.y, s.z, 0.0, 0.0, 0.0)
     NetworkOverrideClockTime(12, 0, 0)
     SetWeatherTypeNowPersist('EXTRASUNNY')
@@ -262,19 +257,65 @@ RegisterNetEvent('gf_thumbs:capture', function(kind, onlyId)
     ClearAllHelpMessages()
 
     local ok = 0
-    for i, id in ipairs(ids) do
-        -- Aucun texte à l'écran pendant la capture (il se retrouverait sur la photo)
-        print(('[gf_thumbs] Photo %d/%d : %s/%s'):format(i, #ids, kind, id))
-        if shoot(kind, id) then ok = ok + 1 end
+    for i, job in ipairs(jobs) do
+        SendNUIMessage({ type = 'progress', text = ('Préparation des photos des menus… %d/%d'):format(i, #jobs) })
+        print(('[gf_thumbs] Photo %d/%d : %s/%s (%s)'):format(i, #jobs, job.kind, job.id, why))
+        if shoot(job.kind, job.id) then ok = ok + 1 end
         Wait(300)
     end
 
+    SendNUIMessage({ type = 'progress' })
     ClearFocus()
     NetworkClearClockTimeOverride()
     ClearOverrideWeather()
     ClearWeatherTypePersist()
     DisplayRadar(true)
-    FreezeEntityPosition(ped, false)
+    if prevCam ~= -1 and DoesCamExist(prevCam) then
+        SetCamActive(prevCam, true)
+        RenderScriptCams(true, false, 0, true, true)
+    else
+        RenderScriptCams(false, false, 0, true, true)
+    end
     capturing = false
-    print(('[gf_thumbs] %d/%d photo(s) %s envoyée(s) au serveur'):format(ok, #ids, kind))
+    print(('[gf_thumbs] %d/%d photo(s) envoyée(s) au serveur'):format(ok, #jobs))
+end
+
+-- /thumbs <famille> [id] : refaire des photos à la main
+RegisterNetEvent('gf_thumbs:capture', function(kind, onlyId)
+    if not Config.Kinds[kind] then return end
+    local jobs = {}
+    for _, item in ipairs(listOf(kind)) do
+        if not onlyId or item.id == onlyId then jobs[#jobs + 1] = { kind = kind, id = item.id } end
+    end
+    if #jobs == 0 then
+        return print(('[gf_thumbs] Rien à photographier pour %s%s'):format(kind, onlyId and ('/' .. onlyId) or ''))
+    end
+    runBatch(jobs, 'manuel')
+end)
+
+-- Automatique : le serveur a confirmé qu'on est admin ; on photographie ce qui manque
+RegisterNetEvent('gf_thumbs:autoCapture', function()
+    local jobs = {}
+    for kind, def in pairs(Config.Kinds) do
+        if def.auto then
+            local ids = {}
+            for _, item in ipairs(listOf(kind)) do ids[#ids + 1] = item.id end
+            if #ids > 0 then
+                local have = get(kind, ids)
+                for _, id in ipairs(ids) do
+                    if not have[id] then jobs[#jobs + 1] = { kind = kind, id = id } end
+                end
+            end
+        end
+    end
+    -- toujours au lobby au moment de commencer (pas pendant une partie)
+    if #jobs > 0 and LocalPlayer.state.gf_mode == 'lobby' then runBatch(jobs, 'automatique') end
+end)
+
+-- Arrivée au lobby : on se signale une fois par session (le serveur vérifie l'admin)
+CreateThread(function()
+    if not Config.AutoCapture then return end
+    while LocalPlayer.state.gf_mode ~= 'lobby' or not NetworkIsPlayerActive(PlayerId()) do Wait(1000) end
+    Wait(Config.AutoCaptureDelay)
+    if LocalPlayer.state.gf_mode == 'lobby' then TriggerServerEvent('gf_thumbs:lobbyReady') end
 end)

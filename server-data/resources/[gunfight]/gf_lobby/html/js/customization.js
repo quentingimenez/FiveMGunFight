@@ -1,6 +1,6 @@
-/* Onglets de personnalisation (placeholders premium).
-   Aucun appel serveur : deux boutons dans #main-nav, une modale « bientôt ».
-   ES5 strict, chargé après app.js (window.Lobby disponible). */
+/* Onglets de personnalisation du lobby.
+   ARMES ouvre la modale « bientôt disponible » ; PERSONNAGE ouvre l'éditeur
+   complet (Creator.openEdit). ES5 strict, chargé après app.js. */
 (function () {
   'use strict';
 
@@ -25,11 +25,8 @@
       id: 'character',
       label: 'PERSONNAGE',
       icon: 'spark',
-      ariaLabel: 'Personnalisation du personnage — bientôt disponible',
-      title: 'Personnalisation du personnage',
-      description: 'Bientôt, va plus loin que le créateur : vêtements, silhouettes et apparence avancée pour affirmer ton identité sur le terrain.',
-      art: 'character',
-      detail: 'TENUES · APPARENCE · STYLE'
+      ariaLabel: 'Personnalisation du personnage',
+      action: 'creator',
     }
   ];
 
@@ -192,9 +189,20 @@
     var button = el('button', 'cust-tab');
     button.type = 'button';
     button.setAttribute('aria-label', config.ariaLabel);
-    button.setAttribute('aria-haspopup', 'dialog');
     button.appendChild(icon(config.icon, 'cust-tab-icon'));
     button.appendChild(el('span', 'cust-tab-label', config.label));
+
+    if (config.action === 'creator') {
+      button.classList.add('cust-tab-live');
+      button.addEventListener('click', function () {
+        if (window.Creator && typeof window.Creator.openEdit === 'function') {
+          window.Creator.openEdit();
+        }
+      });
+      return button;
+    }
+
+    button.setAttribute('aria-haspopup', 'dialog');
     var lock = icon('lock', 'cust-tab-lock');
     lock.setAttribute('aria-hidden', 'true');
     button.appendChild(lock);
@@ -225,6 +233,12 @@
 
   window.Customization = {
     open: function (id) {
+      if (id === 'character') {
+        if (window.Creator && typeof window.Creator.openEdit === 'function') {
+          window.Creator.openEdit();
+        }
+        return;
+      }
       var config = null;
       for (var i = 0; i < TABS.length; i += 1) {
         if (TABS[i].id === id) config = TABS[i];

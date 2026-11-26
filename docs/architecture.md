@@ -67,8 +67,11 @@ sha court du commit **réellement construit**, et suit donc l'image déployée.
 
 Le passage par la convar est volontaire : la convar est posée par l'image qui
 tourne, donc le badge ne peut pas annoncer plus récent qu'elle. En production,
-les ressources viennent **toujours** de l'image ; seuls `gf_maps/data` (maps) et
-`gf_lobby/data` (personnages) peuvent être des volumes. Monter tout `server-data`
+les ressources viennent **toujours** de l'image ; seuls `gf_maps/data` (maps),
+`gf_lobby/data` (personnages), `gf_thumbs/thumbs` (photos des menus) et
+`gf_vehicles/custom` (véhicule de base, customs) peuvent être des volumes ; les deux
+derniers sont complétés depuis l'image au démarrage (`GF_SEED_DATA`, `cp -Rn` : rien
+n'est écrasé). Monter tout `server-data`
 depuis un volume (cas rencontré sur Unraid) masque les ressources de l'image :
 le code servi devient une copie figée, la convar écrite par l'entrypoint est
 ignorée par un ancien `gf_lobby/server.lua`, et le badge ment. La valeur n'est

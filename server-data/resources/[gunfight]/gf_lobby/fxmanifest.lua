@@ -5,9 +5,10 @@ lua54 'yes'
 name 'gf_lobby'
 description 'Lobby statique Gunfight : personnage, escouade et selection de mode'
 author 'Gunfight'
-version '1.0.0'
+version '1.1.0'
 
 shared_script 'config.lua'
+shared_script 'appearance_schema.lua'
 
 client_scripts {
   'appearance.lua',
@@ -31,6 +32,7 @@ files {
   'html/js/squad.js',
   'html/js/creator.js',
   'html/js/customization.js',
+  'html/data/tattoos.json',
 }
 
 dependencies {
