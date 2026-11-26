@@ -397,8 +397,9 @@ function renderItems(list) {
 }
 
 // Armes : [{ key, name, label, clip, clipMax, active }], ou null pour masquer.
-// Image : html/img/weapons/<NOM_GTA>.png (ex. WEAPON_CARBINERIFLE.png) ;
-// tant qu'elle n'existe pas, une silhouette d'arme générique la remplace.
+// Les photos viennent de gf_thumbs ; une silhouette sert de repli pendant leur chargement.
+const WEAPON_PHOTOS = {};
+let LAST_WEAPONS = null;
 const GUN_SVG = 'M2 9h17l2-2h7v3h-3l-1 2h-4l-2 6h-4l1-4H9l-1 3H5l1-3H2z';
 function weaponIcon(name) {
     const box = el('div', 'w-img');
@@ -411,13 +412,14 @@ function weaponIcon(name) {
         svg.appendChild(p);
         box.replaceChildren(svg);
     };
-    img.src = `img/weapons/${encodeURIComponent(name)}.png`;
+    img.src = WEAPON_PHOTOS[name] || `img/weapons/${encodeURIComponent(name)}.png`;
     box.appendChild(img);
     return box;
 }
 
 let WEAPONS_SIG = '';
 function renderWeapons(list) {
+    LAST_WEAPONS = list;
     const box = $('#weapons');
     if (!Array.isArray(list) || list.length === 0) { box.classList.add('hidden'); WEAPONS_SIG = ''; return; }
     box.classList.remove('hidden');
@@ -438,7 +440,6 @@ function renderWeapons(list) {
                 ammo.appendChild(el('span', 'w-clip'));
                 ammo.appendChild(el('span', 'w-inf', '/ ∞'));
                 c.appendChild(ammo);
-                c.appendChild(el('div', 'w-name', w.label));
             }
             box.appendChild(c);
         });
@@ -461,6 +462,11 @@ window.addEventListener('message', (event) => {
         case 'vitals': renderVitals(msg.data); break;
         case 'items': renderItems(msg.data); break;
         case 'weapons': renderWeapons(msg.data); break;
+        case 'weapon_photos':
+            Object.assign(WEAPON_PHOTOS, msg.data || {});
+            WEAPONS_SIG = '';
+            renderWeapons(LAST_WEAPONS);
+            break;
         case 'killfeed': addKill(msg.data); break;
         case 'killfeed_clear': $('#killfeed').replaceChildren(); break;
         case 'loadout_open': openLoadout(msg.data || {}); break;

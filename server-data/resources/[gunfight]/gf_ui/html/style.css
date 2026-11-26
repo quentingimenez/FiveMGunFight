@@ -511,8 +511,8 @@ html, body {
     box-shadow: 0 2px 6px rgba(0, 0, 0, .6);
 }
 .w-circle.active .w-key { top: 4px; left: 4px; background: var(--w-accent); color: #fff; }
-.w-img { width: 44px; height: 28px; display: flex; align-items: center; justify-content: center; }
-.w-circle.active .w-img { width: 92px; height: 44px; margin-bottom: 2px; }
+.w-img { width: 54px; height: 36px; display: flex; align-items: center; justify-content: center; }
+.w-circle.active .w-img { width: 125px; height: 70px; margin-bottom: 3px; }
 .w-img img, .w-img svg { max-width: 100%; max-height: 100%; object-fit: contain; }
 .w-img svg { fill: rgba(255, 255, 255, .9); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8)); }
 .w-ammo {
@@ -526,18 +526,6 @@ html, body {
 }
 .w-clip { font-size: 40px; line-height: .9; font-variant-numeric: tabular-nums; }
 .w-inf { font-size: 16px; color: rgba(255, 255, 255, .7); }
-.w-name {
-    margin-top: 3px;
-    max-width: 120px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, .75);
-}
 .w-circle.low .w-clip { color: #ffb347; }
 .w-circle.empty .w-clip { color: #ff5a5f; animation: wblink .6s ease-in-out infinite alternate; }
 @keyframes wblink { from { opacity: 1; } to { opacity: .35; } }
