@@ -424,6 +424,16 @@ CreateThread(function()
         -- Le personnage peut changer (réapparition) : on réapplique l'invincibilité
         SetEntityInvincible(ped, protected or spectator)
 
+        -- Pas de bonus de tir à la tête de près : GTA multiplie les dégâts d'un
+        -- tir à la tête sur un joueur en deçà d'une distance propre à chaque
+        -- arme (G36 : 396 à 10 m, 29 de loin). Sans « coups critiques », la tête
+        -- prend les mêmes dégâts à toute distance. Appliqué à tous les joueurs :
+        -- le jeu du tireur calcule le dégât sur sa copie de la cible.
+        for _, joueur in ipairs(GetActivePlayers()) do
+            local p = GetPlayerPed(joueur)
+            if p ~= 0 then SetPedSuffersCriticalHits(p, false) end
+        end
+
         Wait(0)
     end
 end)
