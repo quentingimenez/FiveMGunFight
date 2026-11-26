@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponModelInfo__InitDataList>
+	<InitDatas>
+		<Item>
+			<modelName>cutievvsorange_boxmag</modelName>
+			<txdName>cutievvsorange_boxmag</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>cutievvsorangesupp</modelName>
+			<txdName>cutievvsorangesupp</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>cutievvsorange</modelName>
+			<txdName>cutievvsorange</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+	</InitDatas>
+</CWeaponModelInfo__InitDataList>
+

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<CWeaponModelInfo__InitDataList>
+	<InitDatas>
+		<Item>
+			<modelName>w_ar_akfemvvsyellow_mag1</modelName>
+			<txdName>w_ar_akfemvvsyellow_mag1</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"></lodDist>
+		</Item>
+		<Item>
+			<modelName>w_ar_akfemvvsyellow</modelName>
+			<txdName>w_ar_akfemvvsyellow</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"></lodDist>
+		</Item>
+	</InitDatas>
+</CWeaponModelInfo__InitDataList>
+

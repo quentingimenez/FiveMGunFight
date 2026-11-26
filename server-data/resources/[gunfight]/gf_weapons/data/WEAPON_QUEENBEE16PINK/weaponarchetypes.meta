@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponModelInfo__InitDataList>
+	<InitDatas>
+		<Item>
+			<modelName>w_at_queenbee16pink_supp</modelName>
+			<txdName>w_at_queenbee16pink_supp</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>w_ar_queenbee16pink_mag1</modelName>
+			<txdName>w_ar_queenbee16pink_mag1</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>w_ar_queenbee16pink</modelName>
+			<txdName>w_ar_queenbee16pink</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+	</InitDatas>
+</CWeaponModelInfo__InitDataList>
+
