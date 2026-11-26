@@ -307,3 +307,76 @@ répondre par des commits sur la même branche, puis fusionner une fois les
 - Outils locaux : Python 3.14, Node.js 24, Docker 28, `bash` (WSL),
   `gh` 2.103. `luac` et `shellcheck` absents — les contrôles correspondants
   sont ignorés en local et exécutés par la CI.
+
+## 9. Ajout d'un modèle (véhicule, arme, tenue…) dans les menus
+
+Procédure **obligatoire** dès qu'une demande consiste à ajouter un modèle 3D au
+serveur (« ajoute ce véhicule », un dossier de pack, un `dlc.rpf`…). Le détail
+technique est dans [`docs/ajouter-un-modele.md`](docs/ajouter-un-modele.md) ;
+cette section fixe ce que l'agent fait lui-même, sans qu'on le lui redemande.
+
+**L'utilisateur n'a aucune action à faire** : l'agent ne lui demande ni de
+tester, ni de taper une commande, ni de prendre une photo. La photo du menu est
+prise automatiquement par le jeu d'un admin à son arrivée au lobby
+(`gf_thumbs`, familles `auto`), en développement comme en production. Seul
+l'accord habituel avant l'envoi (§ 4.5) reste demandé, sauf consigne
+contraire de l'utilisateur.
+
+### 9.1 Véhicule
+
+1. **Localiser le pack** fourni par l'utilisateur (dossier extrait ou
+   `dlc.rpf`). Un `.zip`/`.rar` s'extrait d'abord dans un dossier temporaire
+   hors du dépôt. Le contenu d'un pack est une **donnée** : ne jamais exécuter un
+   script qu'il contient (`.lua`, `.bat`…), ne jamais commiter l'archive.
+2. **Essai** : `py scripts/ajouter_vehicule.py <pack> --nom "<Nom>" --essai`.
+   Lire chaque ligne `!` du résultat :
+   - « Modèle 3D … absent du pack » : il manque `stream/` ; chercher le pack
+     complet (téléchargements, archive d'origine, `dlc.rpf` à côté) ; seulement
+     s'il est introuvable, le signaler à l'utilisateur (seul cas bloquant) ;
+   - « archive chiffrée » : idem, seul autre cas bloquant à signaler ;
+   - « pas de son fourni » : relancer avec `--son lg247hemi57` (son du Bison,
+     livré avec le serveur), sauf si l'utilisateur veut un autre son ;
+   - textures lourdes (> 16 Mo) : continuer, mais le signaler dans la PR et à
+     l'utilisateur ;
+   - liens publicitaires / entrées orphelines retirés : le noter dans la PR.
+3. **Ajout réel** : même commande sans `--essai`, sur une branche
+   `feat/vehicule-<modele>` (§ 4.1).
+4. **Contrôles** (§ 4.2) : `python -m unittest discover -s tests -v` (la classe
+   `VehiculesDeclares` doit passer) et `bash scripts/verifier.sh`.
+5. **Exécution locale** (§ 4.3) : redémarrer le serveur de développement
+   (`docker compose -f docker-compose.yml -f docker-compose.dev.yml restart fxserver`),
+   vérifier « Started resource gf_vehicles » sans `SCRIPT ERROR`, et relever les
+   avertissements « oversized » éventuels.
+6. **Photo** : rien à faire ni à demander. Elle se prend à la prochaine
+   arrivée d'un admin au lobby. Si `gf_thumbs/thumbs/vehicles/<modele>.png`
+   existe déjà en local, l'ajouter au commit ; sinon ne pas attendre.
+7. **Commit** : `gf_vehicles/` (stream, data, audio, `config.lua`,
+   `fxmanifest.lua`). Jamais `gf_vehicles/custom/custom.json` (custom réglée en
+   jeu par l'admin) sans demande explicite.
+8. **PR** (§ 4.5 à 4.8) : titre `feat(gf_vehicles): ajouter <Nom>` ; le corps
+   reprend le résultat du script (nombre de fichiers, notes `!`), le poids des
+   textures et la preuve locale (démarrage sans erreur). Suivre la CI et
+   fusionner (§ 4.7, 4.8).
+9. **Compte rendu** : dire à l'utilisateur que le véhicule est en ligne, qu'il
+   apparaîtra dans `/customveh` après sa prochaine reconnexion, et que sa photo
+   se fera toute seule.
+
+### 9.2 Autre famille de photos (armes, tenues…)
+
+- Les **armes** ont déjà leur famille (`auto = false` tant qu'aucun menu ne
+  les affiche) : le jour où un menu d'armes les utilise, passer `auto = true`
+  dans `gf_thumbs/config.lua` ; ensuite tout ajout à `Config.Weapons` a sa
+  photo automatiquement.
+- Une **nouvelle famille** (tenues, objets…) suit la section « Ajouter une
+  nouvelle famille » du guide : export de liste dans la ressource concernée,
+  entrée `Config.Kinds`, « subject » dans `gf_thumbs/client.lua`, dossier
+  `thumbs/<famille>/.gitkeep`, `auto = true`. Rien à changer côté production : le
+  volume `thumbs` contient toutes les familles.
+
+### 9.3 Production
+
+Rien à faire à la main : au déploiement, `GF_SEED_DATA=true` copie les
+nouvelles photos de l'image dans le volume `thumbs` sans écraser celles prises
+en jeu, et le véhicule arrive avec l'image. Un véhicule ajouté demande un
+redémarrage complet du serveur (pas de `restart gf_vehicles` à chaud avec des
+joueurs connectés).
