@@ -56,8 +56,8 @@ Une session qui a modifié le dépôt n'est terminée que lorsque, dans cet ordr
 6. la **branche locale** est supprimée ;
 7. on est revenu sur `main`, à jour de `origin/main` ;
 8. l'arbre ne contient plus aucun fichier modifié ou non suivi **appartenant à
-   la session** (les changements préexistants laissés par l'utilisateur restent
-   intacts) ;
+   la session**, captures et fichiers de travail compris (§ 5) ; les
+   changements préexistants laissés par l'utilisateur restent intacts ;
 9. l'utilisateur reçoit le **lien de la pull request**, le **sha du commit de
    fusion** et le **résultat de la CI de `main`** sur ce commit.
 
@@ -309,6 +309,14 @@ vert.
   session sans l'avoir signalé à l'utilisateur.
 - « Réparer » `main` par un commit direct : un problème sur `main` se corrige
   par une PR (revert `git revert -m 1 <sha>` sur une branche dédiée si besoin).
+- Écrire un fichier de travail dans l'arbre du dépôt : captures d'écran,
+  journaux copiés, sorties de commande, notes, scripts d'essai. Ils vont dans
+  un dossier temporaire hors du dépôt (`$env:TEMP`, le dossier de travail de
+  l'outil). `scripts/capturer-jeu.ps1` refuse d'écrire dans le dépôt. Un
+  fichier non suivi laissé à la racine est une faute, même s'il n'est pas
+  commité : il pollue `git status` et risque un `git add` de trop. Un tel
+  fichier laissé par une session précédente se signale à l'utilisateur ;
+  il ne se supprime qu'avec son accord.
 
 ## 6. Revues humaines
 
