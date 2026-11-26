@@ -17,7 +17,7 @@ Config = {}
 Config.GameDuration = 600      -- durée d'une partie en secondes (600 = 10 min)
 Config.EndDelay = 15           -- pause entre deux parties (classement final)
 Config.RespawnDelay = 3        -- secondes avant de réapparaître
-Config.Vehicle = 'sultan'      -- véhicule des points véhicule (nom de modèle GTA)
+Config.Vehicle = 'theramtrx21' -- véhicule des points véhicule (Dodge Ram TRX, ressource gf_vehicles)
 Config.KillZoneMargin = 15.0   -- tolérance (m) au bord de la zone pour compter un kill
 Config.HealOnKill = true       -- le tueur récupère sa vie et son gilet
 

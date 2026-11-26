@@ -32,11 +32,11 @@ Config.EndDelay = 6            -- pause entre deux manches : « Manche gagnée /
 Config.MatchEndDelay = 15      -- pause après la fin d'un match (secondes)
 Config.SwapSidesEveryRound = true
 
-Config.Vehicle = 'sultan'          -- voiture des attaquants en début de manche (nom de modèle GTA)
+Config.Vehicle = 'theramtrx21'     -- voiture des attaquants en début de manche (Dodge Ram TRX, ressource gf_vehicles)
 -- Formation d'apparition (voir spawnPos dans server.lua)
 Config.VehicleColumns = 3          -- voitures côte à côte par rangée
-Config.VehicleSideSpacing = 3.3    -- écart (m) entre deux voitures côte à côte (une voiture ≈ 2 m de large)
-Config.VehicleRowSpacing = 6.5     -- écart (m) entre deux rangées (une voiture ≈ 4,5 m de long)
+Config.VehicleSideSpacing = 3.6    -- écart (m) entre deux véhicules côte à côte (la Ram TRX ≈ 2,2 m de large)
+Config.VehicleRowSpacing = 7.5     -- écart (m) entre deux rangées (la Ram TRX ≈ 6 m de long)
 Config.FootSpacing = 1.6           -- écart (m) entre les joueurs à pied (défenseurs)
 
 Config.AttackSpawnDistance = 70.0  -- (zones de secours) distance des attaquants au-delà du bord
