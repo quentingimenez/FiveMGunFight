@@ -13,8 +13,9 @@
 #  les droits 600 et un propriétaire root : liste des noms dans
 #  docker/secrets.exemple/README.md.
 #
-#  server-data vient de l'image ; seul gf_maps/data est un volume, pour que les
-#  maps créées avec l'éditeur survivent aux mises à jour.
+#  server-data vient de l'image ; seuls gf_maps/data et gf_lobby/data sont des
+#  volumes, pour que les maps créées avec l'éditeur et les personnages survivent
+#  aux mises à jour.
 # =============================================================================
 services:
   fxserver:
@@ -37,6 +38,7 @@ services:
       - steam_web_api_key
     volumes:
       - maps:/opt/fivem/server-data/resources/[gunfight]/gf_maps/data
+      - characters:/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data
 
   mariadb:
     environment:
@@ -59,6 +61,8 @@ volumes:
     name: gunfight-prod-dbdata
   maps:
     name: gunfight-prod-maps
+  characters:
+    name: gunfight-prod-characters
 
 secrets:
   # Chaque entrée est un fichier local lu par Compose au démarrage. Le chemin

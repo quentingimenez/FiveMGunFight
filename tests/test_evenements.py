@@ -87,6 +87,10 @@ def scripts_du_depot(mots: tuple[str, ...]) -> list[Path]:
     manifestes = sorted(RESSOURCES.glob("*/*/fxmanifest.lua"))
     fichiers: set[Path] = set()
     for manifeste in manifestes:
+        # [standalone] : ressources tierces vendorisées (oxmysql, game 'common').
+        # Leurs événements internes ne font pas partie du contrat du dépôt.
+        if manifeste.parent.parent.name == "[standalone]":
+            continue
         fichiers.update(scripts_declares(manifeste, mots))
     return sorted(fichiers)
 

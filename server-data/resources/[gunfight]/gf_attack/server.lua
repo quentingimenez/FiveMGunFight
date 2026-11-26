@@ -415,6 +415,17 @@ local function endRound(winner, reason)
     if matchOver then
         S.matchOver = true
         S.endsAt = now() + Config.MatchEndDelay
+        -- Statistiques persistantes (gf_stats) : participants du match terminé.
+        local participants = {}
+        for src, t in pairs(S.team) do
+            participants[#participants + 1] = { src = src, won = t == winner }
+        end
+        TriggerEvent('gf:matchEnded', {
+            mode = 'attack',
+            map = zone().name,
+            participants = participants,
+            score = { A = S.score.A, B = S.score.B },
+        })
     end
     local scoreText = ('%s %d - %d %s'):format(Config.Teams.A.label, S.score.A, S.score.B, Config.Teams.B.label)
     eachPlayer(function(src)
@@ -669,7 +680,9 @@ AddEventHandler('gf:playerKilled', function(victim, killer, weapon, mode)
 
     local vs = S.stats[victim]
     if vs then vs.deaths = vs.deaths + 1 end
+    local credited = false
     if killer and S.team[killer] and S.team[killer] ~= S.team[victim] and S.stats[killer] then
+        credited = true
         S.stats[killer].kills = S.stats[killer].kills + 1
         -- Récompense : 1 kevlar par kill (dans la limite de Config.MaxKevlars)
         local inv = Items[killer]
@@ -678,6 +691,8 @@ AddEventHandler('gf:playerKilled', function(victim, killer, weapon, mode)
             sendItems(killer)
         end
     end
+    -- Statistiques persistantes (gf_stats) : killer vaut false si le kill n'est pas crédité.
+    TriggerEvent('gf:modeKill', { mode = 'attack', victim = victim, killer = credited and killer or false })
     S.scoreboardDirty = true
 
     if S.phase == 'live' and S.alive[victim] then

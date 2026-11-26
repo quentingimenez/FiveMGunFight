@@ -233,10 +233,13 @@ Tant qu'aucune map n'est cochée pour un mode, les zones de secours des
 
 ### Base MariaDB
 
-Prête mais non utilisée par le jeu (phase 2, `oxmysql`) : base `gunfight`,
-utilisateur `gunfight`, réglages InnoDB/`utf8mb4` dans `docker/mariadb.cnf`,
-scripts de `docker/db/init/` exécutés une seule fois sur une base vide. La
-chaîne `mysql_connection_string` est déjà générée dans `secrets.cfg`.
+Base `gunfight`, utilisateur `gunfight`, réglages InnoDB/`utf8mb4` dans
+`docker/mariadb.cnf`. Le jeu utilise désormais cette base : les ressources
+`oxmysql` et `gf_stats` enregistrent kills, morts, parties et victoires dans la
+table `gf_stats_players`, créée par `docker/db/init/01-schema.sql` au premier
+démarrage sur base vide. La chaîne `mysql_connection_string` est générée dans
+`secrets.cfg`. Les personnages du lobby sont conservés dans le volume
+`gf_lobby/data` (`characters`).
 
 ### Sauvegarde et restauration
 
