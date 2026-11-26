@@ -59,6 +59,13 @@ Config.KillCreditWindow = 10
 -- serveur (voir docs/evenements-serveur.md).
 Config.ValidateDeathHealth = true
 
+-- La mort n'est signalée qu'UNE fois par le client (baseevents), parfois avant
+-- que la santé à 0 soit arrivée au serveur (mort écrasé par un véhicule). La
+-- vérification est alors refaite toutes les delayMs, au plus tries fois. Après
+-- le dernier essai, la mort est traitée sans kill crédité : sinon le joueur ne
+-- réapparaîtrait jamais.
+Config.DeathConfirm = { tries = 8, delayMs = 250 }
+
 -- Multi-kills : délai max (secondes) entre deux kills pour enchaîner
 -- DOUBLÉ, TRIPLÉ, QUADRUPLÉ, QUINTUPLÉ... (remis à zéro si tu meurs)
 Config.MultiKillWindow = 6
