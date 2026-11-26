@@ -1,0 +1,57 @@
+name: Alerte main
+
+# Filet de sécurité : quand la CI échoue sur main (après une fusion ou lors de
+# la relance hebdomadaire), une issue « CI rouge sur main » est ouverte, ou
+# complétée si elle l'est déjà. GitHub notifie alors le propriétaire du dépôt,
+# même si personne ne suivait le run. Les runs de pull request sont ignorés.
+on:
+  workflow_run:
+    workflows: ["Qualité", "Docker"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  alerte:
+    name: Signaler une CI rouge sur main
+    if: >-
+      github.event.workflow_run.event != 'pull_request' &&
+      contains(fromJSON('["failure", "timed_out", "startup_failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      # Le titre du commit vient de l'auteur de la PR : il passe uniquement par
+      # des variables d'environnement, jamais interpolé dans le script.
+      - name: Ouvrir ou compléter l'issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          EVENEMENT: ${{ github.event.workflow_run.event }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          LIEN: ${{ github.event.workflow_run.html_url }}
+          TITRE_COMMIT: ${{ github.event.workflow_run.display_title }}
+        run: |
+          set -euo pipefail
+          titre="CI rouge sur main"
+          corps="$(printf '%s\n' \
+            "Le workflow **$WORKFLOW** a échoué sur \`main\` ($CONCLUSION, déclenché par $EVENEMENT)." \
+            "" \
+            "- Commit : $SHA" \
+            "- Titre : $TITRE_COMMIT" \
+            "- Run : $LIEN" \
+            "" \
+            "À corriger par une pull request (AGENTS.md § 4.9), jamais par un commit direct sur \`main\`. Fermer cette issue une fois \`main\` de nouveau vert.")"
+          numero="$(gh issue list --state open --search "in:title \"$titre\"" \
+            --json number,title --jq "map(select(.title == \"$titre\")) | .[0].number // empty")"
+          if [ -n "$numero" ]; then
+            gh issue comment "$numero" --body "$corps"
+            echo "Issue #$numero complétée."
+          else
+            gh issue create --title "$titre" --body "$corps"
+          fi

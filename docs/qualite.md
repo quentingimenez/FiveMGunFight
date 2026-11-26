@@ -15,6 +15,7 @@ se contente pas de « lancer des tests » : les checks requis sont déclarés co
 | `.github/workflows/qualite.yml` | `Sécurité de l'historique` | chaque pull request, chaque envoi sur `main` | moins d'1 min |
 | `.github/workflows/docker.yml` | `Construire et publier l'image` | chaque pull request, `main`, tags `v*`, et chaque lundi à 03:17 UTC | 3 à 8 min |
 | `.github/workflows/docker.yml` | `Vérifier le démarrage des ressources` | chaque pull request, `main`, tags `v*`, et chaque lundi à 03:17 UTC | 10 à 25 min |
+| `.github/workflows/alerte-main.yml` | `Signaler une CI rouge sur main` | échec de `Qualité` ou de `Docker` sur `main` ; ouvre ou complète l'issue « CI rouge sur main » | quelques secondes |
 
 Le job `Sécurité de l'historique` est un contrôle supplémentaire : il n'est pas
 encore listé dans les `contexts` requis de
