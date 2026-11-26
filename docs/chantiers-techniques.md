@@ -158,6 +158,9 @@ tout correctif.
   commitées) ; un script Python pur, testé, qui calcule le tableau.
 - **Preuve** : le nombre de balles mesuré en jeu sur une cible à distance
   fixe est celui du tableau.
+- **Avancement** : tableau calculé pour le build 1.0.3889.0 dans
+  [`equilibrage-armes.md`](equilibrage-armes.md) ; mesure en jeu et part des
+  kills (C2) à faire.
 
 ## C7 — Manche d'Attaque en machine à états testée
 
