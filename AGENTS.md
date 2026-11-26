@@ -1,7 +1,11 @@
 # Règles agent — FiveMGunFight
 
-Ce fichier est lu automatiquement par les agents de codage (DeepSeek Harness et
-autres) à l'ouverture d'une session dans ce dépôt. Il fixe le **déroulé
+Ce fichier est lu automatiquement par les agents de codage à l'ouverture d'une
+session dans ce dépôt : Codex, opencode, Cursor, GitHub Copilot et DeepSeek
+Harness le lisent directement ; Claude Code et Gemini CLI le chargent par
+[`CLAUDE.md`](CLAUDE.md) et [`GEMINI.md`](GEMINI.md), qui l'importent. Toutes
+ses règles valent pour **tout agent**, quel que soit l'outil ; une consigne
+propre à un seul outil est signalée comme telle. Il fixe le **déroulé
 obligatoire** de toute session qui modifie le dépôt. [`CONTRIBUTING.md`](CONTRIBUTING.md)
 reste la référence pour le fond (style de commit, critères de revue, sécurité) :
 en cas de divergence, `CONTRIBUTING.md` gagne sur le contenu et ce fichier gagne
@@ -26,6 +30,15 @@ documentation). Il découpe la demande, lance des sous-agents
   silencieusement sur un autre modèle.
 - Cette règle s'applique à **toute demande de correction**, y compris quand
   l'utilisateur décrit lui-même le correctif à appliquer.
+
+## 0. Échanges avec l'utilisateur
+
+- Répondre à l'utilisateur **en français** ; code, commentaires et noms de
+  variables restent dans la langue du fichier modifié.
+- Aucun agent ne se déclare co-auteur : pas de ligne `Co-Authored-By` dans les
+  commits, pas de mention « Generated with … » (Claude Code, Codex ou autre)
+  dans les PR.
+- Dire clairement ce qui n'a pas été vérifié.
 
 ## 1. Règle cardinale
 
@@ -209,8 +222,13 @@ gh pr view --json number,state,mergeable,statusCheckRollup
   et fusionnée par l'agent lui-même (§ 4.8), sans que l'utilisateur ait à le
   redemander. L'accord donné pour l'envoi (§ 4.5) vaut aussi pour la fusion
   une fois la CI verte.
-- **Application Claude Code (desktop)** : juste après `gh pr create`, activer
-  le suivi automatique de la PR (Auto-fix : CI rouge, conflits, commentaires).
+- **Tout agent** : après `gh pr create`, suivre la CI jusqu'au bout
+  (`gh pr checks <numéro> --watch`), puis fusionner (§ 4.8). Un suivi
+  automatique fourni par l'outil ne remplace pas ce suivi s'il ne signale que
+  les échecs.
+- **Propre à l'application Claude Code (desktop)** : juste après `gh pr create`,
+  activer aussi le suivi automatique de la PR (Auto-fix : CI rouge, conflits,
+  commentaires) ; il ne réveille pas la session quand tout passe au vert.
   Si l'application répond que le dépôt « could not be matched to this
   session's folders », demander à l'utilisateur de cliquer sur **« Linked by
   Claude »** dans la barre de PR de la session, puis réactiver le suivi. En
@@ -253,7 +271,9 @@ direct sur `main`.
   l'utilisateur, même si tout est vert en local.
 - Proposer un changement sans l'avoir **exécuté en local**, hors documentation
   déclarée comme telle.
-- `git push --force` / `--force-with-lease`, `GF_ALLOW_MAIN=1`, `gh pr merge --admin`.
+- `git push --force` sans bail (seul `--force-with-lease` sur la branche de la
+  PR est permis, § 4.7), tout force-push sur `main`, `GF_ALLOW_MAIN=1`,
+  `gh pr merge --admin`.
 - Fusionner avec un check rouge, en attente, ou en ignorant une conversation de
   revue non résolue.
 - Contourner un contrôle (supprimer un test, désactiver un workflow, modifier la
@@ -268,10 +288,10 @@ direct sur `main`.
 
 ## 6. Revues humaines
 
-Le dépôt exige 1 approbation `CODEOWNERS` (`@WardenPro` ou `@Zhics`). Tant que
-la protection de branche GitHub n'est pas active (dépôt privé en plan gratuit,
-voir [`docs/protection-branche.md`](docs/protection-branche.md)), la discipline
-repose sur l'agent et sur le hook `pre-push`. Si un humain commente la PR :
+Le ruleset « Protection de main » n'exige pas d'approbation : la discipline
+repose sur l'agent, sur les checks requis et sur le hook `pre-push`. Une revue
+de `@WardenPro` ou `@Zhics` (`CODEOWNERS`) reste bienvenue sur les fichiers à
+impact fort (§ 7). Si un humain commente la PR :
 répondre par des commits sur la même branche, puis fusionner une fois les
 échanges résolus.
 
@@ -294,16 +314,18 @@ répondre par des commits sur la même branche, puis fusionner une fois les
 
 ## 8. Contexte du dépôt
 
-- Dépôt : `quentingimenez/FiveMGunFight` (privé), `gh` authentifié et autorisé.
-- CI : `.github/workflows/qualite.yml` (job `Qualité du dépôt`) et
+- Dépôt : `quentingimenez/FiveMGunFight` (public), `gh` authentifié et autorisé.
+- CI, sur les runners GitHub `ubuntu-24.04` : `.github/workflows/qualite.yml`
+  (jobs `Qualité du dépôt` et `Sécurité de l'historique`) et
   `.github/workflows/docker.yml` (jobs `Construire et publier l'image` et
   `Vérifier le démarrage des ressources`), tous déclenchés sur chaque pull
   request. Le smoke construit l'image localement sur une PR, et télécharge
   l'image publiée sur `main` et les tags ; sans le secret CI, il est sauté avec
   une note.
-- Protection GitHub : inactive à cause du plan gratuit ; options de fusion déjà
-  en place (squash autorisé, branche supprimée après fusion). Voir
-  `docs/protection-branche.md`.
+- Protection GitHub : ruleset « Protection de main » actif : PR obligatoire,
+  squash uniquement, conversations résolues, les 4 checks requis (non stricts :
+  la branche n'a pas à être à jour avec `main`), suppression et force-push
+  interdits ; branche distante supprimée après fusion.
 - Outils locaux : Python 3.14, Node.js 24, Docker 28, `bash` (WSL),
   `gh` 2.103. `luac` et `shellcheck` absents — les contrôles correspondants
   sont ignorés en local et exécutés par la CI.
