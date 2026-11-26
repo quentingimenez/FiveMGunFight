@@ -31,15 +31,6 @@ documentation). Il découpe la demande, lance des sous-agents
 - Cette règle s'applique à **toute demande de correction**, y compris quand
   l'utilisateur décrit lui-même le correctif à appliquer.
 
-## 0. Échanges avec l'utilisateur
-
-- Répondre à l'utilisateur **en français** ; code, commentaires et noms de
-  variables restent dans la langue du fichier modifié.
-- Aucun agent ne se déclare co-auteur : pas de ligne `Co-Authored-By` dans les
-  commits, pas de mention « Generated with … » (Claude Code, Codex ou autre)
-  dans les PR.
-- Dire clairement ce qui n'a pas été vérifié.
-
 ## 1. Règle cardinale
 
 `main` est la branche de production. **Aucun agent ne commit ni ne pousse

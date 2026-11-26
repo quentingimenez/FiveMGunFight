@@ -575,9 +575,6 @@ class Documentation(unittest.TestCase):
             r"seul `--force-with-lease` sur la branche de la\s+PR est permis",
             "les interdits doivent réserver le force-push avec bail à la branche de la PR",
         )
-        # Règles de l'utilisateur qui ne vivaient que dans ses CLAUDE.md.
-        self.assertIn("Co-Authored-By", texte, "l'interdiction du co-auteur IA doit viser tous les agents")
-        self.assertIn("en français", texte, "la langue des réponses doit viser tous les agents")
         self.assertNotIn("(privé)", texte, "le dépôt est public : contexte périmé")
 
     def test_readme_cite_chaque_ressource(self) -> None:
