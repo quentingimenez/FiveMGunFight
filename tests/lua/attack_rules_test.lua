@@ -548,7 +548,7 @@ verifier('départ du dernier défenseur en live termine la manche', function()
     egal(1, #etat.partis, 'joueur parti mémorisé')
 end)
 
-verifier('départ pendant select puis pendant place : le match continue', function()
+verifier('départ pendant select puis pendant place : la manche finit en live', function()
     local ctx = nouveauContexte(111, 0, 'depart select/place')
     local etat = matchDeDeux(23)
     appliquer(ctx, etat, AttackRules.tic, 0, false)
@@ -561,16 +561,16 @@ verifier('départ pendant select puis pendant place : le match continue', functi
     appliquer(ctx, etat, AttackRules.depart, 3, 2500)
     egal('place', etat.phase, 'toujours place après départ inexistant')
 
-    -- Second scénario, cette fois avec un départ pendant 'place'.
+    -- Second scénario, cette fois avec un départ pendant 'place' : la victoire
+    -- est constatée au tic qui passe en live, sans attendre la fin du chrono.
     local etat3 = matchDeDeux(25)
     appliquer(ctx, etat3, AttackRules.tic, 0, false)
     appliquer(ctx, etat3, AttackRules.tic, 1000, false)
     egal('place', etat3.phase, 'phase place')
     appliquer(ctx, etat3, AttackRules.depart, 2, 1500)
-    appliquer(ctx, etat3, AttackRules.tic, 2000, false)
-    egal('live', etat3.phase, 'live après place')
-    local finEffets = appliquer(ctx, etat3, AttackRules.tic, 2000 + CONFIG.RoundTimeMs + 1000, false)
-    vrai(aEffet(finEffets, 'finManche'), 'manche terminée après départ en place')
+    local effetsLive = appliquer(ctx, etat3, AttackRules.tic, 2000, false)
+    egal('ended', etat3.phase, 'ended dès le passage en live')
+    vrai(aEffet(effetsLive, 'finManche'), 'finManche produit au passage en live')
 end)
 
 verifier('départ du dernier joueur remet l’état en waiting', function()
@@ -1104,6 +1104,95 @@ verifier('sabotage : double incrément lors d’un finManche détecté', functio
         { score = { A = 0, B = 0 }, phase = 'live' })
     egal(false, ok, 'le double incrément doit être détecté')
     vrai(tostring(erreur):find('invariant=1'), 'invariant 1 attendu : ' .. tostring(erreur))
+end)
+
+-- ===========================================================================
+--  Départ pendant select/place : la victoire est constatée au passage en live.
+-- ===========================================================================
+
+verifier('départ en select qui vide une équipe : victoire au passage en live', function()
+    local ctx = nouveauContexte(130, 0, 'depart select vide équipe')
+    local etat = etatDeTest(37)
+    appliquer(ctx, etat, AttackRules.arrivee, 1)
+    appliquer(ctx, etat, AttackRules.arrivee, 2)
+
+    -- Équipes tirées au hasard : on lit les camps sans supposer A ou B.
+    local campParti = etat.equipes[2]
+    local gagnant = etat.equipes[1]
+    vrai(campParti ~= gagnant, 'camps distincts')
+    appliquer(ctx, etat, AttackRules.tic, 0, false)
+    egal('select', etat.phase, 'select')
+
+    appliquer(ctx, etat, AttackRules.depart, 2, 1500)
+    egal('select', etat.phase, 'toujours select après le départ')
+    appliquer(ctx, etat, AttackRules.tic, 2000, false)
+    egal('place', etat.phase, 'place après select')
+
+    -- Le tic 3000 passe en live : la victoire doit être constatée immédiatement.
+    local effets = appliquer(ctx, etat, AttackRules.tic, 3000, false)
+    egal('ended', etat.phase, 'ended au passage en live')
+    egal(1, etat.score[gagnant], ('score du gagnant %s'):format(gagnant))
+    local fin = trouverEffet(effets, 'finManche')
+    vrai(fin ~= nil, 'finManche au passage en live')
+    egal(gagnant, fin.gagnant, 'gagnant')
+    if campParti == etat.attaquants then
+        egal('Tous les attaquants ont été éliminés', fin.raison, 'raison attaquants')
+    else
+        egal('Tous les défenseurs ont été éliminés', fin.raison, 'raison défenseurs')
+    end
+end)
+
+verifier('départ en place qui vide une équipe : victoire au passage en live', function()
+    local ctx = nouveauContexte(131, 0, 'depart place vide équipe')
+    local etat = etatDeTest(38)
+    appliquer(ctx, etat, AttackRules.arrivee, 1)
+    appliquer(ctx, etat, AttackRules.arrivee, 2)
+
+    -- Équipes tirées au hasard : on lit les camps sans supposer A ou B.
+    local campParti = etat.equipes[2]
+    local gagnant = etat.equipes[1]
+    vrai(campParti ~= gagnant, 'camps distincts')
+    appliquer(ctx, etat, AttackRules.tic, 0, false)
+    appliquer(ctx, etat, AttackRules.tic, 1000, false)
+    egal('place', etat.phase, 'place')
+
+    appliquer(ctx, etat, AttackRules.depart, 2, 1500)
+    egal('place', etat.phase, 'toujours place après le départ')
+
+    -- Le tic 3000 passe en live : la victoire doit être constatée immédiatement.
+    local effets = appliquer(ctx, etat, AttackRules.tic, 3000, false)
+    egal('ended', etat.phase, 'ended au passage en live')
+    egal(1, etat.score[gagnant], ('score du gagnant %s'):format(gagnant))
+    local fin = trouverEffet(effets, 'finManche')
+    vrai(fin ~= nil, 'finManche au passage en live')
+    egal(gagnant, fin.gagnant, 'gagnant')
+    if campParti == etat.attaquants then
+        egal('Tous les attaquants ont été éliminés', fin.raison, 'raison attaquants')
+    else
+        egal('Tous les défenseurs ont été éliminés', fin.raison, 'raison défenseurs')
+    end
+end)
+
+verifier('manche solo : passage en live sans finManche', function()
+    local ctx = nouveauContexte(132, 0, 'solo live sans fin')
+    local etat = etatDeTest(39)
+    appliquer(ctx, etat, AttackRules.arrivee, 1)
+    appliquer(ctx, etat, AttackRules.debutTest, 1000)
+    egal(true, etat.solo, 'solo')
+    egal('select', etat.phase, 'select')
+
+    -- avancerJusquALive n'enregistre pas les effets : on avance pas à pas avec
+    -- appliquer() pour couvrir le tic qui passe en live, y compris ses effets.
+    local t = 1000
+    local effets
+    for _ = 1, 12 do
+        effets = appliquer(ctx, etat, AttackRules.tic, t, false)
+        if etat.phase == 'live' then break end
+        t = t + 1000
+    end
+    egal('live', etat.phase, 'live conservé en solo')
+    egal(false, aEffet(effets, 'finManche'), 'aucun finManche au passage en live')
+    egal(0, etat.score.A + etat.score.B, 'score inchangé au passage en live')
 end)
 
 -- ===========================================================================

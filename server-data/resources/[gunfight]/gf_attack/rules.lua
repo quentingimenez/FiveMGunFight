@@ -222,6 +222,8 @@ local function demarrerPlacement(etat, liste, maintenantMs)
     ajouter(liste, { type = 'phase', phase = 'place' })
 end
 
+local verifierVictoire
+
 local function demarrerLive(etat, liste, maintenantMs)
     etat.phase = 'live'
     etat.echeance = maintenantMs + etat.config.RoundTimeMs
@@ -235,6 +237,9 @@ local function demarrerLive(etat, liste, maintenantMs)
     end
     ajouter(liste, { type = 'annonce', modele = 'go', dureeMs = 2500 })
     ajouter(liste, { type = 'phase', phase = 'live' })
+    -- Un départ pendant select/place peut avoir vidé une équipe : la victoire
+    -- doit être constatée dès le passage en live, sans attendre le chrono.
+    verifierVictoire(etat, liste, maintenantMs)
 end
 
 local function terminerManche(etat, liste, gagnant, raison, maintenantMs)
@@ -286,7 +291,7 @@ local function terminerManche(etat, liste, gagnant, raison, maintenantMs)
 end
 
 -- Attaquants d'abord, comme dans l'ancien checkWin.
-local function verifierVictoire(etat, liste, maintenantMs)
+function verifierVictoire(etat, liste, maintenantMs)
     if etat.phase ~= 'live' or etat.solo then return end
 
     local att = etat.attaquants
