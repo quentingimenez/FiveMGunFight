@@ -544,6 +544,42 @@ class Documentation(unittest.TestCase):
                 self.assertTrue(chemin.is_file(), "document manquant")
                 self.assertGreater(len(lire(chemin).strip()), 200, "document vide ou presque")
 
+    def test_claude_md_importe_agents_md_et_impose_la_fusion(self) -> None:
+        # Claude Code ne lit que CLAUDE.md : sans import explicite, il ignore
+        # le déroulé d'AGENTS.md et laisse des PR vertes sans les fusionner.
+        chemin = RACINE / "CLAUDE.md"
+        self.assertTrue(chemin.is_file(), "CLAUDE.md manquant")
+        texte = lire(chemin)
+        self.assertRegex(texte, r"(?m)^@AGENTS\.md\s*$", "CLAUDE.md doit importer AGENTS.md")
+        self.assertIn("gh pr merge", texte, "CLAUDE.md doit rappeler la fusion par l'agent")
+        self.assertIn("gh pr checks", texte, "CLAUDE.md doit imposer le suivi de la CI jusqu'au vert")
+
+    def test_gemini_md_importe_agents_md(self) -> None:
+        # Gemini CLI lit GEMINI.md, pas AGENTS.md.
+        chemin = RACINE / "GEMINI.md"
+        self.assertTrue(chemin.is_file(), "GEMINI.md manquant")
+        self.assertRegex(lire(chemin), r"(?m)^@AGENTS\.md\s*$", "GEMINI.md doit importer AGENTS.md")
+
+    def test_agents_md_coherent_pour_tout_agent(self) -> None:
+        texte = lire(RACINE / "AGENTS.md")
+        interdits = texte.split("## 5. Interdits", 1)[1].split("\n## ", 1)[0]
+        # § 4.7 impose --force-with-lease après un rebase : les interdits ne
+        # doivent pas le défendre en même temps.
+        self.assertNotIn(
+            "`git push --force` / `--force-with-lease`",
+            interdits,
+            "force-push avec bail à la fois imposé et interdit",
+        )
+        self.assertRegex(
+            interdits,
+            r"seul `--force-with-lease` sur la branche de la\s+PR est permis",
+            "les interdits doivent réserver le force-push avec bail à la branche de la PR",
+        )
+        # Règles de l'utilisateur qui ne vivaient que dans ses CLAUDE.md.
+        self.assertIn("Co-Authored-By", texte, "l'interdiction du co-auteur IA doit viser tous les agents")
+        self.assertIn("en français", texte, "la langue des réponses doit viser tous les agents")
+        self.assertNotIn("(privé)", texte, "le dépôt est public : contexte périmé")
+
     def test_readme_cite_chaque_ressource(self) -> None:
         texte = lire(RACINE / "README.md")
         for ressource in RESSOURCES_GUNFIGHT:
