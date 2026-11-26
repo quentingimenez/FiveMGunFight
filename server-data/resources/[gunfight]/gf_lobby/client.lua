@@ -58,6 +58,11 @@ local lastAppearanceSeed = nil  -- seed du ped local pour éviter les reapplicat
 local remoteAppearance = {}     -- [ped] = clé d'apparence déjà appliquée
 local previewCharacter = nil    -- aperçu local, jamais sauvegardé
 local stateRetryActive = false  -- boucle de récupération de gf_lobby:state
+local editing = false           -- éditeur ouvert depuis l'onglet Personnage
+local creatorMode = 'create'    -- 'create' ou 'edit'
+local catalogCache = {}         -- [gender] = variations réellement installées
+local lastCatalogGender = nil   -- évite de renvoyer le catalogue à chaque aperçu
+local previewAngleOffset = 0    -- rotation demandée par la NUI (face/profil/dos)
 
 -- ---------------------------------------------------------------- Utilitaires
 local function now()
@@ -96,6 +101,8 @@ local function clamp(value, lo, hi, fallback)
 end
 
 -- Validation locale d'un personnage : types et bornes avant tout envoi serveur.
+-- L'apparence complète est normalisée par le schéma partagé, qui retombe sur
+-- les valeurs par défaut du seed quand elle manque (personnages v1).
 local function normalizeCharacter(data)
     if type(data) ~= 'table' then return nil end
     if not validGender(data.gender) then return nil end
@@ -103,7 +110,14 @@ local function normalizeCharacter(data)
     local seed = clamp(data.seed, 1, 2147483647, nil)
     local skin = clamp(data.skin, 0, skins - 1, nil)
     if not seed or not skin then return nil end
-    return { gender = data.gender, seed = seed, skin = skin }
+    local character = { gender = data.gender, seed = seed, skin = skin }
+    if type(GFLobbyAppearanceSchema) == 'table'
+        and type(GFLobbyAppearanceSchema.normalize) == 'function' then
+        character.appearance = GFLobbyAppearanceSchema.normalize(
+            data.appearance, data.gender, seed, skin
+        )
+    end
+    return character
 end
 
 -- Nom : longueur, caractères de contrôle, espaces consécutifs (§7, §5.1).
@@ -169,6 +183,65 @@ local function applyAppearance(ped, character)
         return false
     end
     return result ~= false
+end
+
+-- Clé de cache de l'apparence : seed/genre/carnation pour les personnages v1,
+-- plus une empreinte complète pour propager vêtements et tatouages.
+local function appearanceKey(character)
+    if type(character) ~= 'table' then return 'none' end
+    local key = ('%s:%s:%s'):format(
+        tostring(character.gender), tostring(character.seed), tostring(character.skin)
+    )
+    if type(GFLobbyAppearanceSchema) == 'table'
+        and type(GFLobbyAppearanceSchema.key) == 'function' then
+        key = key .. ':' .. GFLobbyAppearanceSchema.key(character.appearance)
+    end
+    return key
+end
+
+-- Catalogue des variations réellement installées sur le modèle courant. La NUI
+-- ne devine jamais les maxima : elle reçoit les comptes de drawables, de
+-- textures et d'overlays, sinon elle proposerait des choix invisibles ou
+-- invalides selon les DLC présents sur le serveur.
+local function collectCatalog(gender)
+    if catalogCache[gender] then return catalogCache[gender] end
+    local ped = PlayerPedId()
+    if not ped or ped == 0 or not DoesEntityExist(ped) then return nil end
+
+    local catalog = {
+        components = {},
+        props = {},
+        overlays = {},
+        hairColors = 64,
+        makeupColors = 64,
+        features = 20,
+    }
+    for component = 1, 11 do
+        local count = GetNumberOfPedDrawableVariations(ped, component) or 0
+        local textures = {}
+        for drawable = 0, count - 1 do
+            textures[#textures + 1] = GetNumberOfPedTextureVariations(ped, component, drawable) or 0
+        end
+        catalog.components[tostring(component)] = { count = count, textures = textures }
+    end
+    for _, prop in ipairs({ 0, 1, 2, 6, 7 }) do
+        local count = GetNumberOfPedPropDrawableVariations(ped, prop) or 0
+        local textures = {}
+        for drawable = 0, count - 1 do
+            textures[#textures + 1] = GetNumberOfPedPropTextureVariations(ped, prop, drawable) or 0
+        end
+        catalog.props[tostring(prop)] = { count = count, textures = textures }
+    end
+    for overlay = 0, 12 do
+        catalog.overlays[tostring(overlay)] = GetNumHeadOverlayValues(overlay) or 0
+    end
+    catalogCache[gender] = catalog
+    return catalog
+end
+
+local function sendCatalog(gender)
+    local catalog = collectCatalog(gender)
+    if catalog then sendUi('creatorCatalog', catalog) end
 end
 
 -- ---------------------------------------------------------------- Scène (§6.3)
@@ -279,9 +352,7 @@ local function applyRemoteAppearances(currentState)
                     -- SetPlayerModel, où HasModelLoaded peut être faux).
                     if HasModelLoaded(GetEntityModel(best)) then
                         used[best] = true
-                        local key = ('%s:%s:%s'):format(
-                            character.gender, tostring(character.seed), tostring(character.skin)
-                        )
+                        local key = appearanceKey(character)
                         if remoteAppearance[best] ~= key then
                             if applyAppearance(best, character) then
                                 remoteAppearance[best] = key
@@ -460,10 +531,10 @@ local function presentLobby(currentState)
         notify('Modèle de personnage indisponible.')
     end
     local ped = PlayerPedId()
-    local appearanceKey = ('%s:%s:%s'):format(character.gender, tostring(character.seed), tostring(character.skin))
-    if lastAppearanceSeed ~= appearanceKey then
+    local appearance = appearanceKey(character)
+    if lastAppearanceSeed ~= appearance then
         local ok, applied = pcall(applyAppearance, ped, character)
-        if ok and applied then lastAppearanceSeed = appearanceKey end
+        if ok and applied then lastAppearanceSeed = appearance end
     end
 
     local members = (currentState.party and currentState.party.members) or {}
@@ -497,8 +568,15 @@ local function presentLobby(currentState)
     end
 end
 
-local function presentCreator()
-    local preview = previewCharacter or { gender = 'male', seed = 1337, skin = 0 }
+local function presentCreator(sendCreator)
+    local mode = creatorMode or 'create'
+    local preview
+    if mode == 'edit' then
+        preview = previewCharacter or (state and state.me and state.me.character)
+    else
+        preview = previewCharacter
+    end
+    preview = preview or { gender = 'male', seed = 1337, skin = 0 }
     if not validGender(preview.gender) then
         preview.gender = 'male'
     end
@@ -508,16 +586,40 @@ local function presentCreator()
         notify('Modèle de personnage indisponible.')
     end
     local character = {
-        name = '', gender = preview.gender, seed = preview.seed, skin = preview.skin
+        name = preview.name or '',
+        gender = preview.gender,
+        seed = preview.seed,
+        skin = preview.skin,
+        appearance = preview.appearance,
     }
+    if type(GFLobbyAppearanceSchema) == 'table'
+        and type(GFLobbyAppearanceSchema.normalize) == 'function' then
+        character.appearance = GFLobbyAppearanceSchema.normalize(
+            preview.appearance, character.gender, character.seed, character.skin
+        )
+    end
     local ok, applied = pcall(applyAppearance, PlayerPedId(), character)
     if ok and applied then
-        lastAppearanceSeed = ('%s:%s:%s'):format(preview.gender, tostring(preview.seed), tostring(preview.skin))
+        lastAppearanceSeed = appearanceKey(character)
     end
     placeSelfOnSlot(1, 1)
+    if previewAngleOffset ~= 0 then
+        local ped = PlayerPedId()
+        if ped and ped ~= 0 then
+            SetEntityHeading(ped, (Config.Stage.heading + previewAngleOffset) % 360)
+        end
+    end
     if not ensureCamera() then return end
     local pos, look, fov = creatorCameraTargets()
     setCameraTargets(pos, look, fov)
+
+    if lastCatalogGender ~= character.gender or sendCreator then
+        sendCatalog(character.gender)
+        lastCatalogGender = character.gender
+    end
+    if sendCreator then
+        sendUi('creator', { mode = mode, character = character })
+    end
     DoScreenFadeIn(400)
 end
 
@@ -537,8 +639,17 @@ local function applyState(currentState)
     if not inLobby then enterLobbyUi() end
     touchNui()
 
+    -- Un state peut arriver pendant que l'éditeur est ouvert (mise à jour de
+    -- l'escouade, arrivée d'un membre). On rafraîchit les données NUI sans
+    -- remplacer la caméra ni le ped en cours d'édition.
+    if editing and me.character ~= nil then
+        sendUi('state', state)
+        return
+    end
+
     if me.character == nil then
-        local ok, err = pcall(presentCreator)
+        creatorMode = 'create'
+        local ok, err = pcall(presentCreator, true)
         if not ok then print(('[gf_lobby] presentCreator: %s'):format(tostring(err))) end
     else
         local ok, err = pcall(presentLobby, state)
@@ -713,19 +824,27 @@ local CALLBACKS = {
             local me = state and state.me
             local ok, err = pcall(function()
                 if me and me.character ~= nil then
-                    -- Personnage déjà créé : appliquer l'aperçu au ped existant.
+                    -- Personnage déjà créé (édition) : appliquer au ped existant
+                    -- sans remplacer la caméra ni la scène.
                     if applyLocalModel(character.gender) then
                         applyAppearance(PlayerPedId(), character)
+                        lastAppearanceSeed = appearanceKey(character)
                     end
                 else
-                    presentCreator()
+                    presentCreator(false)
                 end
             end)
             if not ok then
                 print(('[gf_lobby] previewCharacter: %s'):format(tostring(err)))
             end
         end
-        respond(cb, { ok = true })
+        respond(cb, {
+            ok = true,
+            gender = character.gender,
+            seed = character.seed,
+            skin = character.skin,
+            appearance = character.appearance,
+        })
     end,
     createCharacter = function(cb, data)
         if type(data) ~= 'table' then fail(cb, 'invalid_payload') return end
@@ -734,8 +853,91 @@ local CALLBACKS = {
         local character = normalizeCharacter(data)
         if not character then fail(cb, 'invalid_character') return end
         TriggerServerEvent('gf_lobby:createCharacter', {
-            name = name, gender = character.gender, seed = character.seed, skin = character.skin
+            name = name,
+            gender = character.gender,
+            seed = character.seed,
+            skin = character.skin,
+            appearance = character.appearance,
         })
+        respond(cb, { ok = true })
+    end,
+    -- Ouvre l'éditeur depuis l'onglet Personnage, en mode édition.
+    editCharacter = function(cb)
+        if not inLobby or not state or not state.me then
+            fail(cb, 'not_in_lobby')
+            return
+        end
+        local current = state.me.character
+        if type(current) ~= 'table' then
+            fail(cb, 'no_character')
+            return
+        end
+        local appearance = nil
+        if type(GFLobbyAppearanceSchema) == 'table'
+            and type(GFLobbyAppearanceSchema.build) == 'function' then
+            appearance = GFLobbyAppearanceSchema.build(current)
+        end
+        editing = true
+        creatorMode = 'edit'
+        previewAngleOffset = 0
+        previewCharacter = {
+            name = current.name or '',
+            gender = current.gender,
+            seed = current.seed,
+            skin = current.skin,
+            appearance = appearance,
+        }
+        local ok, err = pcall(presentCreator, true)
+        if not ok then
+            editing = false
+            creatorMode = 'create'
+            fail(cb, 'internal_error')
+            print(('[gf_lobby] editCharacter: %s'):format(tostring(err)))
+            return
+        end
+        respond(cb, { ok = true })
+    end,
+    -- Enregistre l'apparence éditée. Le serveur ne modifie que l'apparence et
+    -- la carnation : le nom, le genre et la seed restent figés après création.
+    saveAppearance = function(cb, data)
+        if not editing then fail(cb, 'not_editing') return end
+        if type(data) ~= 'table' then fail(cb, 'invalid_payload') return end
+        local base = previewCharacter or (state and state.me and state.me.character)
+        if type(base) ~= 'table' then fail(cb, 'no_character') return end
+        local character = normalizeCharacter({
+            gender = base.gender,
+            seed = base.seed,
+            skin = data.skin,
+            appearance = data.appearance,
+        })
+        if not character then fail(cb, 'invalid_character') return end
+        TriggerServerEvent('gf_lobby:updateAppearance', {
+            appearance = character.appearance,
+            skin = character.skin,
+        })
+        respond(cb, { ok = true })
+    end,
+    cancelEdit = function(cb)
+        if editing then
+            editing = false
+            creatorMode = 'create'
+            previewCharacter = nil
+            previewAngleOffset = 0
+            lastAppearanceSeed = nil
+            if state then
+                local ok, err = pcall(applyState, state)
+                if not ok then print(('[gf_lobby] cancelEdit: %s'):format(tostring(err))) end
+            end
+        end
+        respond(cb, { ok = true })
+    end,
+    -- Rotation locale du personnage pour voir le dos ou le profil.
+    previewAngle = function(cb, data)
+        local angle = type(data) == 'table' and clamp(data.angle, -180, 180, 0) or 0
+        previewAngleOffset = angle
+        local heading = (Config.Stage.heading + angle) % 360
+        local ped = PlayerPedId()
+        if ped and ped ~= 0 then SetEntityHeading(ped, heading + 0.0) end
         respond(cb, { ok = true })
     end,
     requestPlayers = function(cb)
@@ -808,6 +1010,9 @@ local RELAYED = {
 for _, kind in ipairs(RELAYED) do
     RegisterNetEvent('gf_lobby:' .. kind, function(data)
         if kind == 'close' and inLobby then
+            editing = false
+            creatorMode = 'create'
+            previewCharacter = nil
             leaveLobbyUi()
             return
         end
@@ -817,6 +1022,27 @@ end
 
 RegisterNetEvent('gf_lobby:createResult', function(result)
     sendUi('createResult', result)
+end)
+
+RegisterNetEvent('gf_lobby:appearanceResult', function(result)
+    if editing and type(result) == 'table' and result.ok then
+        local saved = previewCharacter
+        editing = false
+        creatorMode = 'create'
+        previewCharacter = nil
+        lastAppearanceSeed = nil
+        -- Le state officiel arrive juste après ; on met à jour la copie locale
+        -- pour que le retour au lobby n'affiche pas brièvement l'ancienne tenue.
+        if state and state.me and state.me.character and type(saved) == 'table' then
+            state.me.character.appearance = saved.appearance
+            state.me.character.skin = saved.skin
+        end
+        if state then
+            local ok, err = pcall(applyState, state)
+            if not ok then print(('[gf_lobby] appearanceResult: %s'):format(tostring(err))) end
+        end
+    end
+    sendUi('appearanceResult', result)
 end)
 
 -- ---------------------------------------------------------------- gf_core

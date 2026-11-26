@@ -58,10 +58,11 @@ au mode (en haut à droite).
 
 Les maps (redzones et zones d'attaque) se créent **en jeu** avec l'éditeur `/editor`.
 
-À sa première connexion, le joueur crée son personnage puis arrive dans un **lobby
-statique** : caméra fixe, personnage visible, escouade de 4 joueurs maximum avec
-invitations, barre de modes et bouton **Jouer**. Les onglets **Armes** et
-**Personnage** sont déjà présents mais réservés aux prochaines versions. Le détail
+À sa première connexion, le joueur compose son personnage (visage, cheveux,
+tenue, accessoires et tatouages) puis arrive dans un **lobby statique** : caméra
+fixe, personnage visible, escouade de 4 joueurs maximum avec invitations, barre
+de modes et bouton **Jouer**. L'onglet **Personnage** rouvre l'éditeur
+d'apparence ; l'onglet **Armes** reste réservé aux prochaines versions. Le détail
 de l'interface, du protocole NUI et des règles d'escouade est dans
 [docs/lobby.md](docs/lobby.md).
 
@@ -641,8 +642,12 @@ et [ADR 0002 — FXServer épinglé](docs/adr/0002-fxserver-epingle.md).
 - **Escouade persistante** : le lobby regroupe déjà jusqu'à 4 joueurs et lance le mode pour
   tous, mais l'escouade est dissoute au lancement. La prochaine étape est de la conserver
   entre les parties et de placer ses membres dans la même équipe en Attaque de zone.
-- **Personnalisation** : les onglets Armes et Personnage du lobby sont des placeholders.
-  L'onglet Personnage remplacera la génération actuelle (nom, genre, carnation, style) par
-  un vrai éditeur de vêtements et de visage ; l'onglet Armes ajoutera les finitions et
-  accessoires. Les points d'extension sont décrits dans [docs/lobby.md](docs/lobby.md).
+- **Personnalisation** : l'onglet **Personnage** ouvre l'éditeur d'apparence
+  (visage, cheveux, tenue, accessoires, tatouages vanilla) et enregistre les
+  changements sans recréer le personnage. L'onglet **Armes** reste un placeholder
+  pour les finitions et accessoires. Les points d'extension et les limites des
+  assets add-on sont décrits dans [docs/lobby.md](docs/lobby.md).
+- `gf_stats` : statistiques permanentes (kills, victoires) dans MariaDB avec **oxmysql**
+  — la base est déjà prête dans `docker-compose.yml`, la chaîne de connexion
+  (`mysql_connection_string`) est déjà générée par `docker/entrypoint.sh`.
 - Un anti-cheat dédié est conseillé avant d'ouvrir au grand public.

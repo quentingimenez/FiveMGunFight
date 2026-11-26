@@ -26,6 +26,7 @@ globals = {
   -- (pas de `return` : FiveM les partage entre fichiers de la ressource).
   "Base64",
   "GFLobbyAppearance",
+  "GFLobbyAppearanceSchema",
   "RateLimit",
   "Validation",
 }
