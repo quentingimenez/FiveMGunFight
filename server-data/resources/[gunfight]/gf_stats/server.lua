@@ -94,3 +94,59 @@ CreateThread(function()
     end)
     if not ok then print('[gf_stats] oxmysql indisponible : ' .. tostring(err)) end
 end)
+
+--- Lit les statistiques d'un joueur (lecture seule, hors chemin chaud).
+--- callback(stats) est TOUJOURS appelé exactement une fois.
+--- stats = { kills, deaths, matches, wins, memberSince } ou nil si inconnu.
+--- L'identifiant complet ne sort jamais de cette ressource ni des logs.
+exports('GetPlayerStats', function(src, callback)
+    if type(callback) ~= 'function' then return end
+
+    local function livrer(stats)
+        callback(stats)
+    end
+
+    if type(src) ~= 'number' or not GetPlayerName(src) then
+        livrer(nil)
+        return
+    end
+
+    local identifiant = identifierOf(src)
+    if not identifiant then
+        livrer(nil)
+        return
+    end
+
+    local repondu = false
+    local function repondre(stats)
+        if repondu then return end
+        repondu = true
+        livrer(stats)
+    end
+
+    local requete = [[
+        SELECT kills, deaths, matches, wins,
+               DATE_FORMAT(first_seen, '%d/%m/%Y') AS member_since
+        FROM gf_stats_players WHERE identifier = ?
+    ]]
+
+    local ok, err = pcall(function()
+        exports.oxmysql:single(requete, { identifiant }, function(ligne)
+            if type(ligne) ~= 'table' then
+                repondre(nil)
+                return
+            end
+            repondre({
+                kills = tonumber(ligne.kills) or 0,
+                deaths = tonumber(ligne.deaths) or 0,
+                matches = tonumber(ligne.matches) or 0,
+                wins = tonumber(ligne.wins) or 0,
+                memberSince = ligne.member_since or nil,
+            })
+        end)
+    end)
+    if not ok then
+        print(('[gf_stats] lecture des statistiques impossible : %s'):format(tostring(err)))
+        repondre(nil)
+    end
+end)

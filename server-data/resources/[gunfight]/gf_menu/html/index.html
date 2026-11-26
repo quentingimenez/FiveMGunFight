@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gunfight — Menu</title>
+  <link rel="stylesheet" href="css/menu.css">
+</head>
+<body>
+  <div id="veil" aria-hidden="true"></div>
+
+  <div id="menu" class="hidden" aria-hidden="true">
+    <header id="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">GF</span>
+        <strong class="brand-name">GUNFIGHT</strong>
+        <span class="brand-sep" aria-hidden="true"></span>
+        <span class="section-label" id="section-label">MENU</span>
+      </div>
+      <div class="topbar-right">
+        <span class="online-chip" id="online-chip">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="online-value">— / — EN LIGNE</span>
+        </span>
+        <span class="build-badge hidden" id="build-badge"></span>
+      </div>
+    </header>
+
+    <main id="layout">
+      <nav id="rail" role="navigation" aria-label="Navigation du menu">
+        <div class="rail-group">
+          <p class="rail-group-title">PARTIE</p>
+          <button class="rail-item is-current" type="button" data-key="resume" aria-current="true">
+            <span class="rail-item-label">REPRENDRE</span>
+          </button>
+        </div>
+
+        <div class="rail-group">
+          <p class="rail-group-title">ÉQUIPEMENT</p>
+          <button class="rail-item is-soon" type="button" data-key="loadout">
+            <span class="rail-item-label">CASIER</span>
+            <span class="soon-badge">BIENTÔT</span>
+          </button>
+          <button class="rail-item is-soon" type="button" data-key="crosshair">
+            <span class="rail-item-label">CROSSHAIR</span>
+            <span class="soon-badge">BIENTÔT</span>
+          </button>
+          <button class="rail-item is-soon" type="button" data-key="shop">
+            <span class="rail-item-label">BOUTIQUE</span>
+            <span class="soon-badge">BIENTÔT</span>
+          </button>
+          <button class="rail-item is-soon" type="button" data-key="crates">
+            <span class="rail-item-label">CAISSES</span>
+            <span class="soon-badge">BIENTÔT</span>
+          </button>
+          <button class="rail-item is-soon" type="button" data-key="battlepass">
+            <span class="rail-item-label">PASS DE COMBAT</span>
+            <span class="soon-badge">BIENTÔT</span>
+          </button>
+          <button class="rail-item is-soon" type="button" data-key="contributor">
+            <span class="rail-item-label">CONTRIBUTEUR</span>
+            <span class="soon-badge">BIENTÔT</span>
+          </button>
+        </div>
+
+        <div class="rail-group">
+          <p class="rail-group-title">SERVEUR</p>
+          <button class="rail-item" type="button" data-key="chat">
+            <span class="rail-item-label">CHAT</span>
+          </button>
+          <button class="rail-item" type="button" data-key="rules">
+            <span class="rail-item-label">RÉGLEMENT</span>
+          </button>
+          <button class="rail-item" type="button" data-key="discord">
+            <span class="rail-item-label">DISCORD</span>
+          </button>
+          <button class="rail-item is-soon" type="button" data-key="gameSettings">
+            <span class="rail-item-label">PARAMÈTRES DU JEU</span>
+            <span class="soon-badge">BIENTÔT</span>
+          </button>
+          <button class="rail-item is-danger" type="button" data-key="quit">
+            <span class="rail-item-label">QUITTER LE SERVEUR</span>
+          </button>
+        </div>
+      </nav>
+
+      <section id="stage" aria-live="polite" aria-label="Contenu de la section"></section>
+
+      <aside id="profile" class="panel" aria-label="Profil du joueur">
+        <div class="profile-top">
+          <span class="profile-avatar" id="avatar" aria-hidden="true">—</span>
+          <div class="profile-identity">
+            <p class="eyebrow">PROFIL</p>
+            <h2 class="profile-name" id="profile-name">—</h2>
+            <p class="profile-id" id="profile-id">ID —</p>
+          </div>
+        </div>
+        <div class="profile-rule"></div>
+        <dl class="profile-stats">
+          <div class="profile-stat"><dt>K/D</dt><dd id="stat-kd">—</dd></div>
+          <div class="profile-stat"><dt>VICTOIRES</dt><dd id="stat-wins">—</dd></div>
+          <div class="profile-stat"><dt>PARTIES</dt><dd id="stat-matches">—</dd></div>
+          <div class="profile-stat"><dt>SESSION</dt><dd id="stat-session">—</dd></div>
+          <div class="profile-stat is-wide"><dt>MEMBRE DEPUIS</dt><dd id="stat-member">—</dd></div>
+        </dl>
+        <div class="profile-foot">
+          <span class="profile-foot-label">MODE</span>
+          <span class="mode-pill" id="mode-pill">—</span>
+        </div>
+      </aside>
+    </main>
+
+    <footer id="keyhints" aria-hidden="true">
+      <span class="hint"><kbd>↑</kbd><kbd>↓</kbd><span>NAVIGUER</span></span>
+      <span class="hint"><kbd>ENTRÉE</kbd><span>CHOISIR</span></span>
+      <span class="hint"><kbd>ÉCHAP</kbd><span>REPRENDRE</span></span>
+    </footer>
+  </div>
+
+  <noscript>Cette interface nécessite JavaScript.</noscript>
+
+  <script src="js/nui.js" defer></script>
+  <script src="js/nav.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>

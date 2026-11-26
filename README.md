@@ -143,6 +143,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | `/lobbyui` | tous | réaffiche l'interface du lobby si elle a disparu |
 | touche **Z** (maintenue) | tous | classement |
 | touches **1** et **2** | tous | sortir l'arme choisie en 1re / 2e position (la roue des armes de GTA est désactivée) |
+| touche **Échap** | tous | ouvre le menu pause GUNFIGHT (profil, règlement, chat, Discord, quitter) à la place du menu natif |
 | `/startround` | admin | force le lancement d’un match avec les joueurs déjà dans le mode (possible en solo) |
 | `/endmatch` | admin | arrête le match, scores à zéro |
 | `/nextzone` | admin | zone d'attaque suivante (hors match) |
@@ -265,6 +266,7 @@ server-data/
     gf_ui       interface : HUD, kill feed, dégâts, multi-kills, sons, classement
     gf_vehicles véhicules du serveur (stream/, data/<modèle>/*.meta, son) : Bison XL « gstbisxl3 », Trackhawk « keyhawk »
     gf_stats    statistiques persistantes (MariaDB via oxmysql)
+    gf_menu     menu pause NUI (Échap) : profil, règlement, chat, Discord, quitter
 ```
 
 Chaque mode a son propre « monde » (routing bucket) : les joueurs du lobby, de
