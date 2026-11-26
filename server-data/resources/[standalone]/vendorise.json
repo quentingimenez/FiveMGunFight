@@ -1,0 +1,10 @@
+[
+  {
+    "nom": "oxmysql",
+    "version": "2.14.3",
+    "depot": "overextended/oxmysql",
+    "licence": "LGPL-3.0-or-later",
+    "dossier": "server-data/resources/[standalone]/oxmysql",
+    "empreinte": "bc754de109832573feb02de27882944c10a06408c5e49ba2f2701d0f903aa329"
+  }
+]

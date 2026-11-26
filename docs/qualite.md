@@ -231,6 +231,17 @@ accord de l'utilisateur, fusion) est décrit dans
 [`../AGENTS.md`](../AGENTS.md) § 10 ; `python scripts/suivre_dependabot.py`
 liste et classe les PR ouvertes sans rien modifier.
 
+### oxmysql vendorisé
+
+[`server-data/resources/[standalone]/vendorise.json`](../server-data/resources/[standalone]/vendorise.json)
+note la version, la source, la licence et l'empreinte SHA-256 de la copie
+d'oxmysql 2.14.3 ; [`scripts/suivre_vendorise.py`](../scripts/suivre_vendorise.py)
+(lecture seule) vérifie ces valeurs (`--verifier`, défaut), recalcule l'empreinte
+(`--empreinte DOSSIER`) et consulte releases et avis amont (`--amont`, ou
+`--depuis-json` hors ligne). Toute montée passe par une PR dédiée : relire le
+changelog amont, remplacer la copie, mettre à jour `version` et l'empreinte, puis
+lancer l'outil et la CI.
+
 ## Épingler FXServer (`.fxserver-version`)
 
 La CI ne dépend plus d'un artefact « recommended » qui change sous elle : la
