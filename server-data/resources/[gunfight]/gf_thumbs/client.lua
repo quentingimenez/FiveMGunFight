@@ -181,6 +181,23 @@ local function shoot(kind, id)
         Wait(0)
     end
 
+    -- Zone de l'objet à l'écran (coins de sa boîte 3D projetés) : le recadrage
+    -- ne cherche que là, aucun élément d'interface ne peut entrer dans la photo.
+    local minV, maxV = GetModelDimensions(GetEntityModel(ent))
+    local x0, y0, x1, y1 = 1.0, 1.0, 0.0, 0.0
+    for _, cx in ipairs({ minV.x, maxV.x }) do
+        for _, cy in ipairs({ minV.y, maxV.y }) do
+            for _, cz in ipairs({ minV.z, maxV.z }) do
+                local w = GetOffsetFromEntityInWorldCoords(ent, cx, cy, cz)
+                local _, sx, sy = GetScreenCoordFromWorldCoord(w.x, w.y, w.z)
+                x0, y0 = math.min(x0, sx), math.min(y0, sy)
+                x1, y1 = math.max(x1, sx), math.max(y1, sy)
+            end
+        end
+    end
+    local m = 0.03
+    local region = { x0 = math.max(0.0, x0 - m), y0 = math.max(0.0, y0 - m), x1 = math.min(1.0, x1 + m), y1 = math.min(1.0, y1 + m) }
+
     local p = promise.new()
     local active = true
     CreateThread(function()
@@ -188,11 +205,12 @@ local function shoot(kind, id)
             drawBox(center, boxSize)
             DrawLightWithRange(camPos.x, camPos.y, camPos.z + 1.0, 255, 255, 255, radius * 6.0, 1.2)
             HideHudAndRadarThisFrame()
+            HideHudComponentThisFrame(14) -- réticule
             Wait(0)
         end
     end)
     captureWaiter = p
-    SendNUIMessage({ type = 'capture', kind = kind, id = id, width = def.width, height = def.height, key = Config.KeyColor })
+    SendNUIMessage({ type = 'capture', kind = kind, id = id, width = def.width, height = def.height, key = Config.KeyColor, region = region })
     SetTimeout(10000, function()
         if captureWaiter == p then captureWaiter = nil p:resolve({ error = 'délai dépassé' }) end
     end)
@@ -240,12 +258,13 @@ RegisterNetEvent('gf_thumbs:capture', function(kind, onlyId)
     NetworkOverrideClockTime(12, 0, 0)
     SetWeatherTypeNowPersist('EXTRASUNNY')
     DisplayRadar(false)
+    ClearPrints()
+    ClearAllHelpMessages()
 
     local ok = 0
     for i, id in ipairs(ids) do
-        BeginTextCommandPrint('STRING')
-        AddTextComponentSubstringPlayerName(('Photo %d/%d : %s'):format(i, #ids, id))
-        EndTextCommandPrint(1500, true)
+        -- Aucun texte à l'écran pendant la capture (il se retrouverait sur la photo)
+        print(('[gf_thumbs] Photo %d/%d : %s/%s'):format(i, #ids, kind, id))
         if shoot(kind, id) then ok = ok + 1 end
         Wait(300)
     end

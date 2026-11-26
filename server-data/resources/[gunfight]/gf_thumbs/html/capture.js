@@ -98,12 +98,16 @@ function keyOut(img) {
     }
 }
 
-// Boîte englobante des pixels visibles
-function bounds(img) {
+// Boîte englobante des pixels visibles, cherchée seulement dans la zone de l'objet
+// (region en fractions de l'écran, calculée par le client à partir du modèle 3D)
+function bounds(img, region) {
     const { w, h, px } = img;
+    const r = region || { x0: 0, y0: 0, x1: 1, y1: 1 };
+    const rx0 = Math.max(0, Math.floor(r.x0 * w)), rx1 = Math.min(w - 1, Math.ceil(r.x1 * w));
+    const ry0 = Math.max(0, Math.floor(r.y0 * h)), ry1 = Math.min(h - 1, Math.ceil(r.y1 * h));
     let x0 = w, y0 = h, x1 = -1, y1 = -1;
-    for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
+    for (let y = ry0; y <= ry1; y++) {
+        for (let x = rx0; x <= rx1; x++) {
             if (px[(y * w + x) * 4 + 3] > 20) {
                 if (x < x0) x0 = x;
                 if (x > x1) x1 = x;
@@ -115,7 +119,7 @@ function bounds(img) {
     return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
-// Objet centré dans une image width x height, marge de 6 %
+// Objet centré dans une image width x height, marge de 2 %
 function compose(img, box, width, height) {
     const src = document.createElement('canvas');
     src.width = img.w;
@@ -127,7 +131,7 @@ function compose(img, box, width, height) {
     out.height = height;
     const ctx = out.getContext('2d');
     ctx.imageSmoothingQuality = 'high';
-    const scale = Math.min(width * 0.94 / box.w, height * 0.94 / box.h);
+    const scale = Math.min(width * 0.98 / box.w, height * 0.98 / box.h);
     const dw = box.w * scale;
     const dh = box.h * scale;
     ctx.drawImage(src, box.x, box.y, box.w, box.h, (width - dw) / 2, (height - dh) / 2, dw, dh);
@@ -151,7 +155,7 @@ function capture(req) {
                 grabFrame();
                 const img = grabFrame();
                 keyOut(img);
-                const box = bounds(img);
+                const box = bounds(img, req.region);
                 if (!box) return reply({ error: 'objet introuvable sur l\'image' });
                 reply({ url: compose(img, box, req.width || 512, req.height || 288) });
             } catch (e) {
