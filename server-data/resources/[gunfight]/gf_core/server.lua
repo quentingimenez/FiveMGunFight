@@ -27,6 +27,7 @@ local Anomalies = {}
 local Spawning = {}     -- [src] = true tant qu'un spawn vient d'être envoyé (anti doublon)
 local SpawnOpts = {}    -- [src] = dernier spawn envoyé (rejouable si le client l'a raté)
 local lastDeath = {}    -- [src] = GetGameTimer() de la dernière mort (anti doublon)
+local DeathPending = {} -- [src] = true pendant que la mort attend la santé à 0 côté serveur
 local Multi = {}        -- [src] = { count, last } pour les multi-kills
 local Vehicles = {}     -- [src] = netId du véhicule de mode (redzone)
 local lastDamager = {}  -- [victime] = { src = tireur, at, weapon } (dégât serveur autorisé)
@@ -480,6 +481,7 @@ AddEventHandler('playerDropped', function()
     Spawning[src] = nil
     SpawnOpts[src] = nil
     lastDeath[src] = nil
+    DeathPending[src] = nil
     lastDamager[src] = nil
     for victime, entree in pairs(lastDamager) do
         if entree.src == src then lastDamager[victime] = nil end
@@ -509,25 +511,47 @@ local function mortConfirmee(victime)
     })
 end
 
-local function handleDeath(victim, weapon)
+local function handleDeath(victim, weapon, essai, entree)
     local now = GetGameTimer()
-    if lastDeath[victim] and now - lastDeath[victim] < 1500 then return end
-
-    -- La preuve de dégât est consommée dès qu'une mort est signalée : elle ne
-    -- doit jamais servir deux fois, même si la validation suivante échoue.
-    local entree = lastDamager[victim]
-    lastDamager[victim] = nil
+    if not essai then
+        -- Nouveau signalement : ignoré si une mort vient d'être traitée ou si
+        -- la précédente est encore en cours de confirmation.
+        if lastDeath[victim] and now - lastDeath[victim] < 1500 then return end
+        if DeathPending[victim] then return end
+        essai = 1
+        -- La preuve de dégât est consommée dès qu'une mort est signalée : elle ne
+        -- doit jamais servir deux fois, même si la validation suivante échoue.
+        -- Elle suit les nouvelles tentatives de confirmation ci-dessous.
+        entree = lastDamager[victim]
+        lastDamager[victim] = nil
+    end
+    DeathPending[victim] = nil
 
     local mode = Modes[victim]
     if not mode then return end
 
     -- La victime doit être réellement morte côté serveur (configurable pour
     -- les serveurs où GetEntityHealth ne reflète pas la mort au bon moment).
+    -- La santé peut arriver au serveur après le signalement : on réessaie.
     if Config.ValidateDeathHealth then
         local morte, raison = mortConfirmee(victim)
         if not morte then
-            journaliserRefus(victim, 'mort', raison)
-            return
+            if raison == 'vivant' and essai < Config.DeathConfirm.tries then
+                DeathPending[victim] = true
+                SetTimeout(Config.DeathConfirm.delayMs, function()
+                    if DeathPending[victim] then handleDeath(victim, weapon, essai + 1, entree) end
+                end)
+                return
+            end
+            if raison ~= 'vivant' then
+                journaliserRefus(victim, 'mort', raison)
+                return
+            end
+            -- Toujours « vivant » après tous les essais : la mort est traitée
+            -- quand même (sinon le joueur ne réapparaît jamais), mais sans
+            -- créditer de kill, puisque le serveur ne l'a pas vue.
+            journaliserRefus(victim, 'kill', 'mort non confirmée, aucun kill crédité')
+            entree = nil
         end
     end
 
