@@ -64,8 +64,21 @@ local function sanitize(p)
 end
 
 -- ---------------------------------------------------------------- Fichier
+-- Version de chaque modèle (taille de son .yft) : si le fichier change (nouvelle
+-- copie d'un pack), les clients qui l'avaient mis de côté après un plantage le
+-- retentent tout seuls (voir gf_core et gf_thumbs).
+local function modelVersions()
+    local versions = {}
+    for _, v in ipairs(Config.Vehicles) do
+        local raw = LoadResourceFile(RES, ('stream/%s.yft'):format(v.model))
+        versions[v.model] = raw and tostring(#raw) or '0'
+    end
+    return versions
+end
+
 local function publish()
     -- répliqués à tous les clients
+    GlobalState:set('gf_vehicle_versions', modelVersions(), true)
     GlobalState:set('gf_vehicle_base', Data.base, true)
     GlobalState:set('gf_vehicle_customs', Data.customs, true)
 end

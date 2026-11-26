@@ -28,18 +28,26 @@ exports('GetModeVehicle', function() return modeVehicle end)
 -- Modèles qui ont fait planter ce client au chargement (marqueur KVP posé avant
 -- le chargement, retiré après : s'il est encore là au démarrage, le jeu a planté).
 -- Un tel modèle n'est plus jamais utilisé comme véhicule de base sur ce PC : on
--- reprend le véhicule du mode, pour ne pas replanter en boucle.
+-- reprend le véhicule du mode, pour ne pas replanter en boucle. La mise de côté vaut
+-- pour une version du modèle (GlobalState.gf_vehicle_versions, publié par gf_vehicles) :
+-- si le fichier change, le modèle est retenté tout seul.
 local VEH_LOADING = 'gf_core:vehicleLoading'
+local function vehicleVersion(model)
+    local versions = GlobalState.gf_vehicle_versions
+    return tostring(type(versions) == 'table' and versions[model] or '0')
+end
 local function badVehicle(model)
-    return GetResourceKvpInt('gf_core:badVehicle:' .. model) == 1
+    return GetResourceKvpString('gf_core:badv:' .. model) == vehicleVersion(model)
 end
 do
-    local crashed = GetResourceKvpString(VEH_LOADING)
+    local crashed = GetResourceKvpString(VEH_LOADING) -- « modèle@version »
     if crashed and crashed ~= '' then
-        SetResourceKvpInt('gf_core:badVehicle:' .. crashed, 1)
+        local model, version = crashed:match('^([^@]+)@(.*)$')
+        model = model or crashed
+        SetResourceKvp('gf_core:badv:' .. model, version or '0')
         DeleteResourceKvp(VEH_LOADING)
-        print(('^1[gf_core] Le modèle %s a fait planter le jeu : il ne sera plus utilisé sur ce PC^0'):format(crashed))
-        TriggerServerEvent('gf_core:vehicleCrashed', crashed)
+        print(("^1[gf_core] Le modèle %s a fait planter le jeu : mis de côté tant qu'il ne change pas^0"):format(model))
+        TriggerServerEvent('gf_core:vehicleCrashed', model)
     end
 end
 
@@ -55,7 +63,7 @@ local function giveVehicle(model, x, y, z, heading)
         print(('[gf_core] Modèle de véhicule inconnu : %s'):format(model))
         return
     end
-    SetResourceKvp(VEH_LOADING, model)
+    SetResourceKvp(VEH_LOADING, model .. '@' .. vehicleVersion(model))
     RequestModel(hash)
     local timeout = GetGameTimer() + 10000
     while not HasModelLoaded(hash) and GetGameTimer() < timeout do Wait(0) end

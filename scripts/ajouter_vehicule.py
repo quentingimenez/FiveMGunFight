@@ -307,7 +307,15 @@ def main() -> int:
                     if not re.fullmatch(r"[A-Za-z0-9_]+", args.son):
                         print(f"Son invalide : {args.son}", file=sys.stderr)
                         return 1
-                    texte = re.sub(r"<audioNameHash>[^<]*</audioNameHash>", f"<audioNameHash>{args.son}</audioNameHash>", texte)
+                    son_xml = f"<audioNameHash>{args.son}</audioNameHash>"
+                    if re.search(r"<audioNameHash\s*/>|<audioNameHash>", texte):
+                        # remplace la ligne existante, pleine ou vide (<audioNameHash />)
+                        texte = re.sub(r"<audioNameHash>[^<]*</audioNameHash>|<audioNameHash\s*/>", son_xml, texte)
+                    else:
+                        # pas de ligne de son : on l'ajoute après <handlingId>
+                        texte = re.sub(r"(\n([ \t]*)<handlingId>[^<]*</handlingId>)",
+                                       lambda m: m.group(1) + NL + m.group(2) + son_xml,
+                                       texte, count=1)
                     notes.append(f"son du moteur : « {args.son} »")
             elif nom_meta == "carvariations.meta":
                 texte = nettoyer_carvariations(texte, set(modeles), notes)
@@ -356,6 +364,8 @@ def main() -> int:
                 shutil.copyfile(f, RESSOURCE / chemin)
         if not rels and not args.son:
             son = balises(vehicles_meta, "audioNameHash")
+            if not son:
+                notes.append("pas de son fourni ni de ligne de son : véhicule muet. Relancer avec --son lg247hemi57")
             if son:
                 notes.append(f"pas de son fourni : le véhicule utilise « {son[0]} » (son GTA, ou silencieux s'il "
                              "n'existe pas). Pour un son du serveur : --son lg247hemi57")

@@ -66,7 +66,10 @@ exports('ApplyCustom', applyCustom)
 -- Liste pour le studio photo (gf_thumbs, famille « vehicles »)
 exports('GetThumbList', function()
     local list = {}
-    for _, v in ipairs(Config.Vehicles) do list[#list + 1] = { id = v.model, label = v.label } end
+    local versions = GlobalState.gf_vehicle_versions or {}
+    for _, v in ipairs(Config.Vehicles) do
+        list[#list + 1] = { id = v.model, label = v.label, version = versions[v.model] }
+    end
     return list
 end)
 

@@ -65,15 +65,22 @@ local capturing = false
 -- Protection contre les modèles cassés : un marqueur est posé avant chaque photo
 -- et retiré après. S'il est encore là au démarrage, ce modèle a fait planter le
 -- jeu : il est mis de côté (plus de photo automatique) et signalé au serveur.
+-- La mise de côté vaut pour une version du modèle (fournie par la liste, ex. taille
+-- du .yft) : si le fichier change, la photo est retentée toute seule.
 local INFLIGHT = 'gf_thumbs:inflight'
-local function badKey(kind, id) return ('gf_thumbs:bad:%s/%s'):format(kind, id) end
+local function badKey(kind, id) return ('gf_thumbs:badv:%s/%s'):format(kind, id) end
+local function isBad(kind, id, version)
+    return GetResourceKvpString(badKey(kind, id)) == tostring(version or '0')
+end
 do
-    local crashed = GetResourceKvpString(INFLIGHT)
+    local crashed = GetResourceKvpString(INFLIGHT) -- « famille/id@version »
     if crashed and crashed ~= '' then
-        SetResourceKvpInt('gf_thumbs:bad:' .. crashed, 1)
+        local ref, version = crashed:match('^([^@]+)@(.*)$')
+        ref = ref or crashed
+        SetResourceKvp('gf_thumbs:badv:' .. ref, version or '0')
         DeleteResourceKvp(INFLIGHT)
-        print(('^1[gf_thumbs] %s a fait planter le jeu pendant sa photo : ignoré désormais^0'):format(crashed))
-        TriggerServerEvent('gf_thumbs:broken', crashed)
+        print(('^1[gf_thumbs] %s a fait planter le jeu pendant sa photo : ignoré tant que le modèle ne change pas^0'):format(ref))
+        TriggerServerEvent('gf_thumbs:broken', ref)
     end
 end
 local captureWaiter = nil -- promesse de la photo en cours
@@ -169,12 +176,12 @@ local function frame(cam, ent, view)
     return center, radius, camPos
 end
 
-local function shoot(kind, id)
+local function shoot(kind, id, version)
     local def = Config.Kinds[kind]
     local subject = Subjects[def.subject]
     local s = Config.Studio
     local pos = vector3(s.x, s.y, s.z)
-    SetResourceKvp(INFLIGHT, kind .. '/' .. id)
+    SetResourceKvp(INFLIGHT, ('%s/%s@%s'):format(kind, id, tostring(version or '0')))
     local ent = subject.spawn(id, pos)
     if not ent then
         print(('[gf_thumbs] %s/%s : modèle introuvable, ignoré'):format(kind, id))
@@ -276,7 +283,7 @@ local function runBatch(jobs, why)
     for i, job in ipairs(jobs) do
         SendNUIMessage({ type = 'progress', text = ('Préparation des photos des menus… %d/%d'):format(i, #jobs) })
         print(('[gf_thumbs] Photo %d/%d : %s/%s (%s)'):format(i, #jobs, job.kind, job.id, why))
-        if shoot(job.kind, job.id) then
+        if shoot(job.kind, job.id, job.version) then
             ok = ok + 1
             DeleteResourceKvp(badKey(job.kind, job.id)) -- refait avec succès : plus « cassé »
         end
@@ -318,13 +325,13 @@ RegisterNetEvent('gf_thumbs:autoCapture', function()
     local jobs = {}
     for kind, def in pairs(Config.Kinds) do
         if def.auto then
-            local ids = {}
-            for _, item in ipairs(listOf(kind)) do ids[#ids + 1] = item.id end
+            local items, ids = listOf(kind), {}
+            for _, item in ipairs(items) do ids[#ids + 1] = item.id end
             if #ids > 0 then
                 local have = get(kind, ids)
-                for _, id in ipairs(ids) do
-                    if not have[id] and GetResourceKvpInt(badKey(kind, id)) ~= 1 then
-                        jobs[#jobs + 1] = { kind = kind, id = id }
+                for _, item in ipairs(items) do
+                    if not have[item.id] and not isBad(kind, item.id, item.version) then
+                        jobs[#jobs + 1] = { kind = kind, id = item.id, version = item.version }
                     end
                 end
             end
