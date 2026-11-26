@@ -753,6 +753,235 @@ verifier('durées des annonces et effets de transition', function()
     egal(false, trouverEffet(liveEffets, 'protection').protege, 'protege=false')
 end)
 
+-- ---------------------------------------------------------------------------
+--  Escouades : les scénarios ci-dessous n'utilisent PAS appliquer() pour le
+--  démarrage de manche. Avec des escouades, l'écart peut légitimement dépasser
+--  1 : l'invariant 4 de verifierInvariants ne s'applique qu'aux suites sans
+--  escouade, et les invariants propres à chaque scénario sont vérifiés ici.
+-- ---------------------------------------------------------------------------
+
+-- Mélange de Fisher-Yates, alimenté uniquement par le hasard déterministe.
+local function melanger(liste, hasard)
+    for i = #liste, 2, -1 do
+        local j = hasard(i)
+        liste[i], liste[j] = liste[j], liste[i]
+    end
+    return liste
+end
+
+verifier('definirGroupes : entrées invalides ignorées, clés distinctes, retour vide', function()
+    local etat = etatDeTest(40)
+    egal(0, etat.prochainGroupe, 'prochainGroupe initial')
+
+    local retours = {
+        AttackRules.definirGroupes(etat, nil),
+        AttackRules.definirGroupes(etat, 42),
+        AttackRules.definirGroupes(etat, 'escouade'),
+        AttackRules.definirGroupes(etat, { false, 7, 'x' }),
+        AttackRules.definirGroupes(etat, { { '1', -2, 0, 1.5 } }),
+    }
+    for i, effets in ipairs(retours) do
+        egal(0, #effets, ('retour vide pour l’entrée invalide %d'):format(i))
+    end
+    egal(0, etat.prochainGroupe, 'aucune clé pour une liste sans src valide')
+    egal(nil, next(etat.groupes), 'aucun groupe créé')
+
+    local effets = AttackRules.definirGroupes(etat, { { 1, 2 }, { 3, 4 } })
+    egal(0, #effets, 'retour vide')
+    egal(2, etat.prochainGroupe, 'une clé par escouade valide')
+    vrai(etat.groupes[1] ~= nil, 'clé pour src=1')
+    egal(etat.groupes[1], etat.groupes[2], 'src 1 et 2 dans la même escouade')
+    egal(etat.groupes[3], etat.groupes[4], 'src 3 et 4 dans la même escouade')
+    vrai(etat.groupes[1] ~= etat.groupes[3], 'clés distinctes pour les deux escouades')
+
+    -- Une liste mixte ne consomme qu'une seule clé, pour les src valides.
+    AttackRules.definirGroupes(etat, { { 5, 'x', 6 }, { -1, 2.5 } })
+    egal(3, etat.prochainGroupe, 'aucune clé pour la liste sans src valide')
+    egal(etat.groupes[5], etat.groupes[6], 'src valides regroupés')
+    egal(nil, etat.groupes['x'], 'src non numérique ignoré')
+end)
+
+verifier('arrivée : priorité au camp du coéquipier, même si ce camp est plus rempli', function()
+    local ctx = nouveauContexte(130, 0, 'priorite escouade')
+    local etat = etatDeTest(41)
+    egal(0, #AttackRules.definirGroupes(etat, { { 1, 4 } }), 'escouade définie avant arrivée')
+    for src = 1, 3 do appliquer(ctx, etat, AttackRules.arrivee, src) end
+    for src = 1, 3 do appliquer(ctx, etat, AttackRules.changerEquipe, src, 'B', 0) end
+    egal(0, AttackRules.compter(etat, 'A'), 'camp A vide')
+    egal(3, AttackRules.compter(etat, 'B'), 'camp B déjà rempli')
+
+    local effets = appliquer(ctx, etat, AttackRules.arrivee, 4)
+    egal('B', etat.equipes[4], 'le coéquipier rejoint B')
+    egal(4, AttackRules.compter(etat, 'B'), 'B reste le camp le plus rempli')
+    local equipe = trouverEffet(effets, 'equipe')
+    vrai(equipe ~= nil, 'effet equipe présent')
+    egal(4, equipe.src, 'src de l’effet equipe')
+    egal('B', equipe.equipe, 'équipe de l’effet equipe')
+end)
+
+verifier('arrivée sans escouade : camp le moins rempli, aucun groupe attribué', function()
+    local ctx = nouveauContexte(131, 0, 'arrivee sans escouade')
+    local etat = etatDeTest(42)
+    for src = 1, 3 do appliquer(ctx, etat, AttackRules.arrivee, src) end
+    for src = 1, 3 do appliquer(ctx, etat, AttackRules.changerEquipe, src, 'B', 0) end
+    egal(0, AttackRules.compter(etat, 'A'), 'camp A vide')
+    egal(3, AttackRules.compter(etat, 'B'), 'camp B rempli')
+
+    local effets = appliquer(ctx, etat, AttackRules.arrivee, 4)
+    egal('A', etat.equipes[4], 'joueur sans escouade rejoint le camp le moins rempli')
+    egal(nil, etat.groupes[4], 'aucun groupe attribué')
+    egal('A', trouverEffet(effets, 'equipe').equipe, 'effet equipe du camp choisi')
+end)
+
+verifier('escouades : 200 graines, groupes entiers et écart résiduel borné', function()
+    local graineBase = 20261201
+    local escouadesVerifiees = 0
+    for suite = 1, 200 do
+        local graine = graineBase + suite
+        local hasardRegles, hasardEvenements = nouveauJeu(graine)
+        local etat = AttackRules.nouveau(CONFIG, hasardRegles)
+        local joueurs = 10 + hasardEvenements(21)  -- 10 à 30 joueurs
+        local srcs = {}
+        for i = 1, joueurs do srcs[i] = i end
+
+        -- Escouades de 1 à 4, définies AVANT les arrivées.
+        local escouades = {}
+        local i = 1
+        while i <= joueurs do
+            local taille = math.min(hasardEvenements(4), joueurs - i + 1)
+            local escouade = {}
+            for j = 0, taille - 1 do escouade[#escouade + 1] = srcs[i + j] end
+            escouades[#escouades + 1] = escouade
+            i = i + taille
+        end
+        egal(0, #AttackRules.definirGroupes(etat, escouades),
+            ('graine=%d definirGroupes'):format(graine))
+
+        -- Arrivées dans un ordre mélangé.
+        for _, src in ipairs(melanger(srcs, hasardEvenements)) do
+            AttackRules.arrivee(etat, src)
+        end
+        egal(joueurs, AttackRules.nombreJoueurs(etat), ('graine=%d nombreJoueurs'):format(graine))
+
+        -- Démarrage direct de la manche 1 : pas de appliquer() ici.
+        local effets = AttackRules.tic(etat, 1000, false)
+        vrai(#effets > 0, ('graine=%d effets de tic vides'):format(graine))
+        egal('select', etat.phase, ('graine=%d phase'):format(graine))
+        egal(1, etat.manche, ('graine=%d manche'):format(graine))
+
+        local a = AttackRules.compter(etat, 'A')
+        local b = AttackRules.compter(etat, 'B')
+        local ecart = math.abs(a - b)
+        local campPlein = a > b and 'A' or 'B'
+
+        for indice, escouade in ipairs(escouades) do
+            local camp = etat.equipes[escouade[1]]
+            for _, src in ipairs(escouade) do
+                egal(camp, etat.equipes[src],
+                    ('graine=%d escouade=%d src=%d camp=%s attendu=%s'):format(
+                        graine, indice, src, tostring(etat.equipes[src]), tostring(camp)))
+            end
+            -- Aucun groupe du camp le plus peuplé ne peut avoir une taille s
+            -- strictement comprise entre 0 et l'écart résiduel d.
+            local s = #escouade
+            if camp == campPlein then
+                vrai(not (s > 0 and s < ecart),
+                    ('graine=%d camp=%d/%d d=%d escouade=%d taille=%d'):format(
+                        graine, a, b, ecart, indice, s))
+            end
+            escouadesVerifiees = escouadesVerifiees + 1
+        end
+    end
+    vrai(escouadesVerifiees >= 200, ('escouades vérifiées=%d'):format(escouadesVerifiees))
+end)
+
+verifier('sans escouade : 200 graines, écart final <= 1 après la manche 1', function()
+    local graineBase = 20262201
+    for suite = 1, 200 do
+        local graine = graineBase + suite
+        local hasardRegles, hasardEvenements = nouveauJeu(graine)
+        local etat = AttackRules.nouveau(CONFIG, hasardRegles)
+        local joueurs = 10 + hasardEvenements(21)
+        local srcs = {}
+        for i = 1, joueurs do srcs[i] = i end
+
+        for _, src in ipairs(melanger(srcs, hasardEvenements)) do
+            AttackRules.arrivee(etat, src)
+        end
+        egal(joueurs, AttackRules.nombreJoueurs(etat), ('graine=%d nombreJoueurs'):format(graine))
+
+        local effets = AttackRules.tic(etat, 1000, false)
+        vrai(#effets > 0, ('graine=%d effets de tic vides'):format(graine))
+        egal('select', etat.phase, ('graine=%d phase'):format(graine))
+        egal(1, etat.manche, ('graine=%d manche'):format(graine))
+        local ecart = math.abs(AttackRules.compter(etat, 'A') - AttackRules.compter(etat, 'B'))
+        vrai(ecart <= 1, ('graine=%d écart=%d'):format(graine, ecart))
+        egal(nil, next(etat.groupes), ('graine=%d aucun groupe attribué'):format(graine))
+    end
+end)
+
+verifier('départ retire le groupe du joueur ; reinitialiser vide les groupes', function()
+    local etat = etatDeTest(43)
+    egal(0, #AttackRules.definirGroupes(etat, { { 1, 2 } }), 'escouade définie')
+    AttackRules.arrivee(etat, 1)
+    AttackRules.arrivee(etat, 2)
+    local cle = etat.groupes[1]
+    vrai(cle ~= nil, 'clé de groupe attribuée')
+    egal(cle, etat.groupes[2], 'même clé pour le coéquipier')
+
+    AttackRules.depart(etat, 1, 0)
+    egal(nil, etat.groupes[1], 'groupe du joueur parti retiré')
+    egal(cle, etat.groupes[2], 'le coéquipier garde sa clé')
+
+    AttackRules.reinitialiser(etat)
+    egal(nil, next(etat.groupes), 'groupes vidés par reinitialiser')
+    vrai(etat.prochainGroupe >= 1, 'prochainGroupe conservé')
+end)
+
+verifier('notifier equilibrage : escouade=true quand une escouade entière est déplacée', function()
+    local etat = etatDeTest(44)
+    AttackRules.definirGroupes(etat, { { 1, 2 }, { 3, 4 }, { 5, 6 }, { 7, 8 } })
+    for src = 1, 9 do AttackRules.arrivee(etat, src) end
+    for _, src in ipairs({ 1, 2, 3, 4, 5, 6 }) do AttackRules.changerEquipe(etat, src, 'A', 0) end
+    for _, src in ipairs({ 7, 8, 9 }) do AttackRules.changerEquipe(etat, src, 'B', 0) end
+    egal(6, AttackRules.compter(etat, 'A'), 'A avant équilibrage')
+    egal(3, AttackRules.compter(etat, 'B'), 'B avant équilibrage (d=3)')
+
+    local effets = AttackRules.tic(etat, 1000, false)
+    local deplaces = {}
+    for _, effet in ipairs(effets) do
+        if effet.type == 'notifier' and effet.modele == 'equilibrage' then
+            deplaces[#deplaces + 1] = effet
+        end
+    end
+    egal(2, #deplaces, 'deux joueurs déplacés avec leur escouade')
+    for _, effet in ipairs(deplaces) do
+        egal(true, effet.escouade, 'escouade=true')
+    end
+    for _, paire in ipairs({ { 1, 2 }, { 3, 4 }, { 5, 6 } }) do
+        egal(etat.equipes[paire[1]], etat.equipes[paire[2]], 'escouade restée entière')
+    end
+end)
+
+verifier('notifier equilibrage : escouade=false quand un joueur seul est déplacé', function()
+    local etat = etatDeTest(45)
+    for src = 1, 4 do AttackRules.arrivee(etat, src) end
+    for _, src in ipairs({ 1, 2, 3 }) do AttackRules.changerEquipe(etat, src, 'A', 0) end
+    AttackRules.changerEquipe(etat, 4, 'B', 0)
+    egal(3, AttackRules.compter(etat, 'A'), 'A avant équilibrage (d=2)')
+    egal(1, AttackRules.compter(etat, 'B'), 'B avant équilibrage')
+
+    local effets = AttackRules.tic(etat, 1000, false)
+    local deplaces = {}
+    for _, effet in ipairs(effets) do
+        if effet.type == 'notifier' and effet.modele == 'equilibrage' then
+            deplaces[#deplaces + 1] = effet
+        end
+    end
+    egal(1, #deplaces, 'un seul joueur déplacé')
+    egal(false, deplaces[1].escouade, 'escouade=false')
+end)
+
 -- ===========================================================================
 --  Campagne aléatoire : 500 suites, 1 à 400 événements, graines fixes.
 -- ===========================================================================

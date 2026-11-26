@@ -175,6 +175,10 @@ Le personnage existe : le lobby s'affiche directement, sans écran de création.
      lancer la partie. » ou « Partie lancée pour X/Y joueurs. ». Le nombre de
      joueurs et d'escouades lancés est journalisé. `PlayersToStart = attackMin`
      et `MaxPlayers = attackMax` restent alignés.
+     Au lancement de la file, `gf_lobby` transmet les escouades à `gf_attack`
+     via l'export `RegisterSquads`. `gf_attack` place une escouade entière dans
+     le même camp : l'équilibrage ne déplace que des escouades entières et
+     accepte un écart d'effectif plutôt que de couper une escouade.
    - `/attack` ramène le joueur au lobby : l'inscription à la file se fait
      depuis la NUI.
 3. **Redzone** : comportement inchangé (`minPlayers = 1`), lancement pour
@@ -839,8 +843,10 @@ Manuel en jeu :
   départ explicite (`leaveParty`, `kickMember`) ou si elle se vide. Attaque de
   zone utilise une file **par escouade** persistante (20–30 joueurs) : le chef
   inscrit son escouade, le compteur est visible par tous et l'inscription survit
-  au match. Extension : répartition équilibrée en deux équipes de 15 côté
-  `gf_attack`.
+  au match. Côté `gf_attack`, les escouades sont réparties en deux camps :
+  chaque escouade est placée entièrement dans le même camp et l'équilibrage ne
+  déplace que des escouades entières, en acceptant un écart d'effectif plutôt
+  que de couper une escouade.
 - Pas de liste d'amis Cfx.re ni de présence hors ligne : invitations des joueurs
   présents dans le lobby uniquement. Extension : `txAdmin`/base de données,
   amis persistants.

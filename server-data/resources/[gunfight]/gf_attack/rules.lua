@@ -42,6 +42,17 @@ local function copieScore(score)
     return { A = score.A, B = score.B }
 end
 
+-- Un src valide est un numéro entier strictement positif.
+local function estSrcValide(src)
+    return type(src) == 'number' and math.floor(src) == src and src > 0
+end
+
+-- Clé de groupe effective : l'affectation explicite s'il y en a une, sinon
+-- -src, ce qui fait de chaque joueur sans escouade un groupe d'une personne.
+local function cleGroupe(etat, src)
+    return etat.groupes[src] or -src
+end
+
 -- ---------------------------------------------------------------------------
 --  Placement d'un joueur selon la phase courante (arrivée, /setteam, soin).
 --  L'ancien server.lua appelait setAlive(src, ...) dans chacun de ces cas :
@@ -79,27 +90,71 @@ local function placementSelonPhase(etat, liste, src)
 end
 
 -- ---------------------------------------------------------------------------
---  Équilibrage des camps : au plus 64 déplacements, toujours depuis le camp
---  le plus peuplé, en tirant le joueur à déplacer avec `aleatoire`. Le pool est
---  construit avec `pairs` SANS tri, comme dans l'ancien server.lua : l'ordre
---  d'énumération peut donc changer le joueur déplacé et notifié.
+--  Équilibrage des camps : au plus 64 itérations, toujours depuis le camp le
+--  plus peuplé. On ne déplace que des escouades ENTIÈRES (une escouade = la
+--  clé de groupe effective, ou un joueur seul s'il n'a pas d'escouade) : jamais
+--  une partie d'une escouade, quitte à accepter un écart supérieur à 1.
+--  Les groupes candidats sont triés par plus petit src (déterministe) ; le
+--  hasard ne intervient qu'au tirage final avec `aleatoire`.
 -- ---------------------------------------------------------------------------
 
 local function autobalance(etat, liste)
     for _ = 1, 64 do
         local a = AttackRules.compter(etat, 'A')
         local b = AttackRules.compter(etat, 'B')
-        if math.abs(a - b) <= 1 then return end
+        local d = math.abs(a - b)
+        if d <= 1 then return end
         local from = a > b and 'A' or 'B'
         local vers = autreCamp(from)
-        local pool = {}
+
+        -- Groupes du camp surpeuplé : clé effective -> liste de src triée.
+        local groupes = {}
         for src, camp in pairs(etat.equipes) do
-            if camp == from then pool[#pool + 1] = src end
+            if camp == from then
+                local cle = cleGroupe(etat, src)
+                if not groupes[cle] then groupes[cle] = {} end
+                local membres = groupes[cle]
+                membres[#membres + 1] = src
+            end
         end
-        local moved = pool[etat.aleatoire(#pool)]
-        etat.equipes[moved] = vers
-        ajouter(liste, { type = 'equipe', src = moved, equipe = vers })
-        ajouter(liste, { type = 'notifier', modele = 'equilibrage', src = moved, equipe = vers })
+
+        local ordonnes = {}
+        for _, membres in pairs(groupes) do
+            table.sort(membres)
+            ordonnes[#ordonnes + 1] = membres
+        end
+        table.sort(ordonnes, function(x, y) return x[1] < y[1] end)
+
+        -- Seuls les groupes de taille s avec 0 < s < d réduisent l'écart.
+        local candidats = {}
+        for _, membres in ipairs(ordonnes) do
+            local s = #membres
+            if s > 0 and s < d then candidats[#candidats + 1] = membres end
+        end
+        if #candidats == 0 then return end
+
+        -- On garde les déplacements qui approchent le plus de l'égalité.
+        local meilleur = nil
+        for _, membres in ipairs(candidats) do
+            local ecart = math.abs(d - 2 * #membres)
+            if not meilleur or ecart < meilleur then meilleur = ecart end
+        end
+        local retenus = {}
+        for _, membres in ipairs(candidats) do
+            if math.abs(d - 2 * #membres) == meilleur then
+                retenus[#retenus + 1] = membres
+            end
+        end
+
+        local groupe = retenus[etat.aleatoire(#retenus)]
+        for _, src in ipairs(groupe) do
+            etat.equipes[src] = vers
+            ajouter(liste, { type = 'equipe', src = src, equipe = vers })
+            ajouter(liste, {
+                type = 'notifier', modele = 'equilibrage', src = src,
+                equipe = vers, escouade = #groupe > 1,
+            })
+        end
     end
 end
 
@@ -313,6 +368,8 @@ function AttackRules.nouveau(config, aleatoire)
         aleatoire = aleatoire,
         phase = 'waiting',
         equipes = {},
+        groupes = {},          -- [src] = clé de groupe (entier > 0)
+        prochainGroupe = 0,
         vivants = {},
         stats = {},
         partis = {},
@@ -331,6 +388,8 @@ end
 function AttackRules.reinitialiser(etat)
     etat.phase = 'waiting'
     etat.equipes = {}
+    etat.groupes = {}
+    -- `prochainGroupe` continue : les clés déjà distribuées ne sont pas réutilisées.
     etat.vivants = {}
     etat.stats = {}
     etat.partis = {}
@@ -345,21 +404,61 @@ function AttackRules.reinitialiser(etat)
     etat.echangeDeCamp = false
 end
 
+-- Affecte une clé de groupe à chaque escouade. Peut être appelé avant
+-- l'arrivée des joueurs (cas normal) ou pendant qu'ils sont déjà dans le mode :
+-- un src déjà affecté est simplement réaffecté. Les entrées invalides sont
+-- ignorées sans erreur. Aucun effet : les escouades ne changent pas de camp.
+function AttackRules.definirGroupes(etat, escouades)
+    if type(escouades) ~= 'table' then return {} end
+    for _, escouade in ipairs(escouades) do
+        if type(escouade) == 'table' then
+            local valides = {}
+            for _, src in ipairs(escouade) do
+                if estSrcValide(src) then valides[#valides + 1] = src end
+            end
+            if #valides > 0 then
+                etat.prochainGroupe = etat.prochainGroupe + 1
+                local cle = etat.prochainGroupe
+                for _, src in ipairs(valides) do
+                    etat.groupes[src] = cle
+                end
+            end
+        end
+    end
+    return {}
+end
+
 -- ---------------------------------------------------------------------------
 --  API publique : entrées, sorties, morts et déplacements.
 -- ---------------------------------------------------------------------------
 
 function AttackRules.arrivee(etat, src)
     local liste = {}
-    local a = AttackRules.compter(etat, 'A')
-    local b = AttackRules.compter(etat, 'B')
     local camp
-    if a < b then
-        camp = 'A'
-    elseif b < a then
-        camp = 'B'
-    else
-        camp = etat.aleatoire(2) == 1 and 'A' or 'B'
+
+    -- Un membre d'escouade rejoint toujours le camp de son escouade, même si
+    -- ce camp est déjà le plus rempli.
+    if etat.groupes[src] then
+        local cle = cleGroupe(etat, src)
+        for _, s in ipairs(listeJoueurs(etat)) do
+            if s ~= src and cleGroupe(etat, s) == cle and etat.equipes[s] then
+                camp = etat.equipes[s]
+                break
+            end
+        end
+    end
+
+    if not camp then
+        -- Sinon, camp le moins rempli, ou tirage au sort en cas d'égalité.
+        local a = AttackRules.compter(etat, 'A')
+        local b = AttackRules.compter(etat, 'B')
+        if a < b then
+            camp = 'A'
+        elseif b < a then
+            camp = 'B'
+        else
+            camp = etat.aleatoire(2) == 1 and 'A' or 'B'
+        end
     end
 
     etat.equipes[src] = camp
@@ -396,6 +495,7 @@ function AttackRules.depart(etat, src, maintenantMs)
     ajouter(liste, { type = 'effacerResultats', src = src })
     ajouter(liste, { type = 'nettoyerJoueur', src = src })
     etat.equipes[src] = nil
+    etat.groupes[src] = nil
     etat.vivants[src] = nil
     etat.stats[src] = nil
     ajouter(liste, { type = 'classement' })
