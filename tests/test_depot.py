@@ -608,9 +608,10 @@ class ChaineCI(unittest.TestCase):
                         r"(?m)^    timeout-minutes:\s*\d+\s*$",
                         "chaque job doit borner sa durée",
                     )
-                    self.assertIn(
-                        "runs-on: [self-hosted, Linux, X64]",
+                    # Un label supplémentaire (ex. smoke-licence) reste permis.
+                    self.assertRegex(
                         bloc,
+                        r"(?m)^    runs-on: \[self-hosted, Linux, X64(?:, [\w-]+)*\]\s*$",
                         "les jobs doivent tourner sur les runners auto-hébergés (Ubuntu 24.04)",
                     )
                     self.assertRegex(
@@ -729,6 +730,33 @@ class ChaineCI(unittest.TestCase):
             "exit 1",
             bloc,
             "hors PR de fork ou de Dependabot, un secret absent doit faire échouer le job",
+        )
+
+    def test_smoke_serialise_par_label_sans_annuler_les_autres_refs(self) -> None:
+        # GitHub ne garde qu'un run en attente par groupe de concurrence : un
+        # groupe global annulait le smoke des autres PR (et même de main). La
+        # sérialisation passe par un runner unique portant le label dédié ;
+        # le groupe ne regroupe plus que les runs d'une même référence.
+        bloc = bloc_service(lire(self.WORKFLOWS / "docker.yml"), "smoke")
+        if bloc is None:
+            self.fail("job smoke absent de docker.yml")
+        self.assertRegex(
+            bloc,
+            r"(?m)^    runs-on: \[self-hosted, Linux, X64, smoke-licence\]\s*$",
+            "le smoke doit tourner sur le runner unique portant le label smoke-licence",
+        )
+        groupe = re.search(r"(?m)^      group:\s*(.+?)\s*$", bloc)
+        if groupe is None:
+            self.fail("concurrence absente du job smoke")
+        self.assertIn(
+            "github.ref",
+            groupe.group(1),
+            "un groupe partagé entre références annule les smoke en attente des autres PR",
+        )
+        self.assertIn(
+            "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+            bloc,
+            "seuls les runs obsolètes d'une même PR peuvent être annulés",
         )
 
     def test_nom_du_check_smoke_inchange(self) -> None:

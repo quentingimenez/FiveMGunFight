@@ -1,0 +1,6 @@
+# Labels personnalisés des runners auto-hébergés, inconnus d'actionlint.
+# smoke-licence : porté par un seul runner, il sérialise le job smoke (clé de
+# licence CI partagée). Voir docs/qualite.md.
+self-hosted-runner:
+  labels:
+    - smoke-licence
