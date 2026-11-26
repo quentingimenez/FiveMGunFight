@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!-- Gabarit pour nouvelle installation ; un conteneur existant se migre à la main, voir docs/runbooks/deploiement-unraid.md -->
+<Container version="2">
+  <Name>Gunfight-FXServer</Name>
+  <Repository>ghcr.io/quentingimenez/fivemgunfight:main</Repository>
+  <Registry>https://ghcr.io/quentingimenez/fivemgunfight</Registry>
+  <Network>fivem-net</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/quentingimenez/FiveMGunFight</Support>
+  <Project>https://github.com/quentingimenez/FiveMGunFight</Project>
+  <Overview>Serveur FiveM gunfight FR : attaque de zone en equipes et redzone. Les ressources viennent TOUJOURS de l'image ; seules les maps (gf_maps/data), les personnages (gf_lobby/data) et les donnees txAdmin (txData) persistent dans /mnt/user/appdata/fivemgunfight. Ne monte jamais /opt/fivem/server-data complet : cela masquerait les ressources de l'image et figerait le badge de build. Necessite le reseau Docker fivem-net (docker network create fivem-net) et le conteneur Gunfight-MariaDB, hostname mariadb. GF_SEED_MAPS=true amorce maps.json si le dossier maps est vide.</Overview>
+  <Category>GameServers</Category>
+  <WebUI/>
+  <TemplateURL/>
+  <ExtraParams>--restart=unless-stopped -i -t --hostname fxserver</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Port jeu TCP" Target="30120" Default="30120" Mode="tcp" Description="Port TCP du serveur FiveM (liste et connexion)" Type="Port" Display="always" Required="true" Mask="false">30120</Config>
+  <Config Name="Port jeu UDP" Target="30120" Default="30120" Mode="udp" Description="Port UDP du serveur FiveM (trafic de jeu)" Type="Port" Display="always" Required="true" Mask="false">30120</Config>
+  <Config Name="Port txAdmin" Target="40120" Default="40120" Mode="tcp" Description="Panneau web txAdmin, utile seulement si TXADMIN=true" Type="Port" Display="always" Required="false" Mask="false">40120</Config>
+  <Config Name="Maps gf_maps" Target="/opt/fivem/server-data/resources/[gunfight]/gf_maps/data" Default="/mnt/user/appdata/fivemgunfight/maps" Mode="rw" Description="Seul sous-dossier de server-data a monter : maps.json cree avec l'editeur en jeu" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/fivemgunfight/maps</Config>
+  <Config Name="Personnages gf_lobby" Target="/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data" Default="/mnt/user/appdata/fivemgunfight/characters" Mode="rw" Description="Personnages du lobby (characters.json), a conserver entre les mises a jour" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/fivemgunfight/characters</Config>
+  <Config Name="txData" Target="/opt/fivem/txData" Default="/mnt/user/appdata/fivemgunfight/txdata" Mode="rw" Description="Donnees txAdmin (profils, base locale)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/fivemgunfight/txdata</Config>
+  <Config Name="GF_SEED_MAPS" Target="GF_SEED_MAPS" Default="true" Mode="" Description="Amorce maps.json depuis le modele de l image si le dossier maps est vide" Type="Variable" Display="always" Required="true" Mask="false">true</Config>
+  <Config Name="LICENSE_KEY" Target="LICENSE_KEY" Default="" Mode="" Description="Cle de licence Cfx (portal.cfx.re)" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="SERVER_NAME" Target="SERVER_NAME" Default="Gunfight FR" Mode="" Description="Nom affiche dans la liste des serveurs" Type="Variable" Display="always" Required="true" Mask="false">Gunfight FR</Config>
+  <Config Name="MAX_PLAYERS" Target="MAX_PLAYERS" Default="48" Mode="" Description="Slots max (plafond cle gratuite : 48)" Type="Variable" Display="always" Required="true" Mask="false">48</Config>
+  <Config Name="TXADMIN" Target="TXADMIN" Default="false" Mode="" Description="true = panneau txAdmin, false = demarrage direct du jeu" Type="Variable" Display="always" Required="true" Mask="false">false</Config>
+  <Config Name="ADMIN_IDENTIFIERS" Target="ADMIN_IDENTIFIERS" Default="" Mode="" Description="Identifiants admins separes par des virgules, ex. fivem:123456,license:abc" Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="STEAM_WEB_API_KEY" Target="STEAM_WEB_API_KEY" Default="" Mode="" Description="Optionnel : cle API Steam pour les identifiants steam" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="DB_HOST" Target="DB_HOST" Default="mariadb" Mode="" Description="Hostname du conteneur MariaDB sur le reseau fivem-net" Type="Variable" Display="advanced" Required="true" Mask="false">mariadb</Config>
+  <Config Name="MARIADB_DATABASE" Target="MARIADB_DATABASE" Default="gunfight" Mode="" Description="Base MySQL utilisee pour gf_stats" Type="Variable" Display="advanced" Required="true" Mask="false">gunfight</Config>
+  <Config Name="MARIADB_USER" Target="MARIADB_USER" Default="gunfight" Mode="" Description="Utilisateur MySQL (doit correspondre au conteneur Gunfight-MariaDB)" Type="Variable" Display="advanced" Required="true" Mask="false">gunfight</Config>
+  <Config Name="MARIADB_PASSWORD" Target="MARIADB_PASSWORD" Default="" Mode="" Description="Mot de passe MySQL : a saisir dans l'UI Unraid, jamais dans le depot" Type="Variable" Display="advanced" Required="true" Mask="true"></Config>
+</Container>

@@ -65,11 +65,15 @@ sha court du commit **réellement construit**, et suit donc l'image déployée.
 | Lecture | `gf_lobby/server.lua` | `GetConvar('gf_build_sha')` → `state.build` |
 | Affichage | `gf_lobby/html/js/app.js` | `applyBuild(next.build)` met le badge à jour |
 
-Le passage par la convar est volontaire : en production, `server-data` peut être
-monté depuis un volume (Unraid) ou figé dans l'image, donc un fichier du dépôt
-n'a aucune chance d'être à jour. La convar est posée par l'image qui tourne : le
-badge ne peut pas annoncer plus récent qu'elle. Hors CI (build local, FXServer
-lancé à la main) la valeur est `dev`.
+Le passage par la convar est volontaire : la convar est posée par l'image qui
+tourne, donc le badge ne peut pas annoncer plus récent qu'elle. En production,
+les ressources viennent **toujours** de l'image ; seuls `gf_maps/data` (maps) et
+`gf_lobby/data` (personnages) peuvent être des volumes. Monter tout `server-data`
+depuis un volume (cas rencontré sur Unraid) masque les ressources de l'image :
+le code servi devient une copie figée, la convar écrite par l'entrypoint est
+ignorée par un ancien `gf_lobby/server.lua`, et le badge ment. La valeur n'est
+lue que par le code de l'image. Hors CI (build local, FXServer lancé à la main)
+la valeur est `dev`. Voir [`runbooks/deploiement-unraid.md`](runbooks/deploiement-unraid.md).
 
 En développement, le sha local se transmet au build via l'environnement :
 `BUILD_SHA=$(git rev-parse --short HEAD) docker compose -f docker-compose.yml
