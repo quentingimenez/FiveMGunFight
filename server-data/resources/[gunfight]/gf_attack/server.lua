@@ -631,27 +631,53 @@ local function reply(src, msg)
     if src == 0 then print('[gf_attack] ' .. msg) else core:Notify(src, msg) end
 end
 
--- /startround : force le lancement (fonctionne même seul, pour tester)
--- Lance une manche tout de suite. Si src est donné et que ce joueur n'est pas
--- dans le mode, il y entre d'abord (partie de test en solo).
-local function startTestRound(src)
-    if not AttackRules.estOuvert(etat) then return false, 'Un match est déjà en cours.' end
-    if AttackRules.nombreJoueurs(etat) < Config.MaxPlayers and src and src > 0 and not etat.equipes[src] then
+-- /startround : force le lancement pour l'admin ET toute la file du lobby, sans seuil
+-- La file du lobby part en premier : si l'admin y est avec son escouade, il
+-- entre avec elle (même équipe) au lieu de partir seul avant elle. Les joueurs
+-- de la file arrivent après le délai de lancement du lobby (700 ms) : l'admin
+-- n'entre seul qu'ensuite, s'il n'est pas déjà dans le mode, puis la manche
+-- démarre. Sans joueur dans la file : entrée de l'admin puis manche immédiate.
+local function entrerAdmin(src)
+    if src and src > 0 and not etat.equipes[src]
+        and AttackRules.nombreJoueurs(etat) < Config.MaxPlayers then
         core:SetMode(src, 'attack')
     end
+end
+
+local function startTestRound(src)
+    if not AttackRules.estOuvert(etat) then return false, 'Un match est déjà en cours.' end
+    local places = Config.MaxPlayers - AttackRules.nombreJoueurs(etat)
+    local lances = 0
+    if places > 0 and GetResourceState('gf_lobby') == 'started' then
+        local ok, n = pcall(function() return exports.gf_lobby:ForceLaunchQueue(places) end)
+        lances = (ok and type(n) == 'number' and n > 0) and n or 0
+    end
+    if lances > 0 then
+        SetTimeout(2500, function()
+            if not AttackRules.estOuvert(etat) then return end
+            entrerAdmin(src)
+            if next(etat.equipes) ~= nil then
+                executer(AttackRules.debutTest(etat, GetGameTimer()))
+            end
+        end)
+        return true, ('Lancement forcé : %d joueur(s) de la file rejoignent la partie.'):format(lances)
+    end
+    entrerAdmin(src)
     if next(etat.equipes) == nil then return false, 'Aucun joueur dans le mode Attaque.' end
     executer(AttackRules.debutTest(etat, GetGameTimer()))
     return true
 end
 exports('StartTestRound', startTestRound)
 
+-- /startround : force le lancement pour l'admin ET toute la file du lobby, sans seuil
 RegisterCommand('startround', function(src)
     if not core:IsAdmin(src) then
         core:Notify(src, ADMIN_REQUIS)
         return
     end
-    local ok, err = startTestRound(src)
-    if not ok then reply(src, err) end
+    local ok, msg = startTestRound(src)
+    if not ok then reply(src, msg)
+    elseif msg then reply(src, msg) end
 end, false)
 
 -- /endmatch : arrête le match et remet les scores à zéro

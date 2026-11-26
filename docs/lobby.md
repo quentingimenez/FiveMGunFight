@@ -179,6 +179,18 @@ Le personnage existe : le lobby s'affiche directement, sans écran de création.
      via l'export `RegisterSquads`. `gf_attack` place une escouade entière dans
      le même camp : l'équilibrage ne déplace que des escouades entières et
      accepte un écart d'effectif plutôt que de couper une escouade.
+   - L'export `gf_lobby:ForceLaunchQueue(maxPlayers)` permet un lancement forcé
+     sans seuil : il retient les escouades prêtes **entières** dans l'ordre FIFO,
+     dans la limite des places, puis les lance par le même chemin que le thread
+     (`launching`, `RegisterSquads`, `SetMode` après 700 ms) ; l'inscription à la
+     file survit au lancement. Il renvoie le nombre de joueurs lancés, `0` si
+     aucune escouade n'est prête ou si la limite est absente ou inférieure à 1,
+     et `-1` si un lancement est déjà en cours ou si le mode attack est
+     indisponible. `/startround` (admin, `gf_attack`) appelle d'abord
+     l'export avec les places restantes : un admin inscrit avec son escouade
+     part avec elle. Au coup d'envoi (`SetTimeout(2500)`, après l'arrivée des
+     joueurs), l'admin entre seul s'il n'est pas déjà dans le mode, puis la
+     manche démarre.
    - `/attack` ramène le joueur au lobby : l'inscription à la file se fait
      depuis la NUI.
 3. **Redzone** : comportement inchangé (`minPlayers = 1`), lancement pour

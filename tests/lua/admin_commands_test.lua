@@ -89,6 +89,10 @@ local function newHarness(admin)
         events = {},          -- liste de { name, args }
         logs = {},            -- lignes print()
         exportsByName = {},   -- exports('Nom', fn)
+        setTimeouts = {},     -- timers programmés : { ms, fn } (jamais exécutés)
+        setModeCalls = {},    -- appels exports.gf_core:SetMode : { src, mode }
+        forceLaunchQueueCalls = {}, -- arguments reçus par gf_lobby:ForceLaunchQueue
+        forceLaunchQueue = nil,     -- pilote : fonction renvoyant le nombre de joueurs lancés
     }
 
     local envMetatable = {
@@ -153,7 +157,9 @@ local function newHarness(admin)
         -- Les threads et timers ne sont jamais lancés : on teste les commandes,
         -- pas la boucle de jeu.
         env.CreateThread = stub
-        env.SetTimeout = stub
+        env.SetTimeout = function(ms, fn)
+            h.setTimeouts[#h.setTimeouts + 1] = { ms = ms, fn = fn }
+        end
         env.Wait = stub
 
         env.TriggerClientEvent = function(name, target, data)
@@ -173,7 +179,10 @@ local function newHarness(admin)
             Notify = function(_self, src, msg)
                 h.notices[#h.notices + 1] = { src = src, msg = msg }
             end,
-            SetMode = function(_self, _src, _mode) return true end,
+            SetMode = function(_self, src, mode)
+                h.setModeCalls[#h.setModeCalls + 1] = { src = src, mode = mode }
+                return true
+            end,
             GetMode = function() return nil end,
             Spawn = stub,
             SetTeam = stub,
@@ -191,12 +200,20 @@ local function newHarness(admin)
         local mapsExport = {
             GetActiveMaps = function() return {} end,
         }
+        local lobbyExport = {
+            ForceLaunchQueue = function(_self, maxPlayers)
+                h.forceLaunchQueueCalls[#h.forceLaunchQueueCalls + 1] = maxPlayers
+                if h.forceLaunchQueue then return h.forceLaunchQueue(maxPlayers) end
+                return 0
+            end,
+        }
         local exportsTable = setmetatable({
             gf_core = coreExport,
             gf_maps = mapsExport,
             gf_attack = genericExport,
             gf_redzone = genericExport,
             gf_inventory = genericExport,
+            gf_lobby = lobbyExport,
         }, {
             __call = function(_t, name, fn)
                 h.exportsByName[name] = fn
@@ -239,6 +256,8 @@ local function newHarness(admin)
 
     function h.resetRecords()
         h.notices, h.clients, h.events, h.logs = {}, {}, {}, {}
+        h.setTimeouts, h.forceLaunchQueueCalls = {}, {}
+        -- h.forceLaunchQueue est volontairement conservé : chaque scénario le pose après reset.
     end
 
     function h.noticesMessages()
@@ -386,6 +405,108 @@ check('3c. /whoami depuis la console : print exact, aucun message réseau', func
     expectList(h.clientNames(), {}, 'aucun TriggerClientEvent')
     expectList(h.noticesMessages(), {}, 'aucun Notify')
     expectList(h.eventNames(), {}, 'aucun TriggerEvent')
+end)
+
+-- ---------------------------------------------------------------------------
+--  Scénarios 4 : /startround et la file du lobby (ForceLaunchQueue).
+--  Le faux SetMode n'ajoute aucun joueur : sans la file, le message reste
+--  'Aucun joueur dans le mode Attaque.'
+-- ---------------------------------------------------------------------------
+
+local function timer2500(h)
+    local count = 0
+    for _, t in ipairs(h.setTimeouts) do
+        if t.ms == 2500 then count = count + 1 end
+    end
+    return count
+end
+
+local function hasMessage(messages, needle)
+    for _, msg in ipairs(messages) do
+        if msg and msg:find(needle, 1, true) then return true end
+    end
+    return false
+end
+
+check('4a. startround : ForceLaunchQueue renvoie 3, message exact et timer 2500', function()
+    local h = newHarness(true)
+    h.resetRecords()
+    h.forceLaunchQueue = function() return 3 end
+    h.call('startround', 5)
+
+    local messages = h.noticesMessages()
+    local found = false
+    for _, msg in ipairs(messages) do
+        if msg == 'Lancement forcé : 3 joueur(s) de la file rejoignent la partie.' then found = true end
+    end
+    eq(true, found, 'message exact de lancement forcé reçu par l admin')
+
+    local called = false
+    for _, arg in ipairs(h.forceLaunchQueueCalls) do
+        if type(arg) == 'number' and arg > 0 then called = true end
+    end
+    eq(true, called, 'ForceLaunchQueue appelé avec un nombre de places > 0')
+
+    eq(true, timer2500(h) > 0, 'au moins un timer de 2500 ms programmé')
+end)
+
+check('4d. startround : la file part avant l admin, qui n entre qu au coup d envoi', function()
+    local h = newHarness(true)
+    h.resetRecords()
+    h.setModeCalls = {}
+    h.forceLaunchQueue = function() return 2 end
+    h.call('startround', 5)
+
+    -- L'admin ne doit pas quitter le lobby avant le lancement de la file :
+    -- s'il y est avec son escouade, il part avec elle.
+    eq(0, #h.setModeCalls, 'aucun SetMode avant le timer')
+    local timer = nil
+    for _, t in ipairs(h.setTimeouts) do
+        if t.ms == 2500 then timer = t end
+    end
+    eq(true, timer ~= nil, 'timer de 2500 ms programmé')
+    timer.fn()
+    eq(1, #h.setModeCalls, 'un SetMode au coup d envoi')
+    eq(5, h.setModeCalls[1].src, 'SetMode pour l admin')
+    eq('attack', h.setModeCalls[1].mode, 'vers le mode attack')
+end)
+
+check('4b. startround : ForceLaunchQueue renvoie 0, comportement actuel conservé', function()
+    local h = newHarness(true)
+    h.resetRecords()
+    h.forceLaunchQueue = function() return 0 end
+    h.call('startround', 5)
+
+    local messages = h.noticesMessages()
+    eq(false, hasMessage(messages, 'Lancement forcé'), 'aucun message de lancement forcé')
+    eq(false, hasMessage(h.logs, 'Lancement forcé'), 'aucun print de lancement forcé')
+    eq(0, timer2500(h), 'aucun timer de 2500 ms')
+
+    local found = false
+    for _, msg in ipairs(messages) do
+        if msg == 'Aucun joueur dans le mode Attaque.' then found = true end
+    end
+    eq(true, found, 'message actuel conservé')
+end)
+
+check('4c. startround : ForceLaunchQueue lève une erreur, rien ne propage', function()
+    local h = newHarness(true)
+    h.resetRecords()
+    h.forceLaunchQueue = function() error('panne simulée') end
+
+    local ok, err = pcall(h.call, 'startround', 5)
+    eq(true, ok, 'aucune erreur propagée : ' .. tostring(err))
+
+    local messages = h.noticesMessages()
+    eq(false, hasMessage(messages, 'Lancement forcé'), 'aucun message de lancement forcé')
+    eq(false, hasMessage(h.logs, 'Lancement forcé'), 'aucun print de lancement forcé')
+    eq(0, timer2500(h), 'aucun timer de 2500 ms')
+
+    local found = false
+    for _, msg in ipairs(messages) do
+        if msg == 'Aucun joueur dans le mode Attaque.' then found = true end
+    end
+    eq(true, found, 'message actuel conservé')
 end)
 
 print(('%d passed, %d failed'):format(passed, failed))

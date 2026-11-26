@@ -927,6 +927,33 @@ CreateThread(function()
     end
 end)
 
+-- Lancement forcé par un administrateur (/startround) : fait entrer toute la
+-- file d'attente du lobby, sans seuil, dans la limite des places demandées.
+-- Renvoie le nombre de joueurs lancés, 0 si rien n'est prêt ou si la limite
+-- est invalide, -1 si un lancement est déjà en cours ou si le mode est absent.
+exports('ForceLaunchQueue', function(maxPlayers)
+    if launchPending then return -1 end
+    local mode = findMode('attack')
+    if not mode or not isModeAvailable(mode) then return -1 end
+
+    local limite = tonumber(maxPlayers)
+    limite = limite and math.floor(limite) or nil
+    if not limite or limite < 1 then return 0 end
+
+    local ready = LobbyQueue.ready(Queue, Parties, isEligible)
+    local picked = LobbyQueue.pick(ready, 1, math.min(queueMax(), limite))
+    if not picked then return 0 end
+
+    launchQueuedSquads(picked, mode)
+
+    local total = 0
+    for _, squad in ipairs(picked) do
+        total = total + #squad.members
+    end
+    log(('lancement forcé par un admin : %d joueur(s), %d escouade(s)'):format(total, #picked))
+    return total
+end)
+
 -- ---------------------------------------------------------------------------
 --  Événements NUI → serveur
 -- ---------------------------------------------------------------------------

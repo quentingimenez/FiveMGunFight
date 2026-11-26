@@ -144,7 +144,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | touche **Z** (maintenue) | tous | classement |
 | touches **1** et **2** | tous | sortir l'arme choisie en 1re / 2e position (la roue des armes de GTA est désactivée) |
 | touche **Échap** | tous | ouvre le menu pause GUNFIGHT (profil, règlement, chat, Discord, quitter) à la place du menu natif |
-| `/startround` | admin | force le lancement d’un match avec les joueurs déjà dans le mode (possible en solo) |
+| `/startround` | admin | force le lancement : fait entrer l'admin et toute la file du lobby (escouades entières, sans seuil, dans la limite des places), puis lance la manche (possible en solo) |
 | `/endmatch` | admin | arrête le match, scores à zéro |
 | `/nextzone` | admin | zone d'attaque suivante (hors match) |
 | `/setteam [id] [A\|B]` | admin | change l'équipe d'un joueur |
@@ -161,7 +161,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
 Le combat commence avec 3 minutes au chrono. Il se met en pause tant qu’au moins un attaquant vivant se trouve dans la zone et reprend lorsque le dernier en sort. À zéro, la défense gagne la manche.
 
-> **Tester seul** : tape `/startround` en tant qu’admin. Comme l'autre équipe est vide,
+> **Tester seul** : tape `/startround` en tant qu'admin, avec une file de lobby vide pour rester seul. Comme l'autre équipe est vide,
 > la manche se termine au chrono et le point revient à ton équipe (mode test). En attaque, sors de la zone pour laisser le chrono défiler.
 
 ## 5. Créer des maps en jeu (`/editor`)

@@ -257,6 +257,10 @@ local function newServer()
     local netHandlers = {}
     local eventHandlers = {}
     local logs = {}
+    -- exports(name, fn) enregistre les exports dynamiques du serveur (par
+    -- exemple ForceLaunchQueue), tout en gardant l'accès par champ pour les
+    -- exports statiques gf_core / gf_attack.
+    local registeredExports = {}
 
     env.print = function(...)
         local parts = {}
@@ -310,7 +314,7 @@ local function newServer()
         timers[#timers + 1] = fn
     end
 
-    env.exports = {
+    env.exports = setmetatable({
         gf_core = {
             GetMode = function(_self, src) return modes[tonumber(src)] end,
             SetMode = function(self, src, mode)
@@ -330,7 +334,11 @@ local function newServer()
                 return true
             end,
         },
-    }
+    }, {
+        __call = function(_self, name, fn)
+            registeredExports[name] = fn
+        end,
+    })
 
     env.TriggerClientEvent = function(name, target, data)
         if name == 'gf_lobby:state' then
@@ -470,6 +478,10 @@ local function newServer()
         end,
         min = function(value) env.Config.Matchmaking.attackMin = value end,
         max = function(value) env.Config.Matchmaking.attackMax = value end,
+        forceLaunch = function(maxPlayers)
+            local fn = assert(registeredExports.ForceLaunchQueue, 'export ForceLaunchQueue absent')
+            return fn(maxPlayers)
+        end,
     }
 end
 
@@ -752,6 +764,114 @@ check('j. un RegisterSquads qui lève une erreur n empêche pas les SetMode', fu
     equal(true, s.setModeFor(1, 'attack'), 'SetMode pour 1 malgré l erreur')
     equal(true, s.setModeFor(2, 'attack'), 'SetMode pour 2 malgré l erreur')
     equal(true, s.setModeFor(3, 'attack'), 'SetMode pour 3 malgré l erreur')
+end)
+
+-- ---------------------------------------------------------------------------
+--  Scénarios d'intégration : export ForceLaunchQueue (lancement forcé).
+-- ---------------------------------------------------------------------------
+
+check('k. ForceLaunchQueue lance une escouade solo sous le seuil', function()
+    local s = newServer()
+    -- attackMin reste à 20 : le lancement forcé ne doit pas en tenir compte.
+    equal(20, s.env.Config.Matchmaking.attackMin, 'seuil inchangé')
+    s.makePlayer(1)
+    s.play(1, 'attack')
+    equal(true, s.queueOf(1).joined, 'joueur inscrit')
+    equal(1, s.forceLaunch(30), 'ForceLaunchQueue renvoie 1 joueur')
+
+    -- Avant flushTimers : le lancement est en attente.
+    equal(-1, s.forceLaunch(30), 'second appel pendant le lancement')
+
+    s.flushTimers()
+    equal(true, s.setModeFor(1, 'attack'), 'SetMode pour le joueur 1')
+    local registerCalls = s.registerCalls()
+    equal(1, #registerCalls, 'un seul appel à RegisterSquads')
+    assert(memesEscouades({ { 1 } }, registerCalls[1].escouades),
+        'RegisterSquads doit recevoir l escouade {1}')
+    local premierSetMode = s.firstSetModeIndex()
+    assert(premierSetMode, 'au moins un SetMode attendu')
+    assert(1 < premierSetMode, 'RegisterSquads appelé avant le premier SetMode')
+end)
+
+check('l. ForceLaunchQueue respecte la limite et l ordre FIFO', function()
+    local s = newServer()
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.makePlayer(3)
+    s.makePlayer(4)
+    -- Première escouade inscrite : 1+2.
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local party1 = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = party1, accept = true })
+    -- Deuxième escouade inscrite : 3+4.
+    s.callNet('gf_lobby:invite', 3, { id = 4 })
+    local party2 = s.stateOf(3).party.id
+    s.callNet('gf_lobby:respondInvite', 4, { partyId = party2, accept = true })
+    s.play(1, 'attack')
+    s.play(3, 'attack')
+    equal(4, s.queueOf(1).size, 'quatre joueurs dans la file')
+
+    -- Limite 3 : la première escouade de 2 tient, la seconde (2 joueurs) ne
+    -- tient plus (2+2 > 3) et n'est pas coupée.
+    equal(2, s.forceLaunch(3), 'ForceLaunchQueue renvoie 2 joueurs')
+    s.flushTimers()
+
+    equal(true, s.setModeFor(1, 'attack'), 'SetMode pour 1')
+    equal(true, s.setModeFor(2, 'attack'), 'SetMode pour 2')
+    equal(false, s.setModeFor(3, 'attack'), 'pas de SetMode pour 3')
+    equal(false, s.setModeFor(4, 'attack'), 'pas de SetMode pour 4')
+    local registerCalls = s.registerCalls()
+    equal(1, #registerCalls, 'un seul appel à RegisterSquads')
+    assert(memesEscouades({ { 1, 2 } }, registerCalls[1].escouades),
+        'seule la première escouade est enregistrée')
+    equal(true, s.queueOf(3).joined, 'escouade 2 toujours inscrite')
+end)
+
+check('m. ForceLaunchQueue sans cible ou limite invalide renvoie 0', function()
+    local s = newServer()
+    -- File vide : aucune escouade prête.
+    equal(0, s.forceLaunch(30), 'file vide')
+
+    s.makePlayer(1)
+    s.play(1, 'attack')
+    -- Limite absente / nil : pick ne peut pas retenir d'escouade (max = nil).
+    equal(0, s.forceLaunch(nil), 'maxPlayers nil')
+    -- Limite 0 : rejet explicite avant même la lecture de la file.
+    equal(0, s.forceLaunch(0), 'maxPlayers 0')
+    equal(0, s.forceLaunch(-1), 'maxPlayers négatif')
+    equal(0, s.forceLaunch('abc'), 'maxPlayers non numérique')
+    local beforeModes = s.setModeCount()
+    s.flushTimers()
+    equal(beforeModes, s.setModeCount(), 'aucun SetMode après un retour 0')
+end)
+
+check('n. l escouade reste inscrite après un lancement forcé et un retour lobby', function()
+    local s = newServer()
+    s.makePlayer(1)
+    s.makePlayer(2)
+    s.callNet('gf_lobby:invite', 1, { id = 2 })
+    local partyId = s.stateOf(1).party.id
+    s.callNet('gf_lobby:respondInvite', 2, { partyId = partyId, accept = true })
+    s.play(1, 'attack')
+    equal(2, s.forceLaunch(30), 'deux joueurs lancés')
+    s.flushTimers()
+    equal(true, s.setModeFor(1, 'attack'), 'SetMode pour 1')
+    equal(true, s.setModeFor(2, 'attack'), 'SetMode pour 2')
+
+    -- Départ vers attack puis retour au lobby, comme dans le scénario e.
+    s.callEvent('gf:modeJoined', 1, 'attack')
+    s.callEvent('gf:modeJoined', 2, 'attack')
+    s.callEvent('gf:modeJoined', 1, 'lobby')
+    s.callEvent('gf:modeJoined', 2, 'lobby')
+
+    equal(true, s.queueOf(1).joined, 'inscription persistée pour le chef')
+    equal(true, s.queueOf(2).joined, 'inscription persistée pour le membre')
+    equal(2, s.queueOf(1).size, 'deux joueurs comptés au retour')
+    equal(2, s.partyOf(1).size, 'escouade toujours de 2')
+    equal(false, s.partyOf(1).launching, 'drapeau launching libéré')
+    -- Un second lancement forcé est de nouveau possible.
+    s.clearModes()
+    equal(2, s.forceLaunch(30), 'relancement forcé possible après retour')
 end)
 
 print(('%d passed, %d failed'):format(passed, failed))
