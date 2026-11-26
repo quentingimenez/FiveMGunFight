@@ -35,7 +35,7 @@ tout correctif.
 | C7 | Manche d'Attaque en machine à états testée | moyenne | ⬜ | — | A1, V5 |
 | C8 | Charge et réseau mesurés | moyenne | ⬜ | C2 | P5, V7 |
 | C9 | Playtests et équilibre des maps | moyenne | ⬜ | C2 | V8 |
-| C10 | Une seule commande de vérification | moyenne | ⬜ | — | V1 |
+| C10 | Une seule commande de vérification | moyenne | ✅ | — | V1 |
 | C11 | Mutation, propriétés et fuzzing | moyenne | ⬜ | C10 | V4, U2, U3 |
 | C12 | Migrations de schéma | haute avant [`must-have.md`](must-have.md) § 1 | ⬜ | — | D4 |
 | C13 | Suivi d'oxmysql | basse | ⬜ | — | E3 |

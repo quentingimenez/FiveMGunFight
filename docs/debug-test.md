@@ -28,7 +28,7 @@ procédures de production.
 | Maps | `server-data/resources/[gunfight]/gf_maps/data/maps.json` | `gf_maps/server.lua` | suivi par Git ; sauvegarde-le après une création volontaire |
 | Console de jeu | **F8** (client) et **T** (chat) | client FiveM | `connect`, `quit`, `reconnect` ; commandes `/...` dans le chat |
 | Éditeur de maps | `/editor` (admin) | `gf_maps` | voir section 5 du README |
-| Tests locaux | `bash scripts/verifier.sh` et `python -m unittest discover -s tests -v` | `scripts/`, `tests/` | outils absents = étape ignorée en local, la CI tranche |
+| Tests locaux | `bash scripts/verifier-docker.sh` | `scripts/`, `tests/`, `docker/verifier/` | même commande qu'en CI, dans l'image ; Docker Desktop doit tourner |
 
 Les scripts `start.bat`, `stop.bat`, `status.bat` et `console.bat` enveloppent
 ces commandes sur Windows. `status.bat` affiche l'état des conteneurs et les
@@ -261,15 +261,18 @@ Valeurs par défaut : `GameDuration=600` (10 min), `RespawnDelay=3`, véhicule
 ### Contrôles avant de proposer une modification
 
 ```bash
-bash scripts/verifier.sh
-python -m unittest discover -s tests -v
+bash scripts/verifier-docker.sh
 ```
 
-En local, `luac`, `shellcheck` ou `luacheck` peuvent manquer : le script
-l'annonce et continue, la CI les exécute. Pour une modification de documentation
-seule, déclare « sans exécution : documentation », vérifie les liens et lance
-quand même `scripts/verifier.sh`. Voir [`qualite.md`](qualite.md) pour le détail
-des contrôles et [`CONTRIBUTING.md`](../CONTRIBUTING.md) pour la boucle de PR.
+La commande construit l'image de vérification
+[`docker/verifier/Dockerfile`](../docker/verifier/Dockerfile), puis y lance
+`scripts/verifier.sh` et les tests Python : c'est la même chose qu'en CI.
+Docker Desktop doit être démarré. Lancé hors de l'image, `scripts/verifier.sh`
+échoue si un outil manque (« outil absent : … ») ; c'est voulu. Pour une
+modification de documentation seule, déclare « sans exécution : documentation »,
+vérifie les liens et lance quand même la commande. Voir
+[`qualite.md`](qualite.md) pour le détail des contrôles et
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) pour la boucle de PR.
 
 ## 5. Débogage
 
@@ -392,9 +395,8 @@ partie du serveur et n'ajoute aucune dépendance au projet.
 
 ## 8. Checklist de test avant une PR
 
-- [ ] `bash scripts/verifier.sh` passe (ou seules les étapes « ignoré » locales
-      restent, la CI tranche).
-- [ ] `python -m unittest discover -s tests -v` passe.
+- [ ] `bash scripts/verifier-docker.sh` passe (mêmes étapes qu'en CI, tests
+      compris).
 - [ ] Le serveur démarre et les six ressources `gf_*` sont lancées.
 - [ ] `http://127.0.0.1:30120/info.json` répond en 200.
 - [ ] Le lobby s'affiche, le personnage est visible, **JOUER** lance le mode.

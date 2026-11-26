@@ -60,11 +60,15 @@ quelques minutes et ne reçoit aucun joueur. Si cela pose problème, la parade
 est une deuxième clé CI (un compte a droit à trois clés), pas un groupe de
 concurrence partagé.
 
-## Les vérifications statiques (`scripts/verifier.sh`)
+## Les vérifications (`scripts/verifier.sh`, dans l'image)
 
-Le même script sert en local et en CI : une erreur ici est une pull request
-rouge. Les outils sont installés en CI dans une version fixe, vérifiée par
-empreinte SHA256.
+La même commande sert en local et en CI : une erreur ici est une pull request
+rouge. `bash scripts/verifier-docker.sh` construit l'image
+[`docker/verifier/Dockerfile`](../docker/verifier/Dockerfile), puis y lance
+[`scripts/verifier.sh`](../scripts/verifier.sh). L'image est la référence des
+versions : Ubuntu 24.04 épinglé par digest, outils épinglés par version et
+SHA256 (Lua 5.4, luacheck, shellcheck, Node.js 20, Python 3, actionlint,
+hadolint, gitleaks, ruff, Docker CLI et Compose).
 
 | Étape | Outil | Ce qu'elle attrape |
 |---|---|---|
@@ -74,16 +78,24 @@ empreinte SHA256.
 | Syntaxe JavaScript | `node --check` | erreur dans `gf_ui/html/app.js` ou `gf_lobby/html/js/*.js` qui casse toute l'interface NUI |
 | Scripts shell | `sh -n` / `bash -n` + `shellcheck -S error` | `entrypoint.sh` cassé : le conteneur ne démarre plus du tout |
 | Workflows | `actionlint` | expression `${{ }}` invalide, dépendance de job incohérente, `runs-on` inconnu |
-| Dockerfile | `hadolint` (`.hadolint.yaml`) | mauvaise pratique Docker, instruction qui casse le build. Les ignores DL3008/DL4006 sont justifiés dans la configuration |
+| Dockerfiles | `hadolint` (`.hadolint.yaml`) | mauvaise pratique Docker, instruction qui casse le build ; vérifie le `Dockerfile` racine et `docker/verifier/Dockerfile`. Les ignores DL3008/DL4006 sont justifiés dans la configuration |
 | Secrets | `gitleaks dir` (`.gitleaks.toml`) | clé ou jeton accidentellement présent dans l'arbre de travail |
-| Style Python | `ruff check tests/` | import inutilisé, nom non défini, erreur évidente dans les tests |
+| Style Python | `ruff check --extend-ignore EXE002 tests/` | import inutilisé, nom non défini, erreur évidente dans les tests. EXE002 est ignoré : un dossier Windows monté sous Docker Desktop est vu en 0777 |
+| Tests du dépôt | `python -m unittest discover -s tests -v` | manifestes, configuration, maps, documentation, Compose, chaîne CI ; `GF_OUTILS_OBLIGATOIRES=1` fait échouer un test sauté faute d'outil |
 | Compose | `docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q` et idem avec `docker-compose.prod.yml` | YAML invalide, référence de volume inexistante, variable mal écrite, surcouche qui ne se combine plus au socle |
 
-Un outil absent sur ta machine provoque un message « ignore », jamais un faux
-succès silencieux. En CI, tous les outils sont installés : rien n'est ignoré.
-L'historique Git complet est en plus scanné par le job
-`Sécurité de l'historique` (`gitleaks git --log-opts=--all`), séparément pour
-que `fetch-depth: 0` ne ralentisse pas le job principal.
+Un outil absent fait **échouer** le script (« outil absent : X ») : plus de
+faux succès. Lancé hors de l'image sur un poste incomplet,
+`scripts/verifier.sh` échoue ; c'est voulu, la commande de référence est
+`bash scripts/verifier-docker.sh`. L'historique Git complet est en plus scanné
+par le job `Sécurité de l'historique` (`gitleaks git --log-opts=--all`),
+séparément pour que `fetch-depth: 0` ne ralentisse pas le job principal.
+
+Les versions et empreintes des outils sont la référence dans
+[`docker/verifier/Dockerfile`](../docker/verifier/Dockerfile), sauf gitleaks
+qui reste aussi dans le job `Sécurité de l'historique` ; un test vérifie que
+les deux versions sont identiques. Dependabot suit l'image de base
+(`directory: /docker/verifier`).
 
 ## Les tests de cohérence (`tests/test_depot.py`)
 
@@ -105,21 +117,28 @@ quelques secondes et peuvent être lancés avant chaque commit.
 
 ## Lancer les contrôles en local
 
-Tout lancer d'un coup :
+Tout lancer d'un coup, comme la CI :
 
 ```bash
-bash scripts/verifier.sh
-python -m unittest discover -s tests -v
+bash scripts/verifier-docker.sh
 ```
 
-Chaque contrôle peut aussi être lancé seul, avec la même commande qu'en CI :
+Prérequis : Docker Desktop démarré. Sous Windows, `bash` est celui de WSL ;
+Git Bash marche aussi. La commande construit l'image au premier lancement
+(quelques minutes), puis exécute `scripts/verifier.sh` sur le dépôt monté en
+`/depot` : contrôles statiques **et** tests Python. Une image déjà construite
+peut être réutilisée avec `GF_VERIFIER_IMAGE=<image>`.
+
+Pour isoler un échec, chaque contrôle peut être lancé seul dans l'image de
+vérification (sinon, il faut les mêmes outils sur le poste, aux mêmes
+versions) :
 
 ```bash
 luacheck server-data/resources
 actionlint
-hadolint Dockerfile
+hadolint Dockerfile docker/verifier/Dockerfile
 gitleaks dir --no-banner --redact --config .gitleaks.toml .
-ruff check tests/
+ruff check --extend-ignore EXE002 tests/
 docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
 IMAGE_REF=exemple.invalid/gunfight:test \
   docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
@@ -141,30 +160,31 @@ echo $?   # doit afficher 1 et citer LICENSE_KEY
 Sans `BUILD_SHA`, l'image porte la version `dev` et le badge du lobby l'affiche
 telle quelle : c'est le repli attendu hors CI, pas un défaut.
 
-Prérequis pour ne rien ignorer : Lua 5.4 (`luac`), LuaRocks (`luacheck`),
-Node.js, Python 3, Docker Desktop démarré, `shellcheck`, `actionlint`,
-`hadolint`, `gitleaks` et `ruff`. Les versions et empreintes SHA256 utilisées
-par la CI sont la référence dans `.github/workflows/qualite.yml` ; une version
-locale différente peut produire des avertissements en plus, jamais en moins.
+Variables utiles :
 
-Sur Windows, `scripts/verifier.sh` fonctionne dans Git Bash ou WSL. Sans Lua
-installé, l'étape de syntaxe Lua est ignorée localement — la CI la vérifie. Il
-en va de même pour chaque outil absent : le script l'annonce et continue.
+| Variable | Effet |
+|---|---|
+| `GF_SANS_TESTS=1` | saute l'étape `unittest` (utilisée par les tests qui lancent `scripts/verifier.sh`) |
+| `GF_OUTILS_MASQUES=a,b` | fait croire que ces outils manquent (crochet de test) |
+| `GF_VERIFIER_IMAGE=<image>` | utilise une image déjà construite au lieu de la construire |
+| `GF_OUTILS_OBLIGATOIRES=1` | transforme en échec un test Python qui serait sauté faute de lua, node ou bash (posé par `scripts/verifier.sh`) |
 
 ## Ajouter un test
 
 Règle : **un test doit échouer sur un vrai défaut et passer sur `main`**.
 
 - Défaut statique (syntaxe, format, outil) → ajouter une étape à
-  `scripts/verifier.sh`, avec un message d'échec qui dit quoi corriger.
+  `scripts/verifier.sh`, avec un message d'échec qui dit quoi corriger. Une
+  étape qui exige un outil passe par `trouver` et `absent`, et l'outil est
+  ajouté à [`docker/verifier/Dockerfile`](../docker/verifier/Dockerfile).
 - Invariant du dépôt (manifeste, config, doc, format de données) → ajouter une
   méthode de test dans la classe correspondante de `tests/test_depot.py`.
 - Comportement du serveur en jeu → à terme un test d'intégration dédié ; en
   attendant, le test de démarrage Docker est la seule couverture automatique.
 
 Toute nouvelle vérification doit être mentionnée dans ce document.
-[`../CONTRIBUTING.md`](../CONTRIBUTING.md) renvoie aux commandes locales
-(`scripts/verifier.sh`), qui exécutent ces contrôles.
+[`../CONTRIBUTING.md`](../CONTRIBUTING.md) renvoie à la commande locale
+(`scripts/verifier-docker.sh`, qui lance `scripts/verifier.sh` dans l'image).
 
 ## Dépendances : épinglage et Dependabot
 

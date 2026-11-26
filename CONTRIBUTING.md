@@ -68,12 +68,17 @@ Refs: #12
 
 ## 5. Tester en local
 
-Avant d'ouvrir la pull request, exécute les mêmes contrôles que la CI :
+Avant d'ouvrir la pull request, exécute la même commande que la CI, avec
+Docker Desktop démarré :
 
 ```bash
-bash scripts/verifier.sh                      # Lua, JSON, JS, shell, compose
-python -m unittest discover -s tests -v      # cohérence du dépôt
+bash scripts/verifier-docker.sh   # image de vérification : contrôles et tests
 ```
+
+Elle construit l'image de vérification
+[`docker/verifier/Dockerfile`](docker/verifier/Dockerfile), puis y lance
+`scripts/verifier.sh` et les tests Python : mêmes outils et mêmes options en
+local qu'en CI.
 
 La classe `InfraDocker` de ces tests vérifie les garde-fous d'exploitation :
 txAdmin limité à `127.0.0.1`, healthcheck FXServer, plafonds mémoire des deux
@@ -175,8 +180,8 @@ Au-delà de ~400 lignes modifiées, découpe.
 
 | Vérification | Workflow | Bloquante |
 |---|---|---|
-| Syntaxe Lua, JSON, JS, shell, compose | `.github/workflows/qualite.yml` | oui |
-| Cohérence des manifestes, maps, config, docs | `.github/workflows/qualite.yml` | oui |
+| Contrôles statiques (Lua, JSON, JS, shell, compose), dans l'image de vérification | `.github/workflows/qualite.yml` | oui |
+| Tests du dépôt (manifestes, maps, config, docs, Compose, CI) | `.github/workflows/qualite.yml` | oui |
 | Construction de l'image Docker | `.github/workflows/docker.yml` | oui |
 | Démarrage réel du serveur (smoke test) | `.github/workflows/docker.yml` | oui, sur PR comme sur `main` ; sans secret `CFX_LICENSE_KEY`, le job est vert mais le démarrage est sauté |
 

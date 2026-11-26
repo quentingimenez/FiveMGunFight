@@ -224,9 +224,8 @@ du journal FXServer, graphe de txAdmin, redémarrages ; procédures dans
 
 **V1 — Une seule commande rejoue la CI.** Mêmes commandes, mêmes options ; un
 outil absent fait échouer la commande au lieu d'être ignoré (C10).
-Aujourd'hui : `bash scripts/verifier.sh` puis
-`python -m unittest discover -s tests -v`, et la PR dit quelles étapes ont été
-ignorées. *Doit. CI.*
+Aujourd'hui : `bash scripts/verifier-docker.sh`, la même commande en local et
+en CI, dans l'image de vérification. *Doit. CI.*
 
 **V2 — Le test d'abord.** Écrit, vu en échec pour la bonne raison, puis
 l'implémentation. *Doit. Revue.*

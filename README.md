@@ -231,7 +231,8 @@ start.bat / stop.bat / status.bat / console.bat
 .github/workflows/      intégration continue (qualité, image Docker, test de démarrage)
 .github/dependabot.yml  mises à jour des actions et des images Docker
 .github/                modèle de pull request, CODEOWNERS, règles de branche
-scripts/verifier.sh     contrôles statiques (Lua, JSON, JS, shell, compose)
+scripts/verifier-docker.sh  vérification complète dans l'image (comme la CI)
+scripts/verifier.sh     étapes de contrôle exécutées dans l'image
 scripts/fusionner-pr.sh  fusionne une PR verte en squash et suit la CI de main
 scripts/sauvegarder.sh  sauvegarde de la production (base, txdata, maps)
 scripts/restaurer.sh    vérifie et extrait une sauvegarde hors production
@@ -356,14 +357,25 @@ sur les tags `v*`, qui publient l'image :
 | **Qualité** | `.github/workflows/qualite.yml` | tests du dépôt + contrôles statiques |
 | **Image Docker** | `.github/workflows/docker.yml` | construit ou publie l'image, puis vérifie le démarrage réel |
 
-**Qualité** installe Lua 5.4, Node et shellcheck, puis lance :
+**Qualité** construit l'image de vérification
+[`docker/verifier/Dockerfile`](docker/verifier/Dockerfile) (Ubuntu 24.04,
+outils épinglés par version et SHA256), puis lance la même commande qu'en
+local, `bash scripts/verifier-docker.sh`. Dans l'image, `scripts/verifier.sh`
+vérifie :
 
-1. `bash scripts/verifier.sh` : syntaxe Lua (`luac -p`), JSON valide, JavaScript
-   (`node --check`), scripts shell (`sh -n`/`bash -n` + `shellcheck -S error`) et
-   validation des **deux** combinaisons Compose (`socle + dev` et `socle + prod`) ;
-2. `python3 -m unittest discover -s tests -v` : les tests de `tests/` (manifestes,
-   configuration du serveur, maps, documentation, environnements Compose, chaîne CI,
-   absence de secrets suivis).
+1. la syntaxe Lua (`luac -p`), le JSON valide, le JavaScript (`node --check`),
+   les scripts shell (`sh -n`/`bash -n` + `shellcheck -S error`), les workflows
+   (`actionlint`), les Dockerfiles (`hadolint`), les secrets (`gitleaks`) et le
+   style Python (`ruff`) ;
+2. les **deux** combinaisons Compose (`socle + dev` et `socle + prod`) ;
+3. les tests de `tests/` (`python -m unittest discover -s tests -v`) :
+   manifestes, configuration du serveur, maps, documentation, environnements
+   Compose, chaîne CI, absence de secrets suivis, avec
+   `GF_OUTILS_OBLIGATOIRES=1` pour qu'un outil manquant fasse échouer au lieu
+   de sauter un test.
+
+Un outil manquant fait échouer `scripts/verifier.sh` (« outil absent : … ») :
+lancé hors de l'image sur un poste incomplet, le script échoue, c'est voulu.
 
 **Image Docker** construit l'image et lance le job **`Vérifier le démarrage des
 ressources`** :
@@ -408,10 +420,10 @@ Le dépôt n'accepte plus de modifications directes sur `main` : tout passe par 
 **branche** et une **pull request** avec une CI verte.
 
 1. Crée ta branche depuis `main` : `git switch -c feat/ma-fonctionnalite`.
-2. Fais tes modifications, puis lance les contrôles en local :
+2. Fais tes modifications, puis lance les contrôles en local (Docker Desktop
+   démarré) :
    ```
-   bash scripts/verifier.sh
-   python -m unittest discover -s tests -v
+   bash scripts/verifier-docker.sh
    ```
 3. Commit avec un message conventionnel (`feat: …`, `fix: …`, `docs: …`).
 4. Envoie la branche et ouvre la pull request : `gh pr create --fill`.

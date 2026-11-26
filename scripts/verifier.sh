@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  Vérifications statiques du dépôt FiveMGunFight.
+#  Vérifications du dépôt FiveMGunFight.
 #
 #  Usage : bash scripts/verifier.sh
 #
-#  Ces contrôles sont identiques en local et en CI (workflow « Qualité ») :
-#  une erreur ici = une pull request bloquée. Tous les contrôles sont exécutés
-#  même si l'un échoue, puis le script sort en code 1.
+#  Une seule commande, la même en local et en CI (workflow « Qualité ») :
+#  scripts/verifier-docker.sh construit l'image docker/verifier et exécute ce
+#  script dedans, où tous les outils sont installés. Lancé directement hors de
+#  l'image, un outil absent est une erreur : plus aucun contrôle n'est ignoré.
 #
-#  Un contrôle est ignoré (avec un message) quand l'outil correspondant
-#  n'existe pas sur la machine ; la CI, elle, installe tout et ne saute rien.
+#  Tous les contrôles sont exécutés même si l'un échoue, puis le script sort en
+#  code 1. La dernière étape lance les tests unittest du dépôt.
+#
+#  Variables de test :
+#    GF_SANS_TESTS=1        saute l'étape unittest (évite une récursion quand
+#                           un test lance ce script) ;
+#    GF_OUTILS_MASQUES=a,b  simule l'absence des outils a et b.
 # =============================================================================
 set -uo pipefail
 
@@ -19,21 +25,30 @@ echecs=0
 titre() { printf '\n== %s\n' "$1"; }
 ok() { printf '   ok      %s\n' "$1"; }
 echec() { printf '   ECHEC   %s\n' "$1"; echecs=$((echecs + 1)); }
-ignore() { printf '   ignore  %s\n' "$1"; }
+absent() { echec "outil absent : $1 (lance bash scripts/verifier-docker.sh)"; }
 details() { sed 's/^/           /'; }
+
+# Recherche d'un outil sur le PATH. GF_OUTILS_MASQUES permet aux tests de
+# simuler un outil absent sans le désinstaller (liste séparée par des virgules).
+trouver() {
+  case ",${GF_OUTILS_MASQUES:-}," in
+    *",$1,"*) return 1 ;;
+  esac
+  command -v "$1" >/dev/null 2>&1
+}
 
 # --- 1. Syntaxe Lua ---------------------------------------------------------
 titre "Syntaxe Lua (luac -p)"
 luac=""
 for candidat in luac5.4 luac5.3 luac; do
-  if command -v "$candidat" >/dev/null 2>&1; then
+  if trouver "$candidat"; then
     luac="$candidat"
     break
   fi
 done
 
 if [ -z "$luac" ]; then
-  ignore "luac absent (installe Lua 5.4 ; la CI le fournit)"
+  absent "luac"
 else
   avant=$echecs
   total_lua=0
@@ -53,17 +68,17 @@ fi
 titre "JSON valide"
 python=""
 for candidat in python3 python; do
-  if command -v "$candidat" >/dev/null 2>&1; then
+  if trouver "$candidat"; then
     python="$candidat"
     break
   fi
 done
 # Le raccourci "python" du Microsoft Store n'est pas un interpréteur : il ouvre
-# la boutique et échoue. On le détecte pour ne pas signaler un faux échec.
+# la boutique et échoue. Il doit désormais être traité comme une absence.
 if [ -z "$python" ]; then
-  ignore "python absent (installe Python 3 ; la CI le fournit)"
+  absent "python"
 elif ! "$python" -c 'import sys' >/dev/null 2>&1; then
-  ignore "python inutilisable (raccourci Microsoft Store ?) ; la CI le fournit"
+  absent "python inutilisable (raccourci Microsoft Store ?)"
   python=""
 fi
 
@@ -84,8 +99,8 @@ fi
 
 # --- 3. Syntaxe JavaScript (interfaces NUI) ---------------------------------
 titre "Syntaxe JavaScript (node --check)"
-if ! command -v node >/dev/null 2>&1; then
-  ignore "node absent (la CI le fournit)"
+if ! trouver node; then
+  absent "node"
 else
   avant=$echecs
   total_js=0
@@ -103,6 +118,13 @@ fi
 
 # --- 4. Scripts shell -------------------------------------------------------
 titre "Scripts shell (sh -n / bash -n, shellcheck)"
+shellcheck_disponible=0
+if trouver shellcheck; then
+  shellcheck_disponible=1
+else
+  absent "shellcheck"
+fi
+
 analyser_shell() {
   if head -n 1 "$1" | grep -q 'bash'; then
     bash -n "$1"
@@ -119,7 +141,7 @@ while IFS= read -r -d '' fichier; do
     echec "$fichier (syntaxe)"
     printf '%s\n' "$sortie" | details
   fi
-  if command -v shellcheck >/dev/null 2>&1; then
+  if [ "$shellcheck_disponible" -eq 1 ]; then
     # -S error : seuls les vrais problèmes (analyse impossible) bloquent ;
     # les remarques de style restent visibles sans casser la CI.
     if ! sortie="$(shellcheck -S error -x "$fichier" 2>&1)"; then
@@ -129,18 +151,17 @@ while IFS= read -r -d '' fichier; do
   fi
 done < <(find . \( -name '*.sh' -o -path './.githooks/*' \) -type f -not -path './.git/*' -not -path './server-data/cache/*' -print0)
 if [ "$echecs" -eq "$avant" ]; then
-  if command -v shellcheck >/dev/null 2>&1; then
+  if [ "$shellcheck_disponible" -eq 1 ]; then
     ok "$total_sh script(s) shell"
   else
     ok "$total_sh script(s) shell (shellcheck non exécuté)"
-    ignore "shellcheck absent (la CI le fournit)"
   fi
 fi
 
 # --- 5. Lua (luacheck) ------------------------------------------------------
 titre "Lua (luacheck)"
-if ! command -v luacheck >/dev/null 2>&1; then
-  ignore "luacheck absent (installe-le avec LuaRocks ; la CI le fournit)"
+if ! trouver luacheck; then
+  absent "luacheck"
 else
   if sortie="$(luacheck server-data/resources 2>&1)"; then
     resume="$(printf '%s\n' "$sortie" | grep '^Total:' | tail -n 1)"
@@ -156,14 +177,14 @@ fi
 titre "Tests unitaires Lua (tests/lua)"
 lua=""
 for candidat in lua5.4 lua; do
-  if command -v "$candidat" >/dev/null 2>&1; then
+  if trouver "$candidat"; then
     lua="$candidat"
     break
   fi
 done
 
 if [ -z "$lua" ]; then
-  ignore "lua absent (installe Lua 5.4 ; la CI le fournit)"
+  absent "lua"
 else
   for fichier in tests/lua/*.lua; do
     if sortie="$("$lua" "$fichier" 2>&1)"; then
@@ -177,8 +198,8 @@ fi
 
 # --- 6. Workflows GitHub Actions (actionlint) -------------------------------
 titre "Workflows GitHub Actions (actionlint)"
-if ! command -v actionlint >/dev/null 2>&1; then
-  ignore "actionlint absent (télécharge une release épinglée ; la CI le fournit)"
+if ! trouver actionlint; then
+  absent "actionlint"
 else
   if sortie="$(actionlint 2>&1)"; then
     ok "workflows valides"
@@ -188,14 +209,14 @@ else
   fi
 fi
 
-# --- 7. Dockerfile (hadolint) -----------------------------------------------
-titre "Dockerfile (hadolint)"
-if ! command -v hadolint >/dev/null 2>&1; then
-  ignore "hadolint absent (télécharge une release épinglée ; la CI le fournit)"
+# --- 7. Dockerfiles (hadolint) ----------------------------------------------
+titre "Dockerfiles (hadolint)"
+if ! trouver hadolint; then
+  absent "hadolint"
 else
   # hadolint découvre .hadolint.yaml dans le répertoire courant.
-  if sortie="$(hadolint Dockerfile 2>&1)"; then
-    ok "Dockerfile valide"
+  if sortie="$(hadolint --config .hadolint.yaml Dockerfile docker/verifier/Dockerfile 2>&1)"; then
+    ok "Dockerfiles valides"
   else
     echec "hadolint"
     printf '%s\n' "$sortie" | details
@@ -204,8 +225,8 @@ fi
 
 # --- 8. Secrets dans l'arbre (gitleaks) -------------------------------------
 titre "Secrets dans l'arbre (gitleaks)"
-if ! command -v gitleaks >/dev/null 2>&1; then
-  ignore "gitleaks absent (télécharge une release épinglée ; la CI le fournit)"
+if ! trouver gitleaks; then
+  absent "gitleaks"
 else
   if sortie="$(gitleaks dir --no-banner --redact --config .gitleaks.toml . 2>&1)"; then
     ok "aucun secret détecté"
@@ -217,10 +238,13 @@ fi
 
 # --- 9. Style Python des tests (ruff) ---------------------------------------
 titre "Style Python des tests (ruff)"
-if ! command -v ruff >/dev/null 2>&1; then
-  ignore "ruff absent (télécharge une release épinglée ; la CI le fournit)"
+if ! trouver ruff; then
+  absent "ruff"
 else
-  if sortie="$(ruff check tests/ 2>&1)"; then
+  # Sous Docker Desktop, un dossier Windows monté montre tous les fichiers en
+  # 0777 : EXE002 (fichier exécutable sans shebang) est alors un faux positif.
+  # Sur le runner Linux, les modes viennent de git (0644) : on ignore EXE002.
+  if sortie="$(ruff check --extend-ignore EXE002 tests/ 2>&1)"; then
     ok "tests/ conformes"
   else
     echec "ruff"
@@ -230,10 +254,10 @@ fi
 
 # --- 10. docker compose -----------------------------------------------------
 titre "docker compose config"
-if ! command -v docker >/dev/null 2>&1; then
-  ignore "docker absent"
+if ! trouver docker; then
+  absent "docker"
 elif ! docker compose version >/dev/null 2>&1; then
-  ignore "docker compose v2 indisponible (démon Docker arrêté ?)"
+  absent "docker compose v2"
 else
   # docker-compose.yml référence « env_file: .env », absent d'un clone neuf :
   # on valide alors avec le modèle, puis on retire le fichier temporaire.
@@ -281,10 +305,28 @@ else
   fi
 fi
 
+# --- 11. Tests du dépôt -----------------------------------------------------
+# GF_OUTILS_OBLIGATOIRES=1 : un outil manquant fait échouer la suite au lieu de
+# la sauter. GF_SANS_TESTS=1 évite la récursion quand un test lance ce script.
+titre "Tests du dépôt (unittest)"
+if [ "${GF_SANS_TESTS:-}" = "1" ]; then
+  printf '   saute   tests (GF_SANS_TESTS=1)\n'
+elif [ -z "$python" ]; then
+  absent "python (tests unittest)"
+else
+  if sortie="$(GF_OUTILS_OBLIGATOIRES=1 "$python" -m unittest discover -s tests -v 2>&1)"; then
+    resume="$(printf '%s\n' "$sortie" | sed '/^[[:space:]]*$/d' | tail -n 1)"
+    ok "${resume:-tests unittest}"
+  else
+    echec "unittest"
+    printf '%s\n' "$sortie" | details
+  fi
+fi
+
 # --- Bilan ------------------------------------------------------------------
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-  echo "Toutes les vérifications statiques sont passées."
+  echo "Toutes les vérifications sont passées."
   exit 0
 fi
 echo "$echecs vérification(s) en échec : corrige-les avant d'ouvrir la pull request." >&2

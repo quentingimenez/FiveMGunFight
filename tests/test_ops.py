@@ -15,13 +15,14 @@ import gzip
 import io
 import os
 import re
-import shutil
 import subprocess
 import tarfile
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+from outils import bash, exiger, manquant
 
 RACINE = Path(__file__).resolve().parents[1]
 DOSSIER_SCRIPTS = RACINE / "scripts"
@@ -66,16 +67,11 @@ def lire(chemin: Path) -> str:
     return chemin.read_text(encoding="utf-8")
 
 
-def bash() -> str | None:
-    """Chemin de bash, ou None si absent (Windows sans WSL, par exemple)."""
-    return shutil.which("bash")
-
-
 def lancer(*arguments: str, variables: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     """Exécute une commande bash depuis la racine, avec des chemins relatifs."""
     executable = bash()
     if executable is None:
-        raise unittest.SkipTest("bash est requis pour exécuter les scripts")
+        manquant("bash")
     environnement = os.environ.copy()
     if variables:
         environnement.update(variables)
@@ -110,9 +106,11 @@ def chemin_relatif(chemin: Path) -> str:
     return os.path.relpath(chemin, RACINE).replace(os.sep, "/")
 
 
-@unittest.skipUnless(bash(), "bash est requis pour exécuter les scripts")
 class ScriptsExploitation(unittest.TestCase):
     """Les scripts d'exploitation sont exécutables, sûrs et documentés."""
+
+    def setUp(self) -> None:
+        exiger(self, "bash", bash())
 
     def test_scripts_presents_et_non_vides(self) -> None:
         for nom in SCRIPTS:
@@ -555,9 +553,11 @@ exit 0
 """
 
 
-@unittest.skipUnless(bash(), "bash est requis pour exécuter les scripts")
 class FusionPR(unittest.TestCase):
     """`fusionner-pr.sh` : checks verts, squash, puis CI de main suivie au bout."""
+
+    def setUp(self) -> None:
+        exiger(self, "bash", bash())
 
     def lancer_fusion(self, *arguments: str, **faux: str) -> tuple[subprocess.CompletedProcess[str], list[str]]:
         with tempfile.TemporaryDirectory(dir=RACINE) as dossier:

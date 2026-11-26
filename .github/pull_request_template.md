@@ -15,7 +15,7 @@
 
 <!--
   Commandes lancées, scénario en jeu, ce que tu as vérifié.
-  Exemple : `bash scripts/verifier.sh`, puis /redzone avec 3 joueurs.
+  Exemple : `bash scripts/verifier-docker.sh`, puis /redzone avec 3 joueurs.
 -->
 
 ## Captures
@@ -24,7 +24,7 @@
 
 ## Checklist
 
-- [ ] Les contrôles passent en local (`bash scripts/verifier.sh`, `python -m unittest discover -s tests -v`)
+- [ ] Les contrôles passent en local (`bash scripts/verifier-docker.sh`)
 - [ ] Testé en jeu si le comportement change (`/attack`, `/redzone`, `/editor`…)
 - [ ] Aucun secret ajouté (`.env`, clé de licence, mots de passe, identifiants admin)
 - [ ] Documentation mise à jour si le comportement, la configuration ou les fichiers changent

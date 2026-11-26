@@ -104,12 +104,12 @@ modifié et pourquoi.
 ### 4.2 Contrôles locaux avant le commit
 
 ```bash
-python -m unittest discover -s tests -v
-bash scripts/verifier.sh
+bash scripts/verifier-docker.sh
 ```
 
-- `luac` et `shellcheck` ne sont pas installés sur le poste de référence : leur
-  étape s'affiche « ignoré » ; c'est la CI (Ubuntu) qui tranche.
+- Docker Desktop doit être démarré. La commande construit l'image de
+  vérification et y lance `scripts/verifier.sh` ; un outil absent fait échouer
+  le script lancé hors de l'image (« outil absent : … »).
 - Si le sujet touche `Dockerfile`, `docker-compose*.yml`, `docker/entrypoint.sh`
   ou `server-data/server.cfg` : construire et démarrer réellement l'image
   (`docker compose -f docker-compose.yml -f docker-compose.dev.yml build`, puis
@@ -146,7 +146,8 @@ le composant concerné et observer le résultat :
 - script / outillage : l'exécuter sur un cas nominal **et** sur le cas d'erreur
   qu'il doit traiter ;
 - documentation seule : le déclarer explicitement (« sans exécution :
-  documentation »), vérifier les liens et lancer `bash scripts/verifier.sh`.
+  documentation »), vérifier les liens et lancer
+  `bash scripts/verifier-docker.sh`.
 
 Consigner la commande lancée et le résultat observable (sortie, capture, log) :
 c'est la preuve qui accompagne l'avant/après.
@@ -220,7 +221,7 @@ gh pr view --json number,state,mergeable,statusCheckRollup
   ```bash
   git fetch origin
   git rebase origin/main          # résoudre chaque conflit, puis git rebase --continue
-  python -m unittest discover -s tests -v && bash scripts/verifier.sh
+  bash scripts/verifier-docker.sh
   git push --force-with-lease
   ```
 
@@ -368,8 +369,9 @@ répondre par des commits sur la même branche, puis fusionner une fois les
   la branche n'a pas à être à jour avec `main`), suppression et force-push
   interdits ; branche distante supprimée après fusion.
 - Outils locaux : Python 3.14, Node.js 24, Docker 28, `bash` (WSL),
-  `gh` 2.103. `luac` et `shellcheck` absents — les contrôles correspondants
-  sont ignorés en local et exécutés par la CI.
+  `gh` 2.103. Les outils de contrôle, dont `luac` et `shellcheck`, sont
+  fournis par l'image de vérification (`docker/verifier/Dockerfile`) : pas
+  besoin de les installer sur le poste.
 
 ## 9. Ajout d'un modèle (véhicule, arme, tenue…) dans les menus
 
@@ -404,8 +406,8 @@ contraire de l'utilisateur.
    - liens publicitaires / entrées orphelines retirés : le noter dans la PR.
 3. **Ajout réel** : même commande sans `--essai`, sur une branche
    `feat/vehicule-<modele>` (§ 4.1).
-4. **Contrôles** (§ 4.2) : `python -m unittest discover -s tests -v` (la classe
-   `VehiculesDeclares` doit passer) et `bash scripts/verifier.sh`.
+4. **Contrôles** (§ 4.2) : `bash scripts/verifier-docker.sh` (la classe
+   `VehiculesDeclares` doit passer).
 5. **Exécution locale** (§ 4.3) : recréer le serveur de développement avec
    `TXADMIN=false` et `MAX_PLAYERS=48` fixés dans le shell
    (`docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate fxserver`),

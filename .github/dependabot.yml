@@ -66,3 +66,18 @@ updates:
       - dependency-name: "mariadb"
         versions:
           - ">= 11.5"
+
+  # Image de vérification (docker/verifier/Dockerfile) : elle épingle son image
+  # de base Ubuntu et ses 7 binaires. Même planning que les autres images.
+  - package-ecosystem: "docker"
+    directory: "/docker/verifier"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    groups:
+      verifier:
+        patterns:
+          - "*"
