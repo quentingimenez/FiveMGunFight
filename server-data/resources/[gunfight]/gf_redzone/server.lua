@@ -98,6 +98,10 @@ end
 -- Appelé par gf_core pour chaque tir : on ne peut toucher / être touché que dans la zone
 exports('AllowDamage', function(sender, victim)
     if S.phase ~= 'live' then return false end
+    -- Le véhicule ne sert qu'à rejoindre la zone : aucun dégât venant d'un
+    -- joueur au volant (écrasement, percussion, tir depuis le véhicule).
+    local ped = GetPlayerPed(sender)
+    if ped ~= 0 and GetVehiclePedIsIn(ped, false) ~= 0 then return false end
     return insideZone(sender, 3.0) and insideZone(victim, 3.0)
 end)
 
