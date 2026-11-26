@@ -172,7 +172,7 @@
     if (result && typeof result.then === 'function') {
       result.then(function (response) {
         if (response && response.ok === false) {
-          window.Lobby.toast(response.error || "Impossible d'afficher l'aperçu.", 'error');
+          window.Lobby.toast(window.NUI.errorText(response.error, "Impossible d'afficher l'aperçu."), 'error');
         }
       });
     }
@@ -315,7 +315,7 @@
     result.then(function (response) {
       if (createHandled) return;
       if (response && response.ok === false) {
-        finishCreate(false, response.error || 'Création refusée.');
+        finishCreate(false, window.NUI.errorText(response.error, 'Création refusée.'));
       }
       // Succès du callback = accusé de réception : le serveur envoie ensuite
       // createResult et un état avec me.character. On attend ces événements
@@ -581,7 +581,7 @@
         finishCreate(true);
         return;
       }
-      finishCreate(false, result.error || 'Création refusée.');
+      finishCreate(false, window.NUI.errorText(result.error, 'Création refusée.'));
     });
     if (window.Lobby.state) applyState(window.Lobby.state);
   }

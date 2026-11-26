@@ -646,8 +646,18 @@ end)
 
 -- ---------------------------------------------------------------- NUI → Lua
 -- Chaque callback répond via sa fonction cb, y compris en erreur.
+-- FiveM passes the NUI result callback as a function reference: a table with a
+-- __call metamethod, not a Lua function (funcref_mt in citizen's scheduler.lua).
+-- Calling only real functions left every fetch unanswered until the reference
+-- was garbage collected, which made the page see `callback_unreachable`.
+local function isCallable(value)
+    if type(value) == 'function' then return true end
+    local meta = getmetatable(value)
+    return type(meta) == 'table' and rawget(meta, '__call') ~= nil
+end
+
 local function respond(cb, payload)
-    if type(cb) == 'function' then cb(payload) end
+    if isCallable(cb) then cb(payload) end
 end
 
 local function fail(cb, message)
