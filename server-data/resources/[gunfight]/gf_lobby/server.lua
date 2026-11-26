@@ -17,6 +17,15 @@ local nextPartyId = 1
 -- Les inscriptions survivent au lancement d'un match et sont visibles de tous.
 local Queue = LobbyQueue.new()
 
+-- Votes de carte : [src] = id du choix voté. Les votes des joueurs qui quittent
+-- la file ou l'escouade sont purgés pour ne jamais départager un match obsolète.
+local Votes = {}
+
+-- Cache des choix de carte exposés par gf_attack. Même une liste vide est
+-- mémorisée : sans cela on rappellerait l'export à chaque state pendant 3 s.
+local choicesCache = {}
+local choicesCacheAt = -math.huge
+
 -- True pendant le lancement d'un match issu de la file : le thread ne reprend
 -- pas de nouvelle sélection tant que le SetTimeout n'est pas terminé.
 local launchPending = false
@@ -176,6 +185,7 @@ local function ensurePlayer(src)
         lastState = 0,
         lastCreate = 0,
         lastAppearance = 0,
+        lastVote = 0,
     }
     Players[src] = player
     return player
@@ -367,12 +377,93 @@ local function isEligible(src)
     return player ~= nil and player.inLobby == true and type(player.character) == 'table'
 end
 
+-- Choix de carte proposés par gf_attack, dans l'ordre de la rotation. Le cache
+-- couvre 3 s et mémorise aussi une liste vide ; toute erreur d'export donne [].
+local function mapChoices()
+    local now = GetGameTimer()
+    if now - choicesCacheAt < 3000 then
+        return choicesCache
+    end
+    choicesCacheAt = now
+    choicesCache = {}
+
+    if GetResourceState('gf_attack') ~= 'started' then
+        return choicesCache
+    end
+
+    local ok, choices = pcall(function()
+        return exports.gf_attack:GetMapChoices()
+    end)
+    if not ok or type(choices) ~= 'table' then
+        return choicesCache
+    end
+
+    for _, choice in ipairs(choices) do
+        if type(choice) == 'table'
+            and type(choice.id) == 'string'
+            and choice.id ~= ''
+            and #choice.id <= 64
+            and type(choice.name) == 'string' then
+            choicesCache[#choicesCache + 1] = { id = choice.id, name = choice.name }
+        end
+    end
+    return choicesCache
+end
+
+-- Joueurs dont le vote compte : éligibles et appartenant à une escouade inscrite
+-- dans la file. Tri par src pour que le résultat soit déterministe.
+local function votersList()
+    local voters = {}
+    for _, rawId in ipairs(GetPlayers()) do
+        local src = tonumber(rawId)
+        if src and isEligible(src) then
+            local party = findParty(src)
+            if party and LobbyQueue.has(Queue, party.id) then
+                voters[#voters + 1] = src
+            end
+        end
+    end
+    table.sort(voters)
+    return voters
+end
+
 -- État de la file envoyé au client : visible par tout le lobby, inscrit ou non.
 queueState = function(src)
     local mode = findMode('attack')
     if not isModeAvailable(mode) then return nil end
     local player = Players[src]
     local party = player and findParty(src)
+    -- Un seul appel pour éviter qu'un rafraîchissement du cache au milieu du
+    -- calcul ne donne des votes et des cartes incohérents.
+    local choices = mapChoices()
+    local voters = votersList()
+    local _, counts = LobbyQueue.tally(Votes, voters, choices, math.random)
+    local maps = {}
+    for _, choice in ipairs(choices) do
+        maps[#maps + 1] = {
+            id = choice.id,
+            name = choice.name,
+            votes = counts[choice.id] or 0,
+        }
+    end
+
+    local myVote = Votes[src]
+    if myVote ~= nil then
+        local valid = false
+        for _, voter in ipairs(voters) do
+            if voter == src then valid = true break end
+        end
+        if not valid then
+            myVote = nil
+        else
+            valid = false
+            for _, choice in ipairs(choices) do
+                if choice.id == myVote then valid = true break end
+            end
+            if not valid then myVote = nil end
+        end
+    end
+
     return {
         mode = 'attack',
         size = LobbyQueue.count(Queue, Parties, isEligible),
@@ -380,6 +471,8 @@ queueState = function(src)
         max = queueMax(),
         joined = party ~= nil and LobbyQueue.has(Queue, party.id) == true,
         parties = #LobbyQueue.ready(Queue, Parties, isEligible),
+        maps = maps,
+        myVote = myVote,
     }
 end
 
@@ -416,6 +509,8 @@ end
 
 local function removeFromParty(src)
     local player = Players[src]
+    -- Changement d'escouade (ou déconnexion) : le vote n'est plus légitime.
+    Votes[src] = nil
     if not player then return end
 
     local party = findParty(src)
@@ -444,6 +539,9 @@ local function removeFromParty(src)
         local partyId = party.id
         Parties[partyId] = nil
         LobbyQueue.leave(Queue, partyId)
+        for _, member in ipairs(party.members) do
+            Votes[member] = nil
+        end
         broadcastQueueState()
         return
     end
@@ -667,6 +765,9 @@ local function cancelQueue(src)
         return false
     end
     LobbyQueue.leave(Queue, party.id)
+    for _, member in ipairs(party.members) do
+        Votes[member] = nil
+    end
     notify(src, 'Escouade retirée de la file.', 'info')
     broadcastQueueState()
     return true
@@ -713,6 +814,44 @@ local function launchQueuedSquads(picked, mode)
                         end
                     end
                     escouades[#escouades + 1] = membres
+                end
+            end
+
+            -- Vote de carte : tous les membres éligibles des escouades lancées
+            -- participent, y compris ceux qui n'ont pas voté eux-mêmes.
+            local voters = {}
+            for _, membres in ipairs(escouades) do
+                for _, member in ipairs(membres) do
+                    voters[#voters + 1] = member
+                end
+            end
+            local choices = mapChoices()
+            local winner, counts = LobbyQueue.tally(Votes, voters, choices, function(n)
+                return math.random(n)
+            end)
+            if winner then
+                local name = '?'
+                for _, choice in ipairs(choices) do
+                    if choice.id == winner then name = choice.name break end
+                end
+                local okMap, applied = pcall(function()
+                    return exports.gf_attack:SetNextMap(winner)
+                end)
+                if not okMap or applied == false then
+                    log(('avertissement : carte %s (%d vote(s)) refusée par gf_attack, rotation actuelle conservée'):format(name, counts[winner] or 0))
+                else
+                    log(('carte choisie : %s (%d vote(s))'):format(name, counts[winner] or 0))
+                end
+                for _, member in ipairs(voters) do
+                    notify(member, ('Carte choisie : %s (%d vote(s)).'):format(name, counts[winner] or 0), 'info')
+                end
+            end
+
+            -- Les votes sont consommés par ce lancement, y compris pour les
+            -- membres qui n'étaient pas votants.
+            for _, squad in ipairs(affected) do
+                for _, member in ipairs(squad.members) do
+                    Votes[member] = nil
                 end
             end
 
@@ -796,6 +935,9 @@ local function launchParty(src, modeId)
 
     -- Autres modes (Redzone) : on retire d'abord l'escouade de la file.
     if LobbyQueue.leave(Queue, party.id) then
+        for _, member in ipairs(party.members) do
+            Votes[member] = nil
+        end
         broadcastQueueState()
     end
 
@@ -1236,6 +1378,43 @@ RegisterNetEvent('gf_lobby:play', function(payload)
     launchParty(src, modeId)
 end)
 
+-- Vote pour la carte du prochain match d'Attaque de zone. `id = false` (ou le
+-- même id que le vote courant) annule le vote. Les votes des joueurs hors file
+-- ne sont pas acceptés.
+RegisterNetEvent('gf_lobby:voteMap', function(payload)
+    local src = source
+    local player = Players[src]
+    local party = findParty(src)
+    if not player or not player.inLobby or not party or not LobbyQueue.has(Queue, party.id) then
+        notify(src, 'Inscris ton escouade dans la file pour voter.', 'error')
+        return
+    end
+
+    local now = GetGameTimer()
+    if now - player.lastVote < 500 then return end
+    player.lastVote = now
+
+    payload = type(payload) == 'table' and payload or {}
+    local id = payload.id
+    if id == false or (type(id) == 'string' and id == Votes[src]) then
+        Votes[src] = nil
+    else
+        local known = type(id) == 'string' and id ~= '' and #id <= 64
+        if known then
+            known = false
+            for _, choice in ipairs(mapChoices()) do
+                if choice.id == id then known = true break end
+            end
+        end
+        if not known then
+            notify(src, 'Carte inconnue.', 'error')
+            return
+        end
+        Votes[src] = id
+    end
+    broadcastQueueState()
+end)
+
 -- ---------------------------------------------------------------------------
 --  Cycle de vie
 -- ---------------------------------------------------------------------------
@@ -1263,6 +1442,7 @@ AddEventHandler('playerDropped', function(_reason)
     if not player then return end
 
     player.inLobby = false
+    Votes[src] = nil
     removeFromParty(src)
     broadcastQueueState()
     Invites[src] = nil

@@ -81,7 +81,9 @@ Config.Teams = {
 -- Les zones se créent EN JEU avec /editor (admin) : contour point par point,
 -- départ des attaquants et des défenseurs. Les zones ci-dessous ne servent que
 -- de SECOURS tant qu'aucune zone d'attaque n'a été créée avec l'éditeur.
--- Les zones sont jouées à tour de rôle (une nouvelle zone à chaque match).
+-- Les joueurs inscrits dans la file du lobby votent pour la carte du prochain
+-- match ; sans vote, les cartes sont jouées à tour de rôle. Les zones de secours
+-- n'ont pas d'id et sont votées sous secours_N (N = rang dans la liste).
 --   center     : centre de la zone (la hauteur z est corrigée automatiquement)
 --   radius      : rayon en mètres
 --   attackFrom  : direction d'où arrivent les attaquants, en degrés

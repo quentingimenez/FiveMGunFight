@@ -126,3 +126,76 @@ function Q.pick(readyList, min, max)
     if total < min then return nil end
     return chosen
 end
+
+-- Dépouille les votes de la carte. `votes` associe chaque `src` à l'identifiant
+-- voté, `voters` liste les `src` dont le vote compte, et `choices` liste les
+-- candidats { id, name }. Seuls les votes d'un `voters` portant sur un id
+-- présent dans `choices` sont comptés. Renvoie `winnerId` (nil si aucun vote
+-- valide) et `counts` ([id] = nombre). En cas d'égalité au maximum, les
+-- candidats ex aequo sont pris dans l'ORDRE de `choices` (ordre stable) et le
+-- gagnant est `candidates[aleatoire(#candidates)]` : `choices` fixe donc
+-- l'ordre de référence du tirage. Sans `aleatoire`, le premier candidat gagne ;
+-- un résultat hors bornes est ramené dans 1..#candidates. La fonction est pure :
+-- ni `votes`, ni `voters`, ni `choices` ne sont modifiés, et elle n'appelle
+-- aucune native FiveM ni horloge. Un argument nil ou mal formé donne un gagnant
+-- nil et des comptes vides plutôt qu'une erreur.
+function Q.tally(votes, voters, choices, aleatoire)
+    local counts = {}
+
+    if type(votes) ~= 'table' or type(voters) ~= 'table' or type(choices) ~= 'table' then
+        return nil, counts
+    end
+
+    -- Liste des identifiants admissibles, dans l'ordre de `choices`, et les
+    -- doublons d'id éventuels ne comptent qu'une seule fois comme candidat.
+    local allowed = {}
+    local candidates = {}
+    for _, choice in ipairs(choices) do
+        if type(choice) == 'table' then
+            local id = choice.id
+            if id ~= nil and not allowed[id] then
+                allowed[id] = true
+                candidates[#candidates + 1] = id
+            end
+        end
+    end
+
+    -- Un vote ne compte que si son src figure parmi les voters et si son id
+    -- est un candidat connu. On ne touche qu'à `counts`, jamais aux entrées.
+    for _, src in ipairs(voters) do
+        local id = votes[src]
+        if id ~= nil and allowed[id] then
+            counts[id] = (counts[id] or 0) + 1
+        end
+    end
+
+    -- Aucun vote valide : pas de gagnant.
+    local best = 0
+    for _, id in ipairs(candidates) do
+        if (counts[id] or 0) > best then best = counts[id] end
+    end
+    if best == 0 then return nil, counts end
+
+    -- Ex aequo au maximum : on tire parmi les candidats dans l'ordre de
+    -- `choices`, en bornant le tirage à 1..#tied.
+    local tied = {}
+    for _, id in ipairs(candidates) do
+        if (counts[id] or 0) == best then tied[#tied + 1] = id end
+    end
+
+    local index = 1
+    if type(aleatoire) == 'function' then
+        local drawn = aleatoire(#tied)
+        if type(drawn) == 'number' and drawn == math.floor(drawn) then
+            if drawn < 1 then
+                index = 1
+            elseif drawn > #tied then
+                index = #tied
+            else
+                index = drawn
+            end
+        end
+    end
+
+    return tied[index], counts
+end

@@ -193,6 +193,16 @@ Le personnage existe : le lobby s'affiche directement, sans écran de création.
      manche démarre.
    - `/attack` ramène le joueur au lobby : l'inscription à la file se fait
      depuis la NUI.
+   - **Vote de la carte** : tout joueur éligible dont l'escouade est inscrite
+     dans la file peut voter pour la carte du prochain match. Cliquer sa carte
+     enregistre le vote ; re-cliquer la même carte ou envoyer `id=false` retire
+     le vote (toggle). Le décompte tient **un vote par joueur** et ne considère
+     que les votes des joueurs présents dans la file : un vote d'un joueur
+     sorti de la file n'est pas compté. En cas d'égalité, la carte gagnante est
+     tirée au hasard ; s'il n'y a aucun vote, la rotation actuelle s'applique.
+     Au lancement, `gf_lobby` transmet la carte retenue à `gf_attack` par
+     l'export `SetNextMap`, puis remet tous les votes à zéro pour le match
+     suivant.
 3. **Redzone** : comportement inchangé (`minPlayers = 1`), lancement pour
    l'escouade via `play` ; l'escouade est d'abord retirée de la file Attaque.
 4. Dans les deux cas, `party.launching = true` est posé côté serveur et diffusé.
@@ -237,6 +247,7 @@ server-data/resources/[gunfight]/gf_lobby/
     ├── js/nui.js              # transport fetch vers les callbacks Lua
     ├── js/app.js              # état global, shell, profil, toasts, routage
     ├── js/modes.js            # barre de modes + bouton Jouer
+    ├── js/votes.js            # vote de la carte de la file (toggle, décompte NUI)
     ├── js/squad.js            # panneau escouade + invitations
     ├── js/creator.js          # éditeur de personnage (visage, tenue, tatouages)
     ├── js/customization.js    # onglets Armes (placeholder) et Personnage (éditeur)
@@ -278,6 +289,7 @@ Transport : `fetch('https://gf_lobby/<callback>', {method:'POST', body: JSON})`.
 | `selectMode` | `{mode}` | choisir le mode (chef) |
 | `selectMode` | `{mode, cancel=true}` | retirer l'escouade de la file Attaque (chef) |
 | `play` | `{mode}` | inscrire l'escouade à la file Attaque (chef) / lancer Redzone |
+| `voteMap` | `{id}` | voter pour la carte `id` ; `id=false` ou un clic sur la carte déjà votée retire le vote |
 
 Tous les callbacks répondent `{ok:true}` (ou `{ok:false, error}`) pour clore le
 `fetch`. Le serveur ne fait jamais confiance aux données du client.
@@ -328,6 +340,11 @@ Enveloppe unique : `{type = "...", data = {...}}`.
     min = 20, max = 30,
     joined = true,       -- l'escouade du joueur est-elle dans la file ?
     parties = 3,         -- nombre d'escouades prêtes
+    maps = {             -- cartes votables, avec leur décompte
+      { id = "a", name = "Alpha", votes = 2 },
+      { id = "b", name = "Bravo", votes = 1 },
+    },
+    myVote = "a",        -- id voté par le joueur, ou nil
   },
   modes = {
     { id = "attack", label = "Attaque de zone", short = "ATTAQUE",
@@ -431,6 +448,7 @@ serveur.
 | `gf_lobby:kickMember` | id cible | chef, cible du groupe |
 | `gf_lobby:selectMode` | mode, `cancel?` | chef ; si `cancel`, retire l'escouade du chef de la file |
 | `gf_lobby:play` | mode | chef, mode disponible ; Attaque : inscrit l'escouade (lobby + personnage pour tous les membres) ; Redzone : tous les membres dans le lobby |
+| `gf_lobby:voteMap` | id de carte (`false` pour retirer) | joueur en lobby dont l'escouade est inscrite dans la file ; id de carte connu ; anti-spam 500 ms |
 | `gf_lobby:requestState` | — | réinscription si le joueur est en lobby |
 
 ### 5.4 Serveur → client
@@ -466,6 +484,7 @@ Players[src] = { character, partyId, inLobby, lastInvite, lastMode }
 Parties[id]  = { id, leader, members = {src...}, selectedMode, launching }
 Invites[src] = { partyId, from, expiresAt }
 Queue        = LobbyQueue.new()   -- module queue.lua, file par escouade
+Votes[src]   = id                 -- vote d'un joueur pour la carte du prochain match
 ```
 
 Règles :
@@ -487,7 +506,10 @@ Règles :
   un match. Le seuil est vérifié par un thread serveur toutes les 500 ms, avec
   un drapeau `launchPending` pour un seul lancement à la fois et
   `exports.gf_attack:CanJoin()` comme garde. `pick` retient des escouades entières
-  dans l'ordre FIFO, sans jamais en couper une.
+  dans l'ordre FIFO, sans jamais en couper une. Le vote de la carte est
+  enregistré serveur dans `Votes[src] = id` ; les choix de cartes sont mis en
+  cache 3 s côté serveur pour limiter les allers-retours avec `gf_maps`, et le
+  décompte ne retient que les votes des joueurs encore inscrits dans la file.
 
 ### 6.2 Routing buckets
 
@@ -817,6 +839,9 @@ Statique (CI) :
   `client.lua`, `queue.lua`, `server.lua` ;
 - `tests/lua/lobby_queue_test.lua` : module pur `queue.lua` testé hors jeu
   (new/join/leave/has/ready/count/pick, ordre FIFO, escouades jamais coupées) ;
+  `LobbyQueue.tally` est testé pour le décompte des votes (un vote par joueur,
+  votes comptés seulement pour les joueurs de la file, égalité départagée au
+  hasard, aucun vote → rotation actuelle) ;
 - `node --check` sur les scripts JS de la NUI ;
 - tests `tests/test_depot.py` : `gf_lobby` dans la liste des ressources, chaque
   fichier du manifeste existe, ressource citée dans `server.cfg` et `README`,
@@ -842,9 +867,14 @@ Manuel en jeu :
    l'escouade est recomptée et peut relancer), et seuil atteint avec deux
    escouades : aucune escouade n'est coupée au lancement, l'attente se poursuit
    avec la suivante ;
-8. caméra/formation à 1, 2, 3 et 4 joueurs ;
-9. `/lobbyui`, redémarrage de `gf_lobby`, passage Attaque → lobby ;
-10. deux escouades : aucun joueur visible d'un groupe à l'autre dans le lobby ;
+8. vote de la carte : un joueur inscrit vote pour une carte (compteur +1),
+   re-clique la même carte pour retirer son vote, envoie `id=false` pour
+   retirer, vérifie qu'un joueur hors file ne peut pas voter, teste l'égalité
+   (tirage au hasard), l'absence de vote (rotation actuelle), la transmission
+   à `gf_attack` au lancement et la remise à zéro des votes après le match ;
+9. caméra/formation à 1, 2, 3 et 4 joueurs ;
+10. `/lobbyui`, redémarrage de `gf_lobby`, passage Attaque → lobby ;
+11. deux escouades : aucun joueur visible d'un groupe à l'autre dans le lobby ;
     les deux escouades peuvent être inscrites dans la file et sont lancées
     entières, dans l'ordre FIFO, sans jamais être coupées.
 

@@ -33,6 +33,7 @@ files {
   'html/js/nui.js',
   'html/js/app.js',
   'html/js/modes.js',
+  'html/js/votes.js',
   'html/js/squad.js',
   'html/js/creator.js',
   'html/js/customization.js',

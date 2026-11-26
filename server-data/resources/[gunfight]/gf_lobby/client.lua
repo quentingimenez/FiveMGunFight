@@ -1047,6 +1047,11 @@ local CALLBACKS = {
                 and d.id > 0 and d.id == math.floor(d.id)
         end)
     end,
+    voteMap = function(cb, data)
+        relay(cb, data, 'gf_lobby:voteMap', function(d)
+            return type(d) == 'table' and (d.id == false or (type(d.id) == 'string' and #d.id >= 1 and #d.id <= 64))
+        end)
+    end,
     selectMode = function(cb, data)
         local mode = type(data) == 'table' and tostring(data.mode) or 'nil'
         print(('[gf_lobby] NUI selectMode entrée (mode=%s)'):format(mode))

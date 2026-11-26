@@ -127,5 +127,50 @@ check('a callback without a usable cb is ignored without an error', function()
     end
 end)
 
+check('voteMap answers ok for a valid map id', function()
+    local answers = invoke(callbacks, 'voteMap', { id = 'secours_1' })
+    equal(1, #answers, 'answers')
+    equal(true, answers[1].ok, 'ok')
+    equal(nil, answers[1].error, 'error')
+end)
+
+check('voteMap answers ok for the false removal id', function()
+    local answers = invoke(callbacks, 'voteMap', { id = false })
+    equal(1, #answers, 'answers')
+    equal(true, answers[1].ok, 'ok')
+end)
+
+check('voteMap answers invalid_payload for invalid ids', function()
+    local invalidBodies = {
+        { id = 42 },
+        { id = '' },
+        { id = string.rep('a', 65) },
+        {},  -- id = nil
+    }
+    for _, body in ipairs(invalidBodies) do
+        local answers = invoke(callbacks, 'voteMap', body)
+        equal(1, #answers, 'answers')
+        equal(false, answers[1].ok, 'ok')
+        equal('invalid_payload', answers[1].error, 'error')
+    end
+    -- Non-table payloads must be rejected, never indexed.
+    for _, body in ipairs({ 'x', false }) do
+        local answers = invoke(callbacks, 'voteMap', body)
+        equal(1, #answers, 'answers')
+        equal(false, answers[1].ok, 'ok')
+        equal('invalid_payload', answers[1].error, 'error')
+    end
+    local answers = invoke(callbacks, 'voteMap', nil)
+    equal(1, #answers, 'answers')
+    equal(false, answers[1].ok, 'ok')
+    equal('invalid_payload', answers[1].error, 'error')
+end)
+
+check('voteMap accepts a 64-character id', function()
+    local answers = invoke(callbacks, 'voteMap', { id = string.rep('a', 64) })
+    equal(1, #answers, 'answers')
+    equal(true, answers[1].ok, 'ok')
+end)
+
 print(('%d passed, %d failed'):format(passed, failed))
 if failed > 0 then os.exit(1) end

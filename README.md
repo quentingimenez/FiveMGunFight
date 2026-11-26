@@ -158,6 +158,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
 
 > **Recherche** : un chef d’escouade la lance depuis le lobby (Attaque de zone puis JOUER) ; tous les joueurs du lobby qui ont un personnage y sont inscrits. Le match démarre à 20 joueurs et en prend 30 au plus (`Config.Matchmaking` de `gf_lobby`, voir [docs/lobby.md](docs/lobby.md)). Si un match est déjà en cours, la file attend sa fin. Les participants reviennent au lobby à la fin du match.
+>
+> Les joueurs inscrits dans la file votent pour la carte du prochain match : la plus votée est jouée, une égalité se départage au hasard et, sans vote, la rotation actuelle s’applique.
 
 Le combat commence avec 3 minutes au chrono. Il se met en pause tant qu’au moins un attaquant vivant se trouve dans la zone et reprend lorsque le dernier en sort. À zéro, la défense gagne la manche.
 
