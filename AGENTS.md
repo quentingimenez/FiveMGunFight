@@ -209,7 +209,8 @@ gh pr checks --watch
 gh pr view --json number,state,mergeable,statusCheckRollup
 ```
 
-- Attendre la fin de **tous** les checks : `Qualité du dépôt` (1–2 min),
+- Attendre la fin de **tous** les checks : `Qualité du dépôt` (3–4 min :
+  construction de l'image de vérification comprise),
   `Construire et publier l'image` (3–8 min) et `Vérifier le démarrage des
   ressources` (10–20 min, sauté avec une note si le secret CI est absent).
 - **Rouge** : corriger sur la même branche, commit additionnel, `git push`, puis

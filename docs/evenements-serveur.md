@@ -136,9 +136,10 @@ réutilisé hériterait du compteur du joueur précédent.
 4. Vérifier les droits avec `core:IsAdmin(src)` s'il modifie la configuration
    ou les maps.
 5. Ajouter la ligne dans le tableau ci-dessus.
-6. Lancer `python -m unittest discover -s tests -v` : le contrat échouera tant
-   que l'événement n'est pas déclaré côté serveur, documenté et, le cas
-   échéant, protégé.
+6. Lancer `bash scripts/verifier-docker.sh` : le contrat échouera tant que
+   l'événement n'est pas déclaré côté serveur, documenté et, le cas échéant,
+   protégé (`python -m unittest discover -s tests -v` suffit pour un essai
+   rapide).
 
 ## Événements serveur internes (non déclenchables par un client)
 

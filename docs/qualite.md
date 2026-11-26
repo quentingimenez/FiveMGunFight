@@ -11,7 +11,7 @@ se contente pas de « lancer des tests » : les checks requis sont déclarés co
 
 | Workflow | Job affiché | Déclencheur | Durée typique |
 |---|---|---|---|
-| `.github/workflows/qualite.yml` | `Qualité du dépôt` | chaque pull request, chaque envoi sur `main` | 1 à 2 min |
+| `.github/workflows/qualite.yml` | `Qualité du dépôt` | chaque pull request, chaque envoi sur `main` | 3 à 4 min (image de vérification construite à chaque run) |
 | `.github/workflows/qualite.yml` | `Sécurité de l'historique` | chaque pull request, chaque envoi sur `main` | moins d'1 min |
 | `.github/workflows/docker.yml` | `Construire et publier l'image` | chaque pull request, `main`, tags `v*`, et chaque lundi à 03:17 UTC | 3 à 8 min |
 | `.github/workflows/docker.yml` | `Vérifier le démarrage des ressources` | chaque pull request, `main`, tags `v*`, et chaque lundi à 03:17 UTC | 10 à 25 min |
