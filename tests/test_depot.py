@@ -143,6 +143,33 @@ class ManifestesFiveM(unittest.TestCase):
                         f"fichier déclaré introuvable : {chemin}",
                     )
 
+    def test_images_des_ressources_sont_declarees(self) -> None:
+        # Le client ne reçoit que les fichiers listés : une image absente de
+        # `files` est introuvable pour la NUI comme pour
+        # CreateRuntimeTextureFromImage, qui échoue alors sans message clair.
+        extensions = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+        for manifeste in manifestes():
+            declares = chemins_declares(manifeste)
+            for image in sorted(manifeste.parent.rglob("*")):
+                if image.suffix.lower() not in extensions or "cache" in image.parts:
+                    continue
+                chemin = image.relative_to(manifeste.parent).as_posix()
+                with self.subTest(manifeste=str(manifeste.relative_to(RACINE)), image=chemin):
+                    self.assertIn(chemin, declares, f"image non déclarée dans files : {chemin}")
+
+    def test_textures_runtime_recoivent_un_handle_de_txd(self) -> None:
+        # CreateRuntimeTextureFrom* attend le handle renvoyé par
+        # CreateRuntimeTxd. Un nom de dictionnaire en dur provoque
+        # « invalid handle » en jeu (erreur déjà rencontrée sur gf_lobby).
+        appel_avec_nom = re.compile(r"CreateRuntimeTextureFrom\w*\s*,?\s*\(?\s*['\"]")
+        for script in sorted(RESSOURCES.glob("*/gf_*/**/*.lua")):
+            for numero, ligne in enumerate(lire(script).splitlines(), start=1):
+                with self.subTest(script=str(script.relative_to(RACINE)), ligne=numero):
+                    self.assertIsNone(
+                        appel_avec_nom.search(ligne),
+                        f"txd passé par son nom au lieu du handle de CreateRuntimeTxd : {ligne.strip()}",
+                    )
+
     def test_ressources_gunfight_listees_dans_les_manifestes(self) -> None:
         noms = {m.parent.name for m in manifestes()}
         for ressource in RESSOURCES_GUNFIGHT:

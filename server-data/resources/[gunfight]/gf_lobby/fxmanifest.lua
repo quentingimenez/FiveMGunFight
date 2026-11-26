@@ -12,6 +12,7 @@ shared_script 'appearance_schema.lua'
 
 client_scripts {
   'appearance.lua',
+  'backdrop.lua',
   'client.lua',
 }
 
@@ -33,6 +34,8 @@ files {
   'html/js/creator.js',
   'html/js/customization.js',
   'html/data/tattoos.json',
+  -- Image du fond de scène, chargée par CreateRuntimeTextureFromImage (client.lua).
+  'img/backdrop.jpg',
 }
 
 dependencies {

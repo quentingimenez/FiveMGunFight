@@ -455,7 +455,12 @@ et les invitations sont le seul moyen de la rejoindre.
      (même seed et même apparence enregistrée = même rendu sur tous les clients) ;
   5. met à jour la caméra.
 - Le client réapplique le placement après `gf_core:spawned` (le spawn de
-  `gf_core` peut se terminer après l'arrivée de l'état).
+  `gf_core` peut se terminer après l'arrivée de l'état). `gf_core` termine son
+  spawn en dégelant le ped puis émet `gf_core:spawned` par `TriggerEvent`, dans
+  la même frame : le client replace et regèle le ped dès la réception, puis
+  réapplique l'état complet 200 ms plus tard. Sans ce regel immédiat, le ped
+  tombait pendant ces 200 ms, la scène n'ayant pas de sol (0,2 m mesuré, avec
+  l'animation de chute).
 
 ## 7. Création et édition de personnage
 
@@ -546,37 +551,82 @@ collection streamée plus tard :
 
 ## 8. Caméra et scène
 
-Scène : `Config.Stage` :
+Une seule scène, `Config.Stage`, pour le lobby et pour l'écran de création. Elle
+est dans le vide, à 1000 m d'altitude : rien de la map n'est entre la caméra et
+l'image de fond. Chaque escouade a son routing bucket : ses membres ne voient
+pas les autres joueurs placés sur la même scène.
 
 ```lua
 Config.Stage = {
-  x = -1037.7, y = -2737.9, z = 20.2, heading = 330.0,
+  x = 0.0, y = 0.0, z = 1000.0, heading = 0.0,
   spacing = 1.45,
   camera = {
-    baseDistance = 3.2, distancePerMember = 0.95,
-    height = 1.52, lookHeight = 1.12, fov = 42.0,
-    creatorDistance = 2.9, creatorOffset = -0.75, creatorFov = 34.0,
+    baseDistance = 4.4, distancePerMember = 0.95, height = 1.52, fov = 42.0,
+    creatorDistance = 4.2, creatorOffset = 0.0, creatorFov = 40.0,
+    creatorHeight = 1.45, creatorLookOffset = 0.0,
   },
 }
 ```
 
 - Repère : `forward` et `right` dérivés du heading ; les personnages font face
-  à la caméra.
+  à la caméra. `origin = (x, y, z)`.
+- Aucun sol ne porte le ped : seul `FreezeEntityPosition` le maintient. Le lobby
+  ne le dégèle donc jamais, ni en sortie (`leaveLobbyUi`), ni à la suspension de
+  l'interface (`suspendUi`), ni à l'arrêt de la ressource. Chaque mode place le
+  joueur par `gf_core:Spawn`, qui fixe lui-même le gel à la fin du spawn.
+- Hauteurs : `SetEntityCoordsNoOffset` pose la racine du ped (au bassin) à `z`.
+  Les hauteurs de caméra se comptent depuis les pieds : `origin.z = z - 1.03`.
+  1,03 m a été mesuré en jeu (`GetEntityHeightAboveGround`, ped
+  `mp_m_freemode_01` debout sur le tarmac de l'aéroport). Le bas de
+  `GetModelDimensions` (-1,30 m) descend 0,27 m sous les semelles : s'en servir
+  remonte le ped dans le cadre.
 - `slot i` sur `n` : décalage latéral
   `(i - (n + 1) / 2) * spacing`.
 - Caméra groupe :
   `origin + forward * (baseDistance + (n - 1) * distancePerMember) + (0, 0, height)`,
-  regard vers `origin + (0, 0, lookHeight)`.
-- Caméra création : distance `creatorDistance`, décalage latéral
-  `creatorOffset`, FOV `creatorFov` (le personnage apparaît à droite, le
-  formulaire à gauche).
+  regard vers `origin + (0, 0, hauteur de regard)`.
+- Caméra création :
+  `origin + forward * creatorDistance + right * creatorOffset + (0, 0, creatorHeight)`,
+  regard vers `origin - right * creatorLookOffset + (0, 0, hauteur de regard)`,
+  FOV `creatorFov`.
+- Hauteur de regard : elle n'est pas réglable. `GFLobbyBackdrop.lookHeight`
+  la calcule pour que les pieds tombent à l'écran sur la ligne de sol de l'image
+  de fond (rangée 1116 sur 1440, `BACKDROP_FLOOR_V`), quel que soit le nombre de
+  membres. Avec la marge de 10 % du fond, cette ligne est à 80,25 % de la hauteur
+  de l'écran (`GFLobbyBackdrop.floorScreenY`). Décaler seulement la caméra ne déplace pas le ped à
+  l'écran : il reste au centre tant que le regard le vise.
+
+### Fond de scène
+
+Une image CSS ne convient pas : la NUI est dessinée par-dessus le rendu du jeu
+et cacherait le personnage. Le fond est donc dessiné dans le monde 3D, derrière
+le ped :
+
+- `img/backdrop.jpg` (2560 × 1440, déclarée dans `files`) est chargée une fois
+  en texture runtime : `CreateRuntimeTxd('gf_lobby_backdrop')`, puis
+  `CreateRuntimeTextureFromImage(txd, 'image', 'img/backdrop.jpg')`. Le premier
+  argument est le handle renvoyé par `CreateRuntimeTxd` ; lui passer le nom du
+  dictionnaire provoque l'erreur `invalid handle`. Un test du dépôt
+  (`test_textures_runtime_recoivent_un_handle_de_txd`) refuse une chaîne à cette
+  place.
+- Chaque frame tant que la scène est présentée, `DRAW_TEXTURED_POLY` dessine
+  deux triangles formant un plan perpendiculaire à l'axe de la caméra, 1 m
+  derrière l'origine (`BACKDROP_DEPTH`, mesuré le long de l'axe), qui couvre le
+  champ de la caméra agrandi de 10 % (`BACKDROP_MARGIN`). Vu de la caméra,
+  l'image se comporte comme un fond d'écran fixe, le ped devant. La géométrie
+  est dans `backdrop.lua`, module pur testé par `tests/lua/lobby_backdrop.lua`.
+- La native ne dessine que la face vers laquelle pointe `(b - a) × (c - a)` :
+  l'ordre (haut-gauche, bas-droite, haut-droite) puis (haut-gauche, bas-gauche,
+  bas-droite) tourne les deux triangles vers la caméra.
+- Le fond s'arrête quand la scène est quittée (`leaveLobbyUi`, `suspendUi`).
 - Interpolation : chaque frame, position/regard/FOV glissent vers la cible
   (`SetCamCoord`, `PointCamAtCoord`, `SetCamFov`), pour éviter les coupures lors
   d'une arrivée dans l'escouade.
 - Entrée : `RenderScriptCams(true)`, `SetNuiFocus(true, true)`, `DisplayHud(false)`,
   `DisplayRadar(false)`, gel et invincibilité du ped.
 - Sortie : rendu caméra désactivé, caméra détruite, focus NUI relâché, HUD et
-  radar restaurés. Nettoyage aussi sur `onResourceStop`.
+  radar restaurés ; le ped reste gelé (voir plus haut). Nettoyage aussi sur
+  `onResourceStop`.
 
 ### Chien de garde
 
@@ -750,5 +800,5 @@ Manuel en jeu :
 - Les drawables proposés dépendent des DLC montés sur le serveur : la NUI reçoit
   les comptes réels et ne propose pas d'index absent.
 - Escouade non prise en compte par les règles d'équipe de `gf_attack` / `gf_redzone`.
-- La scène est un point fixe de l'aéroport. Extension : plusieurs scènes,
-  choisi par le chef, ou Studio (intérieur).
+- La scène est un point fixe dans le vide. Extension : plusieurs images de
+  fond, choisies par le chef.

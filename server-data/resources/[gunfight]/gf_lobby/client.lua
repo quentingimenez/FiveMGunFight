@@ -22,16 +22,16 @@ if type(Config.Character) ~= 'table' then
     Config.Character = { nameMin = 3, nameMax = 20, skins = 5 }
 end
 if type(Config.Stage) ~= 'table' then Config.Stage = {} end
-Config.Stage.x = Config.Stage.x or -1037.7
-Config.Stage.y = Config.Stage.y or -2737.9
-Config.Stage.z = Config.Stage.z or 20.2
-Config.Stage.heading = Config.Stage.heading or 330.0
+Config.Stage.x = Config.Stage.x or 0.0
+Config.Stage.y = Config.Stage.y or 0.0
+Config.Stage.z = Config.Stage.z or 1000.0
+Config.Stage.heading = Config.Stage.heading or 0.0
 Config.Stage.spacing = Config.Stage.spacing or 1.45
 if type(Config.Stage.camera) ~= 'table' then Config.Stage.camera = {} end
 local cameraDefaults = {
-    baseDistance = 3.2, distancePerMember = 0.95, height = 1.52,
-    lookHeight = 1.12, fov = 42.0, creatorDistance = 2.9,
-    creatorOffset = -0.75, creatorFov = 34.0,
+    baseDistance = 4.4, distancePerMember = 0.95, height = 1.52, fov = 42.0,
+    creatorDistance = 4.2, creatorOffset = 0.0, creatorFov = 40.0,
+    creatorHeight = 1.45, creatorLookOffset = 0.0,
 }
 for key, value in pairs(cameraDefaults) do
     Config.Stage.camera[key] = Config.Stage.camera[key] or value
@@ -63,6 +63,27 @@ local creatorMode = 'create'    -- 'create' ou 'edit'
 local catalogCache = {}         -- [gender] = variations réellement installées
 local lastCatalogGender = nil   -- évite de renvoyer le catalogue à chaque aperçu
 local previewAngleOffset = 0    -- rotation demandée par la NUI (face/profil/dos)
+
+-- Fond de scène : une image fixe derrière le ped. La NUI est dessinée devant le
+-- jeu, une image CSS cacherait donc le personnage : l'image est une texture
+-- runtime dessinée chaque frame sur un plan 3D face à la caméra, juste derrière
+-- la scène (géométrie dans backdrop.lua).
+local BACKDROP_TXD = 'gf_lobby_backdrop'
+local BACKDROP_TEXTURE = 'image'
+local BACKDROP_IMAGE = 'img/backdrop.jpg' -- déclarée dans `files` (fxmanifest)
+local BACKDROP_DEPTH = 1.0                -- mètres derrière la scène, le long de l'axe caméra
+local BACKDROP_MARGIN = 1.1               -- le plan déborde de 10 % du champ de la caméra
+-- Ligne de sol de l'image : rangée 1116 sur 1440 (ligne claire mesurée dans
+-- img/backdrop.jpg). Les caméras posent les pieds dessus.
+local BACKDROP_FLOOR_V = 1116 / 1440
+-- DRAW_TEXTURED_POLY, appelée par son hash : c'est la forme vérifiée en jeu.
+local DRAW_TEXTURED_POLY = 0x29280002282F1928
+-- Hauteur de la racine du ped au-dessus de ses semelles, debout : 1,031 m
+-- mesuré en jeu (GetEntityHeightAboveGround, mp_m_freemode_01, scène du lobby).
+local PED_ROOT_ABOVE_FEET = 1.03
+local backdropReady = nil   -- nil : texture pas encore créée ; sinon succès de la création
+local backdropActive = false
+local backdropGeneration = 0
 
 -- ---------------------------------------------------------------- Utilitaires
 local function now()
@@ -248,9 +269,9 @@ end
 local function stageBasis()
     local s = Config.Stage
     local rad = math.rad(s.heading or 0.0)
-    local origin = vector3(s.x + 0.0, s.y + 0.0, s.z + 0.0)
     local forward = vector3(-math.sin(rad), math.cos(rad), 0.0)
     local right = vector3(math.cos(rad), math.sin(rad), 0.0)
+    local origin = vector3(s.x + 0.0, s.y + 0.0, s.z + 0.0)
     return origin, forward, right
 end
 
@@ -259,6 +280,9 @@ local function slotOffset(slot, count)
     local i = clamp(slot, 1, count, 1)
     return (i - (count + 1) / 2) * (Config.Stage.spacing or 1.45)
 end
+
+-- Dernière place donnée au ped, rejouée sans attendre après un spawn de gf_core.
+local placedSlot, placedCount = nil, nil
 
 local function placeSelfOnSlot(slot, count)
     -- Un état gf_lobby:state retardé peut arriver pendant le spawn d'un autre
@@ -274,21 +298,9 @@ local function placeSelfOnSlot(slot, count)
     local y = origin.y + right.y * offset
     local z = origin.z
 
-    -- Sans collision chargée le ped tombe à travers le sol ou reste à l'ancienne
-    -- position : demander la collision avant tout déplacement.
-    RequestCollisionAtCoord(x, y, z)
+    -- La scène est dans le vide : aucun sol ne porte le ped, seul le gel le
+    -- maintient à Config.Stage.z (altitude de sa racine).
     SetEntityCoordsNoOffset(ped, x, y, z, false, false, false)
-    PlaceObjectOnGroundProperly(ped)
-    -- Re-lecture du sol : PlaceObjectOnGroundProperly échoue si la collision
-    -- n'est pas encore chargée.
-    local groundZ = nil
-    for _, h in ipairs({ z + 2.0, z + 30.0, z + 100.0, 400.0 }) do
-        local found, gz = GetGroundZFor_3dCoord(x, y, h, false)
-        if found then groundZ = gz + 0.05 break end
-    end
-    if groundZ then
-        SetEntityCoordsNoOffset(ped, x, y, groundZ, false, false, false)
-    end
     ClearPedTasksImmediately(ped)
     SetEntityHeading(ped, (Config.Stage.heading or 0.0) + 0.0)
     -- gf_core peut laisser le ped invisible (spectateur) : le lobby doit toujours
@@ -297,6 +309,7 @@ local function placeSelfOnSlot(slot, count)
     SetEntityCollision(ped, true, true)
     FreezeEntityPosition(ped, true)
     SetEntityInvincible(ped, true)
+    placedSlot, placedCount = slot, count
 end
 
 -- Applique l'apparence encapsulée des autres membres à leur ped local quand il
@@ -394,16 +407,72 @@ local function setCameraTargets(pos, look, fov)
     end
 end
 
--- Le ped est posé sur le sol réel (placeSelfOnSlot), pas sur Config.Stage.z :
--- ancrer la caméra sur la même hauteur pour ne pas cadrer ~1 m au-dessus.
+-- Origine de la scène à l'altitude des pieds du ped. SetEntityCoordsNoOffset
+-- place la racine du ped (au bassin) à Config.Stage.z : la caméra et le fond
+-- se calent sur les pieds, sinon le cadre monte d'autant et coupe le bas du
+-- corps. Le bas de GetModelDimensions ne convient pas : il descend 0,27 m sous
+-- les semelles.
 local function groundOrigin()
     local origin, forward, right = stageBasis()
-    local z = (Config.Stage.z or 20.2) - 0.98
-    local ped = PlayerPedId()
-    if ped and ped ~= 0 and DoesEntityExist(ped) then
-        z = GetEntityCoords(ped).z
+    return vector3(origin.x, origin.y, origin.z - PED_ROOT_ABOVE_FEET), forward, right
+end
+
+-- Hauteur de regard qui pose les pieds sur la ligne de sol de l'image de fond,
+-- pour une caméra `height` au-dessus des pieds et `distance` devant eux.
+local function floorLookHeight(height, distance, fov)
+    local screenY = GFLobbyBackdrop.floorScreenY(BACKDROP_FLOOR_V, BACKDROP_MARGIN)
+    return GFLobbyBackdrop.lookHeight(height, distance, fov, screenY) or 0.0
+end
+
+-- ---------------------------------------------------------------- Fond de scène
+-- Crée la texture une seule fois. Le premier argument de
+-- CreateRuntimeTextureFromImage est le handle renvoyé par CreateRuntimeTxd :
+-- lui passer le nom du dictionnaire provoque « invalid handle ».
+local function ensureBackdropTexture()
+    if backdropReady ~= nil then return backdropReady end
+    local ok, texture = pcall(function()
+        local txd = CreateRuntimeTxd(BACKDROP_TXD)
+        return CreateRuntimeTextureFromImage(txd, BACKDROP_TEXTURE, BACKDROP_IMAGE)
+    end)
+    backdropReady = ok and texture ~= nil and texture ~= 0
+    if not backdropReady then
+        print(('[gf_lobby] fond : texture %s indisponible (%s)'):format(BACKDROP_IMAGE, tostring(texture)))
     end
-    return vector3(origin.x, origin.y, z), forward, right
+    return backdropReady
+end
+
+local function drawBackdrop()
+    if not camPos or not camLook then return end
+    local quad = GFLobbyBackdrop.quad(camPos, camLook, camFov, GetAspectRatio(false),
+        groundOrigin(), BACKDROP_DEPTH, BACKDROP_MARGIN)
+    if not quad then return end
+    for _, t in ipairs(GFLobbyBackdrop.triangles(quad)) do
+        local a, b, c = t[1], t[2], t[3]
+        Citizen.InvokeNative(DRAW_TEXTURED_POLY,
+            a.p.x, a.p.y, a.p.z, b.p.x, b.p.y, b.p.z, c.p.x, c.p.y, c.p.z,
+            255, 255, 255, 255, BACKDROP_TXD, BACKDROP_TEXTURE,
+            a.u, a.v, 1.0, b.u, b.v, 1.0, c.u, c.v, 1.0)
+    end
+end
+
+-- Dessine le fond chaque frame tant que la scène est présentée. Le numéro de
+-- génération empêche deux boucles de coexister après un arrêt suivi d'une
+-- reprise dans la même frame.
+local function startBackdrop()
+    if backdropActive or not ensureBackdropTexture() then return end
+    backdropActive = true
+    backdropGeneration = backdropGeneration + 1
+    local generation = backdropGeneration
+    CreateThread(function()
+        while backdropActive and generation == backdropGeneration do
+            drawBackdrop()
+            Wait(0)
+        end
+    end)
+end
+
+local function stopBackdrop()
+    backdropActive = false
 end
 
 local function groupCameraTargets(count)
@@ -411,20 +480,27 @@ local function groupCameraTargets(count)
     local c = s.camera or {}
     local origin, forward = groundOrigin()
     local n = math.max(1, count or 1)
-    local distance = (c.baseDistance or 3.2) + (n - 1) * (c.distancePerMember or 0.95)
-    local pos = origin + forward * distance + vector3(0.0, 0.0, c.height or 1.52)
-    local look = origin + vector3(0.0, 0.0, c.lookHeight or 1.12)
-    return pos, look, c.fov or 42.0
+    local distance = (c.baseDistance or 4.4) + (n - 1) * (c.distancePerMember or 0.95)
+    local height = c.height or 1.52
+    local fov = c.fov or 42.0
+    local pos = origin + forward * distance + vector3(0.0, 0.0, height)
+    local look = origin + vector3(0.0, 0.0, floorLookHeight(height, distance, fov))
+    return pos, look, fov
 end
 
 local function creatorCameraTargets()
-    local s = Config.Stage
-    local c = s.camera or {}
+    local c = Config.Stage.camera or {}
     local origin, forward, right = groundOrigin()
-    local pos = origin + forward * (c.creatorDistance or 2.9)
-        + right * (c.creatorOffset or -0.75) + vector3(0.0, 0.0, c.height or 1.52)
-    local look = origin + vector3(0.0, 0.0, c.lookHeight or 1.12)
-    return pos, look, c.creatorFov or 34.0
+    local distance = c.creatorDistance or 4.2
+    local height = c.creatorHeight or c.height or 1.45
+    local fov = c.creatorFov or 40.0
+    local pos = origin + forward * distance
+        + right * (c.creatorOffset or 0.0)
+        + vector3(0.0, 0.0, height)
+    -- Vue de face, centrée sur la colonne de scène de la NUI.
+    local look = origin - right * (c.creatorLookOffset or 0.0)
+        + vector3(0.0, 0.0, floorLookHeight(height, distance, fov))
+    return pos, look, fov
 end
 
 local function ensureCamera()
@@ -508,13 +584,14 @@ local function leaveLobbyUi()
     inLobby = false
     nuiReady = false
     uiSuspended = false
+    placedSlot, placedCount = nil, nil
     destroyCamera()
+    stopBackdrop()
     local ped = PlayerPedId()
     SetPlayerControl(PlayerId(), true, 0)
-    if ped and ped ~= 0 then
-        FreezeEntityPosition(ped, false)
-        SetEntityInvincible(ped, false)
-    end
+    -- Le ped reste gelé : la scène est dans le vide et il tomberait. Chaque mode
+    -- place le joueur par gf_core:Spawn, qui fixe lui-même le gel à la fin du spawn.
+    if ped and ped ~= 0 then SetEntityInvincible(ped, false) end
     DisplayHud(true)
     DisplayRadar(true)
     SetNuiFocus(false, false)
@@ -546,6 +623,7 @@ local function presentLobby(currentState)
         end
     end
     placeSelfOnSlot(slot or 1, count)
+    startBackdrop()
     local dbgPed = PlayerPedId()
     if dbgPed and dbgPed ~= 0 then
         local c = GetEntityCoords(dbgPed)
@@ -609,6 +687,7 @@ local function presentCreator(sendCreator)
             SetEntityHeading(ped, (Config.Stage.heading + previewAngleOffset) % 360)
         end
     end
+    startBackdrop()
     if not ensureCamera() then return end
     local pos, look, fov = creatorCameraTargets()
     setCameraTargets(pos, look, fov)
@@ -664,12 +743,12 @@ local function suspendUi(reason)
     uiSuspended = true
     -- Joueur laissé en mode lobby côté serveur : on ne change que la présentation.
     destroyCamera()
+    stopBackdrop()
     local ped = PlayerPedId()
     SetPlayerControl(PlayerId(), true, 0)
-    if ped and ped ~= 0 then
-        FreezeEntityPosition(ped, false)
-        SetEntityInvincible(ped, false)
-    end
+    -- Le ped reste gelé : la scène est dans le vide, le dégeler le ferait tomber.
+    -- Le joueur garde le chat (/lobbyui, /attack, /redzone).
+    if ped and ped ~= 0 then SetEntityInvincible(ped, false) end
     DisplayHud(true)
     DisplayRadar(true)
     SetNuiFocus(false, false)
@@ -1057,6 +1136,11 @@ end)
 
 RegisterNetEvent('gf_core:spawned', function()
     if not inLobby or not state then return end
+    -- gf_core termine son spawn en dégelant le ped, puis émet cet événement
+    -- (TriggerEvent, donc dans la même frame). Le replacer et le regeler tout
+    -- de suite : dans le vide de la scène de création, les 200 ms d'attente
+    -- ci-dessous suffisaient à le faire tomber (0,2 m mesuré, animation de chute).
+    if placedSlot then placeSelfOnSlot(placedSlot, placedCount) end
     -- Le spawn de gf_core peut se terminer après l'état : on réapplique après
     -- un court délai, une seule fois.
     SetTimeout(200, function()
@@ -1070,10 +1154,8 @@ AddEventHandler('onResourceStop', function(resource)
     destroyCamera()
     SetNuiFocus(false, false)
     local ped = PlayerPedId()
-    if ped and ped ~= 0 then
-        FreezeEntityPosition(ped, false)
-        SetEntityInvincible(ped, false)
-    end
+    -- Le ped reste gelé : dans la scène du lobby, il tomberait du vide.
+    if ped and ped ~= 0 then SetEntityInvincible(ped, false) end
     DisplayHud(true)
     DisplayRadar(true)
 end)
