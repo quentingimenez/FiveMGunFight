@@ -19,6 +19,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from datetime import date
 from pathlib import Path
 
 from outils import bash as bash_utilisable
@@ -39,6 +40,7 @@ def charger_script(nom: str):
 native = charger_script("native")
 fivem_rcon = charger_script("fivem_rcon")
 journal_client = charger_script("journal_client")
+suivre_dependabot = charger_script("suivre_dependabot")
 
 # Extrait réel des bases runtime.fivem.net (doc/natives.json, natives_cfx.json).
 BASE_GTA = {
@@ -387,6 +389,263 @@ class JournalClient(unittest.TestCase):
         propre.write_text(self.lignes[3] + "\n" + self.lignes[5] + "\n", encoding="utf-8")
         with redirect_stdout(io.StringIO()):
             self.assertEqual(journal_client.main(["--fichier", str(propre), "--ressource", "gf_lobby"]), 0)
+
+
+def check_run(nom: str, conclusion: str | None = "SUCCESS", statut: str = "COMPLETED") -> dict:
+    """Entrée CheckRun de `statusCheckRollup`, comme la sortie de gh."""
+    return {
+        "__typename": "CheckRun",
+        "name": nom,
+        "status": statut,
+        "conclusion": conclusion,
+    }
+
+
+def status_context(nom: str, etat: str) -> dict:
+    """Entrée StatusContext de `statusCheckRollup` (ancien statut de commit)."""
+    return {"__typename": "StatusContext", "context": nom, "state": etat}
+
+
+# PR réelle #50 : Ubuntu 26.04 de l'image de vérification, « Qualité du dépôt »
+# en échec, les trois autres checks verts.
+PR_50 = {
+    "number": 50,
+    "title": (
+        "build(deps): bump ubuntu from 24.04 to 26.04 in /docker/verifier "
+        "in the verifier group"
+    ),
+    "url": "https://github.com/quentingimenez/FiveMGunFight/pull/50",
+    "headRefName": "dependabot/docker/docker/verifier/ubuntu-24.04",
+    "createdAt": "2026-06-01T06:42:11Z",
+    "mergeable": "MERGEABLE",
+    "statusCheckRollup": [
+        check_run("Qualité du dépôt", conclusion="FAILURE"),
+        check_run("Sécurité de l'historique"),
+        check_run("Construire et publier l'image"),
+        check_run("Vérifier le démarrage des ressources"),
+    ],
+    "labels": [{"name": "dependencies"}, {"name": "docker"}],
+}
+
+
+def pr_dependabot(**changements) -> dict:
+    """PR Dependabot minimale, proche de la sortie `gh pr list --json`."""
+    pr = {
+        "number": 50,
+        "title": "build(deps): bump foo from 1.7.12 to 1.7.13",
+        "url": "https://github.com/quentingimenez/FiveMGunFight/pull/50",
+        "headRefName": "dependabot/docker/foo-1.7.13",
+        "createdAt": "2026-06-01T06:42:11Z",
+        "mergeable": "MERGEABLE",
+        "statusCheckRollup": [check_run("Qualité du dépôt")],
+        "labels": [{"name": "dependencies"}],
+    }
+    pr.update(changements)
+    return pr
+
+
+class SuiviDependabot(unittest.TestCase):
+    """Classement des PR Dependabot, hors-ligne (--depuis-json)."""
+
+    AUJOURDHUI = date(2026, 6, 10)
+
+    def test_type_de_montee_numerique(self) -> None:
+        for titre, attendu in (
+            (
+                (
+                    "build(deps): bump ubuntu from 24.04 to 26.04 in /docker/verifier "
+                    "in the verifier group"
+                ),
+                "majeure",
+            ),
+            ("build(deps): bump foo from 1.7.12 to 1.7.13", "correctif"),
+            ("build(deps): bump foo from 1.7.12 to 1.8.0", "mineure"),
+            ("build(deps): bump node from v4 to v5", "majeure"),
+        ):
+            with self.subTest(titre=titre):
+                self.assertEqual(suivre_dependabot.type_de_montee(titre), attendu)
+
+    def test_type_de_montee_digest_et_inconnue(self) -> None:
+        digest = (
+            "build(deps): bump alpine from "
+            "0123456789abcdef0123456789abcdef01234567 to "
+            "89abcdef0123456789abcdef0123456789abcdef"
+        )
+        self.assertEqual(suivre_dependabot.type_de_montee(digest), "digest")
+        groupe = "build(deps): bump the actions group across 1 directory with 7 updates"
+        self.assertEqual(suivre_dependabot.type_de_montee(groupe), "inconnue")
+
+    def test_type_de_montee_plusieurs_paires(self) -> None:
+        titre = (
+            "build(deps): bump a from 1.7.12 to 1.7.13 and "
+            "b from 2.1.0 to 3.0.0"
+        )
+        self.assertEqual(suivre_dependabot.type_de_montee(titre), "majeure")
+
+    def test_etat_checks_vert(self) -> None:
+        rollup = [
+            check_run("Qualité du dépôt"),
+            check_run("Docker", conclusion="NEUTRAL"),
+            check_run("Smoke", conclusion="SKIPPED"),
+        ]
+        self.assertEqual(suivre_dependabot.etat_checks(rollup), ("vert", []))
+
+    def test_etat_checks_rouge_avec_noms(self) -> None:
+        rollup = [
+            check_run("Qualité du dépôt", conclusion="FAILURE"),
+            check_run("Docker"),
+            check_run("Smoke", conclusion="TIMED_OUT"),
+            status_context("lint", "ERROR"),
+        ]
+        self.assertEqual(
+            suivre_dependabot.etat_checks(rollup),
+            ("rouge", ["Qualité du dépôt", "Smoke", "lint"]),
+        )
+
+    def test_etat_checks_en_cours(self) -> None:
+        rollup = [
+            check_run("Qualité du dépôt"),
+            check_run("Docker", conclusion=None, statut="IN_PROGRESS"),
+            status_context("lint", "PENDING"),
+        ]
+        self.assertEqual(suivre_dependabot.etat_checks(rollup), ("en cours", []))
+
+    def test_etat_checks_aucun(self) -> None:
+        self.assertEqual(suivre_dependabot.etat_checks([]), ("aucun", []))
+
+    def test_etat_checks_status_context(self) -> None:
+        for etat, attendu in (
+            ("SUCCESS", ("vert", [])),
+            ("FAILURE", ("rouge", ["contrat"])),
+            ("ERROR", ("rouge", ["contrat"])),
+            ("PENDING", ("en cours", [])),
+        ):
+            with self.subTest(etat=etat):
+                self.assertEqual(
+                    suivre_dependabot.etat_checks([status_context("contrat", etat)]),
+                    attendu,
+                )
+
+    def test_action_conflit_prioritaire(self) -> None:
+        pr = pr_dependabot(
+            title="build(deps): bump ubuntu from 24.04 to 26.04",
+            mergeable="CONFLICTING",
+            statusCheckRollup=[check_run("Qualité du dépôt", conclusion="FAILURE")],
+        )
+        code, phrase = suivre_dependabot.action(pr, self.AUJOURDHUI)
+        self.assertEqual(code, "rebase")
+        self.assertEqual(
+            phrase,
+            "conflit : commenter « @dependabot rebase » (avec l'accord de l'utilisateur)",
+        )
+
+    def test_action_ci_rouge_avant_montee_majeure(self) -> None:
+        pr = pr_dependabot(
+            title="build(deps): bump ubuntu from 24.04 to 26.04",
+            statusCheckRollup=[
+                check_run("Qualité du dépôt", conclusion="FAILURE"),
+                check_run("Docker", conclusion="FAILURE"),
+            ],
+        )
+        code, phrase = suivre_dependabot.action(pr, self.AUJOURDHUI)
+        self.assertEqual(code, "diagnostiquer")
+        self.assertIn("CI rouge (Qualité du dépôt, Docker)", phrase)
+        self.assertIn("gh run view --log-failed", phrase)
+        self.assertIn("PR séparée sur main", phrase)
+
+    def test_action_attend_checks_en_cours_ou_absents(self) -> None:
+        for rollup in (
+            [check_run("Qualité du dépôt", conclusion=None, statut="QUEUED")],
+            [],
+        ):
+            with self.subTest(rollup=rollup):
+                pr = pr_dependabot(statusCheckRollup=rollup)
+                code, phrase = suivre_dependabot.action(pr, self.AUJOURDHUI)
+                self.assertEqual(code, "attendre")
+                self.assertEqual(phrase, "checks en cours")
+
+    def test_action_decider_montee_majeure_ou_inconnue(self) -> None:
+        for titre, montee in (
+            ("build(deps): bump ubuntu from 24.04 to 26.04", "majeure"),
+            ("build(deps): bump the actions group across 1 directory with 7 updates", "inconnue"),
+        ):
+            with self.subTest(montee=montee):
+                pr = pr_dependabot(title=titre)
+                code, phrase = suivre_dependabot.action(pr, self.AUJOURDHUI)
+                self.assertEqual(code, "decider")
+                self.assertIn(f"montée {montee} : relire le changelog", phrase)
+                self.assertIn("décision explicite de l'utilisateur", phrase)
+
+    def test_action_fusionner_si_vert_et_mineure(self) -> None:
+        pr = pr_dependabot(title="build(deps): bump foo from 1.7.12 to 1.7.13")
+        code, phrase = suivre_dependabot.action(pr, self.AUJOURDHUI)
+        self.assertEqual(code, "fusionner")
+        self.assertIn("vert : tester en local", phrase)
+        self.assertIn("bash scripts/fusionner-pr.sh 50", phrase)
+
+    def test_action_mentionne_l_age_a_14_jours(self) -> None:
+        pr = pr_dependabot(createdAt="2026-06-01T06:42:11Z")
+        code, phrase = suivre_dependabot.action(pr, date(2026, 6, 15))
+        self.assertEqual(code, "fusionner")
+        self.assertIn(" ; ouverte depuis 14 jours", phrase)
+        code, phrase = suivre_dependabot.action(pr, date(2026, 6, 14))
+        self.assertEqual(code, "fusionner")
+        self.assertNotIn("ouverte depuis", phrase)
+
+    def executer(self, *arguments: str) -> tuple[int, str, str]:
+        sortie, erreur = io.StringIO(), io.StringIO()
+        with redirect_stdout(sortie), redirect_stderr(erreur):
+            code = suivre_dependabot.main(list(arguments))
+        return code, sortie.getvalue(), erreur.getvalue()
+
+    def fichier_json(self, contenu) -> Path:
+        dossier = base_temporaire()
+        fichier = dossier / "dependabot.json"
+        fichier.write_text(json.dumps(contenu), encoding="utf-8")
+        return fichier
+
+    def test_cli_pr50_reelle(self) -> None:
+        fichier = self.fichier_json([PR_50])
+        code, sortie, erreur = self.executer(
+            "--depuis-json", str(fichier), "--aujourdhui", "2026-06-10"
+        )
+        self.assertEqual(code, 1, erreur)
+        self.assertIn("1 PR Dependabot ouverte(s)", sortie)
+        self.assertIn("#50 [diagnostiquer]", sortie)
+        self.assertIn("Qualité du dépôt", sortie)
+        self.assertIn("montée : majeure", sortie)
+
+    def test_cli_liste_vide(self) -> None:
+        fichier = self.fichier_json([])
+        code, sortie, erreur = self.executer("--depuis-json", str(fichier))
+        self.assertEqual(code, 0, erreur)
+        self.assertEqual(sortie, "Aucune PR Dependabot ouverte.\n")
+
+    def test_cli_json_invalide(self) -> None:
+        dossier = base_temporaire()
+        fichier = dossier / "dependabot.json"
+        fichier.write_text("{ ceci n'est pas du JSON", encoding="utf-8")
+        code, sortie, erreur = self.executer("--depuis-json", str(fichier))
+        self.assertEqual(code, 2)
+        self.assertIn("JSON", erreur)
+        self.assertEqual(sortie, "")
+
+    def test_cli_json_valide(self) -> None:
+        fichier = self.fichier_json([PR_50])
+        code, sortie, erreur = self.executer(
+            "--depuis-json", str(fichier), "--aujourdhui", "2026-06-10", "--json"
+        )
+        self.assertEqual(code, 1, erreur)
+        donnees = json.loads(sortie)
+        self.assertIsInstance(donnees, list)
+        self.assertEqual(len(donnees), 1)
+        pr = donnees[0]
+        self.assertEqual(pr["numero"], 50)
+        self.assertEqual(pr["action"], "diagnostiquer")
+        self.assertEqual(pr["checks"], "rouge")
+        self.assertEqual(pr["checks_rouges"], ["Qualité du dépôt"])
+        self.assertEqual(pr["montee"], "majeure")
+        self.assertEqual(pr["age_jours"], 9)
 
 
 if __name__ == "__main__":

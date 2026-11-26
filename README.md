@@ -244,6 +244,7 @@ scripts/proteger-branche.sh  ancien nom du script de protection (conservé)
 scripts/native.py       signature d'un natif FiveM/GTA, hors ligne (docs/pieges-fivem.md)
 scripts/fivem_rcon.py   commande console en dev, ex. restart gf_lobby (TXADMIN=false)
 scripts/journal_client.py  erreurs du journal client FiveM, natifs nommés
+scripts/suivre_dependabot.py  PR Dependabot ouvertes et action à mener
 scripts/capturer-jeu.ps1  capture de la fenêtre du jeu (une à la fois)
 tests/                  tests automatiques du dépôt (unittest)
 docs/                   architecture, lobby, qualité, exploitation, décisions

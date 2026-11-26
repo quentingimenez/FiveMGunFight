@@ -919,6 +919,44 @@ class ChaineCI(unittest.TestCase):
         texte = lire(self.DEPENDABOT)
         self.assertIn('directory: "/docker/verifier"', texte)
 
+    def test_dependabot_garde_l_image_de_verification_sur_ubuntu_24_04(self) -> None:
+        # Le runner CI et l'image de vérification partagent le même système :
+        # seules les montées majeures et mineures d'ubuntu sont exclues, le
+        # digest de 24.04 continue d'être mis à jour.
+        entrees = re.findall(
+            r"(?ms)^\s*-\s*package-ecosystem:.*?(?=^\s*-\s*package-ecosystem:|\Z)",
+            lire(self.DEPENDABOT),
+        )
+        verificateur = [
+            entree
+            for entree in entrees
+            if 'directory: "/docker/verifier"' in entree
+        ]
+        self.assertEqual(
+            len(verificateur),
+            1,
+            'une seule entrée avec directory: "/docker/verifier" est attendue',
+        )
+        entree = verificateur[0]
+        self.assertIn(
+            'dependency-name: "ubuntu"',
+            entree,
+            "l'image de vérification doit rester sur Ubuntu 24.04 : "
+            "exclure explicitement ubuntu dans cette entrée",
+        )
+        for type_maj in (
+            "version-update:semver-major",
+            "version-update:semver-minor",
+        ):
+            with self.subTest(type=type_maj):
+                self.assertIn(
+                    type_maj,
+                    entree,
+                    "l'image de vérification doit rester sur Ubuntu 24.04 : "
+                    "les montées majeures et mineures d'ubuntu doivent être "
+                    "ignorées, seul le digest de 24.04 continue d'être mis à jour",
+                )
+
     def test_fxserver_version_est_epingle(self) -> None:
         chemin = RACINE / ".fxserver-version"
         self.assertTrue(chemin.is_file(), ".fxserver-version manquant")
