@@ -232,6 +232,7 @@ start.bat / stop.bat / status.bat / console.bat
 .github/dependabot.yml  mises à jour des actions et des images Docker
 .github/                modèle de pull request, CODEOWNERS, règles de branche
 scripts/verifier.sh     contrôles statiques (Lua, JSON, JS, shell, compose)
+scripts/fusionner-pr.sh  fusionne une PR verte en squash et suit la CI de main
 scripts/sauvegarder.sh  sauvegarde de la production (base, txdata, maps)
 scripts/restaurer.sh    vérifie et extrait une sauvegarde hors production
 scripts/deployer.sh     déploie un digest, contrôle la santé, rollback

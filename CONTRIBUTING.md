@@ -154,6 +154,9 @@ Au-delà de ~400 lignes modifiées, découpe.
 
 ## 8. Fusionner
 
+- Fusionner avec `bash scripts/fusionner-pr.sh <numéro>` : il attend les checks
+  de la PR, fusionne en squash, puis suit la CI de `main` sur le commit de
+  fusion et échoue, avec le lien du run, si elle est rouge.
 - La fusion se fait **en squash** : l'historique de `main` reste une suite de
   changements complets et lisibles.
 - La branche est supprimée automatiquement après fusion.

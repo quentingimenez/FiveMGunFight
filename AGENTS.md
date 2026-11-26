@@ -48,15 +48,18 @@ Une session qui a modifié le dépôt n'est terminée que lorsque, dans cet ordr
 
 1. la modification a été **exécutée et vérifiée en local** (§ 4.3) ;
 2. l'utilisateur a donné son **accord explicite** sur l'avant/après (§ 4.5) ;
-3. la branche a été poussée et la pull request est **mergée** sur `main` (squash) ;
-4. la **branche distante** est supprimée (le dépôt s'en charge après fusion) ;
-5. la **branche locale** est supprimée ;
-6. on est revenu sur `main`, à jour de `origin/main` ;
-7. l'arbre ne contient plus aucun fichier modifié ou non suivi **appartenant à
+3. la branche a été poussée et la pull request est **mergée** sur `main` (squash)
+   avec `scripts/fusionner-pr.sh` (§ 4.8) ;
+4. la **CI de `main`** est **verte** sur le commit de fusion (le script la suit
+   jusqu'au bout) ; rouge, une PR de correction est ouverte aussitôt (§ 4.9) ;
+5. la **branche distante** est supprimée (le dépôt s'en charge après fusion) ;
+6. la **branche locale** est supprimée ;
+7. on est revenu sur `main`, à jour de `origin/main` ;
+8. l'arbre ne contient plus aucun fichier modifié ou non suivi **appartenant à
    la session** (les changements préexistants laissés par l'utilisateur restent
    intacts) ;
-8. l'utilisateur reçoit le **lien de la pull request** et le **sha du commit de
-   fusion**.
+9. l'utilisateur reçoit le **lien de la pull request**, le **sha du commit de
+   fusion** et le **résultat de la CI de `main`** sur ce commit.
 
 Si l'utilisateur refuse ou ne donne pas son accord, la session s'arrête à
 l'étape 2 : la branche et le commit restent **locaux**, ne sont pas poussés, et
@@ -219,7 +222,7 @@ gh pr view --json number,state,mergeable,statusCheckRollup
   redemander. L'accord donné pour l'envoi (§ 4.5) vaut aussi pour la fusion
   une fois la CI verte.
 - **Tout agent** : après `gh pr create`, suivre la CI jusqu'au bout
-  (`gh pr checks <numéro> --watch`), puis fusionner (§ 4.8). Un suivi
+  (`gh pr checks <numéro> --watch`), puis fusionner avec le script du § 4.8. Un suivi
   automatique fourni par l'outil ne remplace pas ce suivi s'il ne signale que
   les échecs.
 - **Propre à l'application Claude Code (desktop)** : juste après `gh pr create`,
@@ -233,16 +236,22 @@ gh pr view --json number,state,mergeable,statusCheckRollup
 
 ### 4.8 Fusion
 
-Fusionner **uniquement** quand la CI est verte et la PR fusionnable :
+Fusionner **uniquement** avec le script, jamais avec `gh pr merge` à la main :
 
 ```bash
-gh pr merge --squash --delete-branch
+bash scripts/fusionner-pr.sh <numéro>
 ```
+
+Il attend la fin des checks de la PR (un check rouge bloque la fusion),
+fusionne en squash, puis suit jusqu'au bout chaque run lancé sur `main` par le
+commit de fusion. Il ne sort en code 0 que si la CI de `main` est verte ; sinon
+il affiche le lien du run rouge. Le lancer en arrière-plan si l'outil limite la
+durée d'une commande : la CI de `main` dure de 10 à 20 minutes.
 
 - Squash **uniquement** (jamais de merge commit ni de rebase) : l'historique de
   `main` reste une suite de changements complets.
-- Le dépôt supprime la branche distante après fusion ; `--delete-branch` retire
-  aussi la branche locale.
+- Le dépôt supprime la branche distante après fusion ; la branche locale se
+  supprime au § 4.9.
 
 ### 4.9 Retour sur `main`
 
@@ -255,10 +264,14 @@ git status -sb
 git rev-parse HEAD origin/main           # les deux sha doivent être identiques
 ```
 
-Puis surveiller le run de `main` : le test de démarrage réel y tourne aussi,
-comme sur chaque pull request (`gh run list --branch main --limit 1`). S'il est
-rouge, ouvrir une pull request de correction immédiatement — jamais de commit
-direct sur `main`.
+Si `scripts/fusionner-pr.sh` a signalé une CI de `main` rouge, ouvrir une pull
+request de correction immédiatement — jamais de commit direct sur `main`.
+
+Filet de sécurité : le workflow `.github/workflows/alerte-main.yml` ouvre (ou
+complète) l'issue « CI rouge sur main » à chaque échec de `Qualité` ou de
+`Docker` sur `main`. Une issue ouverte avec ce titre signale un `main` cassé :
+la traiter avant tout nouveau sujet, puis la fermer quand `main` est de nouveau
+vert.
 
 ## 5. Interdits
 

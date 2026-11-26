@@ -577,6 +577,17 @@ class Documentation(unittest.TestCase):
         )
         self.assertNotIn("(privé)", texte, "le dépôt est public : contexte périmé")
 
+    def test_fusion_et_suivi_de_main_par_le_script(self) -> None:
+        texte = lire(RACINE / "AGENTS.md")
+        self.assertIn("scripts/fusionner-pr.sh", texte, "AGENTS.md doit imposer le script de fusion")
+        terminee = texte.split("## 2.", 1)[1].split("\n## ", 1)[0]
+        self.assertRegex(
+            " ".join(terminee.split()),
+            r"\*\*CI de `main`\*\* est \*\*verte\*\* sur le commit de fusion",
+            "session terminée = CI de main verte",
+        )
+        self.assertIn("scripts/fusionner-pr.sh", lire(RACINE / "CLAUDE.md"))
+
     def test_langues_du_projet_fixees_pour_tout_agent(self) -> None:
         # Documentation et descriptions de PR en français, commits en anglais.
         for document in ("AGENTS.md", "CONTRIBUTING.md"):
@@ -731,6 +742,23 @@ class ChaineCI(unittest.TestCase):
                         "chaque job doit déclarer des permissions explicites",
                     )
                     self.assertNotIn("write-all", bloc, "permissions trop larges")
+
+    def test_alerte_main_ouvre_une_issue_sur_echec(self) -> None:
+        # Filet si personne ne suit la CI de main après une fusion.
+        chemin = self.WORKFLOWS / "alerte-main.yml"
+        self.assertTrue(chemin.is_file(), "workflow alerte-main.yml manquant")
+        texte = lire(chemin)
+        self.assertRegex(texte, r"(?m)^  workflow_run:\s*$")
+        self.assertRegex(texte, r'workflows: \["Qualité", "Docker"\]')
+        self.assertRegex(texte, r"branches: \[main\]")
+        self.assertIn("workflow_run.conclusion", texte)
+        self.assertIn("issues: write", texte)
+        self.assertIn("gh issue create", texte)
+        # Le titre du commit est une donnée externe : jamais interpolé dans run.
+        blocs = re.findall(r"(?ms)^        run: \|\n(.*?)(?=^      - |\Z)", texte)
+        self.assertTrue(blocs, "aucun script run: | trouvé")
+        for bloc in blocs:
+            self.assertNotIn("${{", bloc, "expression GitHub interpolée dans un script")
 
     def test_qualite_execute_les_nouveaux_controles(self) -> None:
         texte = lire(self.WORKFLOWS / "qualite.yml")

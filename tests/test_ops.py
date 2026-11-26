@@ -32,6 +32,7 @@ SCRIPTS = (
     "restaurer.sh",
     "deployer.sh",
     "sauvegarder.sh",
+    "fusionner-pr.sh",
 )
 
 RUNBOOKS = (
@@ -537,6 +538,85 @@ class DocumentationExploitation(unittest.TestCase):
         ):
             with self.subTest(attendu=attendu):
                 self.assertIn(attendu, texte)
+
+
+# Faux `gh` : journalise chaque appel et répond selon des variables FAUX_*.
+FAUX_GH = r"""#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAUX_JOURNAL"
+case "$1 $2" in
+  "pr checks") exit "${FAUX_CHECKS:-0}" ;;
+  "pr merge") exit 0 ;;
+  "pr view") echo "${FAUX_ETAT:-MERGED} abc1234def" ;;
+  "run list") [ -n "${FAUX_RUNS-101 102}" ] && printf '%s\n' ${FAUX_RUNS-101 102}; exit 0 ;;
+  "run watch") [ "$3" = "${FAUX_ROUGE:-}" ] && exit 1; exit 0 ;;
+  "run view") echo "https://exemple.test/runs/$3" ;;
+esac
+exit 0
+"""
+
+
+@unittest.skipUnless(bash(), "bash est requis pour exécuter les scripts")
+class FusionPR(unittest.TestCase):
+    """`fusionner-pr.sh` : checks verts, squash, puis CI de main suivie au bout."""
+
+    def lancer_fusion(self, *arguments: str, **faux: str) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+        with tempfile.TemporaryDirectory(dir=RACINE) as dossier:
+            gh = Path(dossier) / "gh"
+            gh.write_text(FAUX_GH, encoding="utf-8", newline="\n")
+            gh.chmod(0o755)
+            journal = Path(dossier) / "journal.txt"
+            journal.write_text("", encoding="utf-8")
+            variables = {
+                "GH": chemin_relatif(gh),
+                "FAUX_JOURNAL": chemin_relatif(journal),
+                "INTERVALLE": "0",
+                "ESSAIS_RUNS": "2",
+            }
+            variables.update({f"FAUX_{cle.upper()}": valeur for cle, valeur in faux.items()})
+            resultat = lancer("scripts/fusionner-pr.sh", *arguments, variables=variables)
+            appels = [ligne for ligne in lire(journal).splitlines() if ligne]
+        return resultat, appels
+
+    def indice(self, appels: list[str], debut: str) -> int:
+        for position, appel in enumerate(appels):
+            if appel.startswith(debut):
+                return position
+        self.fail(f"appel « {debut} » absent : {appels}")
+
+    def test_checks_verts_fusion_puis_suivi_de_main(self) -> None:
+        resultat, appels = self.lancer_fusion("12")
+        self.assertEqual(resultat.returncode, 0, resultat.stdout + resultat.stderr)
+        self.assertLess(self.indice(appels, "pr checks 12"), self.indice(appels, "pr merge 12"))
+        self.assertIn("--squash", appels[self.indice(appels, "pr merge 12")])
+        liste = appels[self.indice(appels, "run list")]
+        self.assertIn("--branch main", liste)
+        self.assertIn("abc1234def", liste, "les runs suivis doivent être ceux du commit de fusion")
+        self.assertLess(self.indice(appels, "pr merge 12"), self.indice(appels, "run watch 101"))
+        self.indice(appels, "run watch 102")
+
+    def test_checks_rouges_aucune_fusion(self) -> None:
+        resultat, appels = self.lancer_fusion("12", checks="1")
+        self.assertNotEqual(resultat.returncode, 0)
+        self.assertFalse([a for a in appels if a.startswith("pr merge")], "fusion malgré un check rouge")
+
+    def test_main_rouge_fait_echouer_et_donne_le_lien(self) -> None:
+        resultat, _ = self.lancer_fusion("12", rouge="102")
+        self.assertNotEqual(resultat.returncode, 0, "main rouge doit faire échouer le script")
+        self.assertIn("https://exemple.test/runs/102", resultat.stdout + resultat.stderr)
+
+    def test_aucun_run_sur_main_echoue(self) -> None:
+        resultat, _ = self.lancer_fusion("12", runs="")
+        self.assertNotEqual(resultat.returncode, 0, "aucun run de main trouvé : rien n'a été vérifié")
+
+    def test_pr_non_fusionnee_echoue(self) -> None:
+        resultat, appels = self.lancer_fusion("12", etat="OPEN")
+        self.assertNotEqual(resultat.returncode, 0)
+        self.assertFalse([a for a in appels if a.startswith("run watch")])
+
+    def test_numero_invalide_refuse(self) -> None:
+        resultat, appels = self.lancer_fusion("douze")
+        self.assertNotEqual(resultat.returncode, 0)
+        self.assertEqual(appels, [], "aucun appel à gh avec un numéro invalide")
 
 
 if __name__ == "__main__":
