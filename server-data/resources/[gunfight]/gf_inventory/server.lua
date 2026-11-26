@@ -19,10 +19,15 @@ local function load(src)
     if old and old.id == id then return old end
     local rows = MySQL.query.await('SELECT weapon_id FROM gf_player_weapons WHERE identifier = ?', { id })
     local selection = MySQL.single.await('SELECT slot1, slot2 FROM gf_player_loadout WHERE identifier = ?', { id })
+    local accessories = MySQL.query.await('SELECT weapon_id, selections FROM gf_weapon_accessories WHERE identifier = ?', { id })
     if not GetPlayerName(src) or identifierOf(src) ~= id then return nil end
-    local entry = { id = id, obtained = {}, slots = {} }
+    local entry = { id = id, obtained = {}, slots = {}, accessories = {} }
     for _, row in ipairs(rows or {}) do entry.obtained[row.weapon_id] = true end
     if selection then entry.slots = { selection.slot1, selection.slot2 } end
+    for _, row in ipairs(accessories or {}) do
+        local ok, decoded = pcall(json.decode, row.selections or '')
+        if ok and type(decoded) == 'table' then entry.accessories[row.weapon_id] = decoded end
+    end
     cache[src] = entry
     return entry
 end
@@ -48,8 +53,30 @@ local function withInventory(src, action)
 end
 
 local function lockerData(src, entry)
-    return { weapons = core:GetOwnedWeapons(src), slot1 = entry.slots[1], slot2 = entry.slots[2] }
+    local weapons = core:GetOwnedWeapons(src)
+    for _, weapon in ipairs(weapons) do
+        weapon.accessories = WeaponAccessories.catalog(weapon.name)
+        weapon.selections = WeaponAccessories.validate(weapon.accessories, entry.accessories[weapon.id] or {}) or {}
+    end
+    return { weapons = weapons, slot1 = entry.slots[1], slot2 = entry.slots[2] }
 end
+
+exports('GetWeaponAccessories', function(src, weaponId, weaponName)
+    local entry = cache[src]
+    if not entry then return {}, {} end
+    local catalog = WeaponAccessories.catalog(weaponName)
+    local selected = WeaponAccessories.validate(catalog, entry.accessories[weaponId] or {}) or {}
+    local remove, add = {}, {}
+    for kind, group in pairs(catalog) do
+        local value = selected[kind]
+        if value == nil and group.applyDefault then value = group.default end
+        if value ~= nil then
+            for _, option in ipairs(group.options) do remove[#remove + 1] = option end
+            if value ~= '' then add[#add + 1] = value end
+        end
+    end
+    return remove, add
+end)
 
 local function adminData(src)
     local list = core:GetWeaponCatalog()
@@ -130,6 +157,33 @@ RegisterNetEvent('gf_inventory:equip', function(slot, weaponId)
         entry.slots = slots
         TriggerEvent('gf_inventory:selectionChanged', src)
         TriggerClientEvent('gf_inventory:locker', src, lockerData(src, entry))
+    end)
+end)
+
+RegisterNetEvent('gf_inventory:setAccessories', function(weaponId, choices)
+    local src = source
+    if type(weaponId) ~= 'string' or #weaponId > 48 then return end
+    withInventory(src, function(entry)
+        if not core:OwnsWeapon(src, weaponId) then return end
+        if core:GetMode(src) == 'redzone' and (GetResourceState('gf_redzone') ~= 'started'
+            or not exports.gf_redzone:CanChangeWeapons(src)) then
+            core:Notify(src, 'Sors de la zone de combat pour modifier tes accessoires.')
+            TriggerClientEvent('gf_inventory:locker', src, lockerData(src, entry))
+            return
+        end
+        local weapon
+        for _, item in ipairs(core:GetOwnedWeapons(src)) do if item.id == weaponId then weapon = item break end end
+        if not weapon then return end
+        local selected = WeaponAccessories.validate(WeaponAccessories.catalog(weapon.name), choices)
+        if not selected then return end
+        MySQL.prepare.await('INSERT INTO gf_weapon_accessories (identifier, weapon_id, selections) VALUES (?, ?, ?) '
+            .. 'ON DUPLICATE KEY UPDATE selections = VALUES(selections)', { entry.id, weaponId, json.encode(selected) })
+        if not GetPlayerName(src) or identifierOf(src) ~= entry.id then return end
+        entry.accessories[weaponId] = selected
+        TriggerEvent('gf_inventory:selectionChanged', src)
+        core:Notify(src, 'Accessoires enregistrés.')
+        TriggerClientEvent('gf_inventory:locker', src, lockerData(src, entry))
+        TriggerClientEvent('gf_inventory:accessoriesSaved', src, weaponId)
     end)
 end)
 

@@ -10,6 +10,8 @@ version '1.0.0'
 -- Réglages : data/<ARME>/*.meta (un dossier par arme, accessoires dans components/).
 -- Le catalogue des armes (nom, catégorie, munitions) reste Config.Weapons de gf_core.
 files {
+    'data/GF_VANILLA_60/vanilla60.patch.meta',
+    'data/GF_VANILLA_60/weaponcomponents.meta',
     'data/index.json',
     'data/WEAPON_GHOSTFAIR/components/COMPONENT_AT_GHOSTFAIR_SUPP/weaponcomponents.meta',
     'data/WEAPON_GHOSTFAIR/components/COMPONENT_AT_SCOPE_GHOSTFAIR/weaponcomponents.meta',
@@ -335,9 +337,45 @@ files {
     'data/WEAPON_VVSMPXQYELLOW/weaponanimations.meta',
     'data/WEAPON_VVSMPXQYELLOW/weaponarchetypes.meta',
     'data/WEAPON_VVSMPXQYELLOW/weapons.meta',
+    'data/WEAPON_SCARH/pedpersonality.meta',
+    'data/WEAPON_SCARH/weaponanimations.meta',
+    'data/WEAPON_SCARH/weaponarchetypes.meta',
+    'data/WEAPON_SCARH/weaponcomponents.meta',
+    'data/WEAPON_SCARH/weapons.meta',
+    'data/WEAPON_ANGEL9VVSBLUE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ANGEL9VVSGREEN/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ANGEL9VVSORANGE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ANGEL9VVSPINK/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ANGEL9VVSPURPLE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ANGEL9VVSYELLOW/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ARPFEMVVSBLUE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ARPFEMVVSGREEN/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ARPFEMVVSPINK/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ARPFEMVVSPURPLE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_ARPFEMVVSRED/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_GHOSTFAIR/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_GKITFEM17BLUE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_GKITFEM17GREEN/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_GKITFEM17PINK/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_GKITFEM17PURPLE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_GKITFEM17YELLOW/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_MTZFEMBLUE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_MTZFEMGREEN/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_MTZFEMORANGE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_MTZFEMPINK/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_MTZFEMPURPLE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_SCARH/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_VVSMPXQBLUE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_VVSMPXQGREEN/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_VVSMPXQORANGE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_VVSMPXQPINK/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_VVSMPXQPURPLE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_VVSMPXQROSE/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_VVSMPXQYELLOW/components/GF_CLIP60/weaponcomponents.meta',
 }
 
 data_file 'WEAPONCOMPONENTSINFO_FILE' 'data/**/weaponcomponents.meta'
+data_file 'WEAPONINFO_FILE_PATCH' 'data/GF_VANILLA_60/vanilla60.patch.meta'
 data_file 'WEAPON_METADATA_FILE' 'data/**/weaponarchetypes.meta'
 data_file 'WEAPON_ANIMATIONS_FILE' 'data/**/weaponanimations.meta'
 data_file 'PED_PERSONALITY_FILE' 'data/**/pedpersonality.meta'

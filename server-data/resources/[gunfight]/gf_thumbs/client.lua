@@ -337,9 +337,19 @@ RegisterNetEvent('gf_thumbs:capture', function(kind, onlyId)
 end)
 
 -- Automatique : le serveur a confirmé qu'on est admin ; on photographie ce qui manque
+local scanning = false
 RegisterNetEvent('gf_thumbs:autoCapture', function()
-    local jobs = {}
-    for kind, def in pairs(Config.Kinds) do
+    if scanning or capturing or LocalPlayer.state.gf_mode ~= 'lobby' then return end
+    scanning = true
+    local kinds = {}
+    for kind in pairs(Config.Kinds) do
+        if kind ~= 'weapons' then kinds[#kinds + 1] = kind end
+    end
+    table.sort(kinds)
+    if Config.Kinds.weapons then table.insert(kinds, 1, 'weapons') end
+    for _, kind in ipairs(kinds) do
+        if LocalPlayer.state.gf_mode ~= 'lobby' then break end
+        local def, jobs = Config.Kinds[kind], {}
         if def.auto then
             local items, ids = listOf(kind), {}
             for _, item in ipairs(items) do ids[#ids + 1] = item.id end
@@ -356,9 +366,15 @@ RegisterNetEvent('gf_thumbs:autoCapture', function()
                 end
             end
         end
+        if kind == 'weapons' then
+            table.sort(jobs, function(a, b)
+                if (a.version ~= nil) ~= (b.version ~= nil) then return a.version ~= nil end
+                return a.id < b.id
+            end)
+        end
+        if #jobs > 0 and LocalPlayer.state.gf_mode == 'lobby' then runBatch(jobs, 'automatique') end
     end
-    -- toujours au lobby au moment de commencer (pas pendant une partie)
-    if #jobs > 0 and LocalPlayer.state.gf_mode == 'lobby' then runBatch(jobs, 'automatique') end
+    scanning = false
 end)
 
 -- Chaque retour au lobby peut relancer une capture interrompue ou pas encore lancée.
@@ -367,13 +383,12 @@ local function planAutoCapture()
     if not Config.AutoCapture then return end
     lobbyGeneration = lobbyGeneration + 1
     local generation = lobbyGeneration
-    CreateThread(function()
-        Wait(Config.AutoCaptureDelay)
-        if generation == lobbyGeneration and LocalPlayer.state.gf_mode == 'lobby'
-            and NetworkIsPlayerActive(PlayerId()) then
-            TriggerServerEvent('gf_thumbs:lobbyReady')
-        end
-    end)
+    local function essayer()
+        if generation ~= lobbyGeneration or LocalPlayer.state.gf_mode ~= 'lobby' then return end
+        if NetworkIsPlayerActive(PlayerId()) then TriggerServerEvent('gf_thumbs:lobbyReady') end
+        SetTimeout(Config.AutoCaptureRetryMs or 30000, essayer)
+    end
+    SetTimeout(Config.AutoCaptureDelay, essayer)
 end
 
 RegisterNetEvent('gf_core:modeChanged', function(mode)

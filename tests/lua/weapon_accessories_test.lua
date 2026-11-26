@@ -1,0 +1,57 @@
+local root = os.getenv('GF_ROOT') or '.'
+local base = root .. '/server-data/resources/[gunfight]/'
+local env = setmetatable({
+    LoadResourceFile = function(resource, path)
+        local file = io.open(base .. resource .. '/' .. path, 'rb')
+        if not file then return nil end
+        local text = file:read('*a')
+        file:close()
+        return text
+    end,
+}, { __index = _G })
+assert(loadfile(base .. 'gf_inventory/accessories.lua', 't', env))()
+local catalog = env.WeaponAccessories.catalog('WEAPON_CARBINERIFLE')
+assert(catalog.clip and #catalog.clip.options == 2 and catalog.sight and catalog.grip and catalog.light)
+for _, name in ipairs({ 'CARBINERIFLE', 'ASSAULTRIFLE', 'SPECIALCARBINE', 'BULLPUPRIFLE', 'SMG',
+    'COMBATPDW', 'PISTOL', 'PISTOL50', 'HEAVYPISTOL' }) do
+    local weapon = env.WeaponAccessories.catalog('WEAPON_' .. name)
+    assert(env.WeaponAccessories.validate(weapon, { clip = 'GF_' .. name .. '_CLIP_60' }), name .. ' : chargeur 60')
+end
+local shotgun = env.WeaponAccessories.catalog('WEAPON_BFSHOTTYPINK')
+assert(shotgun.clip and shotgun.clip.hidden, 'chargeur fixe du fusil à pompe masqué')
+local oldShotgun = env.WeaponAccessories.validate(shotgun, { clip = 'GF_BFSHOTTYPINK_CLIP_60' })
+assert(oldShotgun and oldShotgun.clip == shotgun.clip.default, 'ancien choix remplacé par le chargeur original')
+local marksman = env.WeaponAccessories.catalog('WEAPON_MARKSMANRIFLE')
+assert(marksman.clip and #marksman.clip.options == 2, 'chargeurs GTA du sniper conservés')
+local oldMarksman = env.WeaponAccessories.validate(marksman, { clip = 'GF_MARKSMANRIFLE_CLIP_60' })
+assert(oldMarksman and oldMarksman.clip == 'COMPONENT_MARKSMANRIFLE_CLIP_01', 'ancien chargeur 60 remplacé')
+local oldClip = env.WeaponAccessories.validate(catalog, { clip = 'COMPONENT_CARBINERIFLE_CLIP_03' })
+assert(oldClip and oldClip.clip == 'GF_CARBINERIFLE_CLIP_60', 'ancien chargeur conservé avec limite de 60')
+assert(env.WeaponAccessories.validate(catalog, { sight = 'COMPONENT_AT_SCOPE_MEDIUM', grip = '' }))
+assert(not env.WeaponAccessories.validate(catalog, { sight = 'COMPONENT_AT_PI_SUPP' }), 'refuser un composant incompatible')
+assert(not env.WeaponAccessories.validate(catalog, { clip = '' }), 'refuser un chargeur vide')
+assert(not env.WeaponAccessories.validate(catalog, { unknown = 'COMPONENT_AT_SCOPE_MEDIUM' }), 'refuser une catégorie inconnue')
+local custom = env.WeaponAccessories.catalog('WEAPON_GHOSTFAIR')
+assert(custom.sight and custom.suppressor, 'composants du pack')
+assert(env.WeaponAccessories.validate(custom, { suppressor = 'COMPONENT_AT_GHOSTFAIR_SUPP' }))
+assert(env.WeaponAccessories.validate(custom, { clip = 'GF_GHOSTFAIR_CLIP_60' }), 'chargeur 60 Honey Badger')
+local scar = env.WeaponAccessories.catalog('WEAPON_SCARH')
+assert(scar.clip and #scar.clip.options == 2, 'chargeurs du SCAR-H')
+assert(scar.sight and #scar.sight.options >= 2, 'viseurs du SCAR-H')
+assert(env.WeaponAccessories.validate(scar, { sight = 'COMPONENT_AT_SCOPE_LARGE' }), 'lunette longue portée')
+local legacyScope = env.WeaponAccessories.validate(scar, { sight = 'COMPONENT_AT_SCOPE_MAX' })
+assert(legacyScope and legacyScope.sight == 'GF_SCARH_SCOPE_TALL', 'lunette de sniper conservée et adaptée')
+assert(scar.light and scar.suppressor and scar.grip, 'autres accessoires du SCAR-H')
+assert(env.WeaponAccessories.validate(scar, { clip = 'GF_SCARH_CLIP_60' }), 'chargeur 60 du SCAR-H')
+local oldScarClip = env.WeaponAccessories.validate(scar, { clip = 'SCARH_BETAMAG' })
+assert(oldScarClip and oldScarClip.clip == 'GF_SCARH_CLIP_60', 'ancien chargeur SCAR-H adapté')
+local angel = env.WeaponAccessories.catalog('WEAPON_ANGEL9VVSPINK')
+assert(env.WeaponAccessories.validate(angel, { clip = 'GF_ANGEL9VVSPINK_CLIP_60' }), 'chargeur 60 Angel Pink')
+local ak = env.WeaponAccessories.catalog('WEAPON_AKFEMVVSBLUE')
+assert(not ak.clip, 'arme de 100 balles : ne pas proposer de chargeur 60')
+local queen = env.WeaponAccessories.catalog('WEAPON_QUEENBEE16YELLOW')
+assert(queen.suppressor and queen.suppressor.applyDefault
+    and queen.suppressor.default == 'COMPONENT_AT_QUEENBEE16YELLOW_SUPP', 'silencieux initial mais amovible')
+assert(env.WeaponAccessories.validate(queen, { suppressor = '' }), 'le silencieux peut être retiré')
+assert(not next(env.WeaponAccessories.catalog('../invalid')), 'refuser les chemins invalides')
+print('Accessoires : compatibilités, pack personnalisé et validation serveur vérifiées')

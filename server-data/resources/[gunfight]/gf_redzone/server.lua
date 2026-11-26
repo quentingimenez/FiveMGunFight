@@ -142,7 +142,7 @@ local function spawnPlayer(src)
         protected = S.phase ~= 'live',
     }
     if #equipped > 0 then
-        options.weapons = core:BuildWeaponList(core:ResolveSelection(src, equipped))
+        options.weapons = core:BuildWeaponList(core:ResolveSelection(src, equipped), src)
         options.armour = core:GetSelectionSettings().armour
     else
         options.loadout = 'redzone'

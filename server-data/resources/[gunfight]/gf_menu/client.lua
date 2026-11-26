@@ -12,6 +12,108 @@ local pagePret = false
 local derniereFermeture = 0
 local etatEnAttente = nil
 local generationOuverture = 0
+local armesCasier = {}
+local apercu = { generation = 0 }
+
+local function fermerApercu()
+    apercu.generation = apercu.generation + 1
+    if apercu.camera then
+        RenderScriptCams(false, false, 0, true, false)
+        DestroyCam(apercu.camera, false)
+        ClearFocus()
+    end
+    if apercu.ped and DoesEntityExist(apercu.ped) then DeleteEntity(apercu.ped) end
+    apercu.camera, apercu.ped, apercu.weapon = nil, nil, nil
+end
+
+local function appliquerApercu(choices)
+    local weapon = apercu.weapon
+    if not weapon or not apercu.ped or not DoesEntityExist(apercu.ped) then return end
+    local ajouter = {}
+    local objet = GetCurrentPedWeaponEntityIndex(apercu.ped, 0)
+    if not objet or objet == 0 or not DoesEntityExist(objet) then objet = nil end
+    for kind, group in pairs(weapon.accessories or {}) do
+        local selected = type(choices) == 'table' and choices[kind] or nil
+        if selected == nil then selected = (weapon.selections or {})[kind] or group.default or '' end
+        for _, component in ipairs(group.options or {}) do
+            if type(component) == 'string' and component:match('^[%w_]+$') then
+                local hash = joaat(component)
+                RemoveWeaponComponentFromPed(apercu.ped, apercu.hash, hash)
+                if objet then RemoveWeaponComponentFromWeaponObject(objet, hash) end
+                if selected == component then ajouter[#ajouter + 1] = hash end
+            end
+        end
+    end
+    for _, component in ipairs(ajouter) do
+        GiveWeaponComponentToPed(apercu.ped, apercu.hash, component)
+        if objet then GiveWeaponComponentToWeaponObject(objet, component) end
+    end
+end
+
+-- Les pièces sont appliquées à nouveau après le chargement du modèle en jeu.
+-- Une génération empêche qu'un ancien choix remplace une sélection plus récente.
+local function actualiserApercu(choices)
+    apercu.choices = choices
+    apercu.revision = (apercu.revision or 0) + 1
+    local revision, generation = apercu.revision, apercu.generation
+    appliquerApercu(choices)
+    CreateThread(function()
+        Wait(150)
+        if apercu.generation == generation and apercu.revision == revision then
+            appliquerApercu(apercu.choices)
+        end
+    end)
+end
+
+local function ouvrirApercu(id, choices)
+    fermerApercu()
+    local weapon = armesCasier[id]
+    if not menuOuvert or not weapon or type(weapon.name) ~= 'string'
+        or not weapon.name:match('^[%w_]+$') then return false end
+    apercu.weapon, apercu.choices, apercu.clientRevision = weapon, choices, 0
+    local generation = apercu.generation
+    CreateThread(function()
+        local hash = joaat(weapon.name)
+        if not IsWeaponValid(hash) then return end
+        RequestWeaponAsset(hash, 31, 0)
+        local deadline = GetGameTimer() + 5000
+        while not HasWeaponAssetLoaded(hash) and GetGameTimer() < deadline and apercu.generation == generation do Wait(50) end
+        if apercu.generation ~= generation or not menuOuvert or not HasWeaponAssetLoaded(hash) then
+            RemoveWeaponAsset(hash)
+            return
+        end
+        local player = PlayerPedId()
+        local heading = 180.0
+        local pos = vector3(-75.0, -818.0, 326.2)
+        SetFocusPosAndVel(pos.x, pos.y, pos.z, 0.0, 0.0, 0.0)
+        RequestCollisionAtCoord(pos.x, pos.y, pos.z)
+        local ped = ClonePed(player, heading, false, false)
+        if not ped or ped == 0 then ClearFocus() RemoveWeaponAsset(hash) return end
+        apercu.ped, apercu.hash = ped, hash
+        SetEntityCoordsNoOffset(ped, pos.x, pos.y, pos.z, false, false, false)
+        SetEntityHeading(ped, heading)
+        SetEntityCollision(ped, false, false)
+        SetEntityVisible(ped, true, false)
+        ResetEntityAlpha(ped)
+        SetEntityInvincible(ped, true)
+        FreezeEntityPosition(ped, true)
+        RemoveAllPedWeapons(ped, true)
+        GiveWeaponToPed(ped, hash, 250, false, true)
+        SetCurrentPedWeapon(ped, hash, true)
+        actualiserApercu(apercu.choices)
+        local cameraPos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 2.8, 0.75)
+        local cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
+        apercu.camera = cam
+        SetCamCoord(cam, cameraPos.x, cameraPos.y, cameraPos.z)
+        PointCamAtCoord(cam, pos.x, pos.y, pos.z + 0.65)
+        SetCamFov(cam, 45.0)
+        SetCamActive(cam, true)
+        RenderScriptCams(true, false, 0, true, false)
+        RemoveWeaponAsset(hash)
+        SendNUIMessage({ type = 'accessoryPreviewReady' })
+    end)
+    return true
+end
 
 -- FiveM transmet le callback NUI comme référence de fonction : une table avec
 -- un métaméthode __call, pas une fonction Lua (funcref_mt du scheduler de
@@ -34,6 +136,7 @@ end
 local function fermerMenu()
     if not menuOuvert then return end
     menuOuvert = false
+    fermerApercu()
     derniereFermeture = GetGameTimer()
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
@@ -72,6 +175,15 @@ CreateThread(function()
         -- Le menu pause natif se bloque à chaque frame : c'est le seul
         -- endroit où Wait(0) est nécessaire dans cette ressource.
         DisableFrontendThisFrame()
+
+        -- Cette invisibilité est locale et ne dure qu'une image ; les autres
+        -- joueurs ne sont pas modifiés et réapparaissent dès la fin de l'aperçu.
+        if apercu.camera then
+            for _, player in ipairs(GetActivePlayers()) do
+                local ped = GetPlayerPed(player)
+                if ped ~= 0 then SetEntityLocallyInvisible(ped) end
+            end
+        end
 
         if not menuOuvert and not lobbyUiOpen then
             DisableControlAction(0, Config.ToggleControl, true)
@@ -164,7 +276,18 @@ local function transmettreArmes(kind, data)
     end)
 end
 
-RegisterNetEvent('gf_inventory:locker', function(data) transmettreArmes('locker', data) end)
+RegisterNetEvent('gf_inventory:locker', function(data)
+    armesCasier = {}
+    for _, weapon in ipairs(type(data) == 'table' and data.weapons or {}) do
+        if weapon.id then armesCasier[weapon.id] = weapon end
+    end
+    transmettreArmes('locker', data)
+end)
+RegisterNetEvent('gf_inventory:accessoriesSaved', function(weaponId)
+    if not menuOuvert or not apercu.weapon or apercu.weapon.id ~= weaponId then return end
+    fermerApercu()
+    SendNUIMessage({ type = 'accessorySaved' })
+end)
 RegisterNetEvent('gf_inventory:adminData', function(data) transmettreArmes('armory', data) end)
 RegisterNetEvent('gf_inventory:openAdmin', function(data)
     if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', true) end
@@ -182,6 +305,30 @@ RegisterNUICallback('equipWeapon', function(data, cb)
     repondre(cb, { ok = true })
 end)
 
+RegisterNUICallback('setAccessories', function(data, cb)
+    if type(data) == 'table' then TriggerServerEvent('gf_inventory:setAccessories', data.id, data.choices) end
+    repondre(cb, { ok = true })
+end)
+
+RegisterNUICallback('previewAccessories', function(data, cb)
+    local ok = type(data) == 'table' and ouvrirApercu(data.id, data.choices)
+    repondre(cb, { ok = not not ok })
+end)
+
+RegisterNUICallback('updateAccessoryPreview', function(data, cb)
+    if menuOuvert and apercu.weapon and type(data) == 'table' and data.id == apercu.weapon.id
+        and type(data.revision) == 'number' and data.revision > apercu.clientRevision then
+        apercu.clientRevision = data.revision
+        actualiserApercu(data.choices)
+    end
+    repondre(cb, { ok = true })
+end)
+
+RegisterNUICallback('closeAccessoryPreview', function(_, cb)
+    fermerApercu()
+    repondre(cb, { ok = true })
+end)
+
 RegisterNUICallback('giveWeapon', function(data, cb)
     if type(data) == 'table' then TriggerServerEvent('gf_inventory:adminGive', data.id) end
     repondre(cb, { ok = true })
@@ -191,6 +338,7 @@ end)
 
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
+    fermerApercu()
     if menuOuvert then
         SetNuiFocus(false, false)
         SetNuiFocusKeepInput(false)

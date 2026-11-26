@@ -256,7 +256,8 @@
 									<Default value="true"/>
 									<Name>COMPONENT_VVSMPXQORANGE_CLIP_01</Name>
 								</Item>
-							</Components>
+                <Item><Name>GF_VVSMPXQORANGE_CLIP_60</Name><Default value="false" /></Item>
+              </Components>
 						</Item>
 					</AttachPoints>
 					<GunFeedBone/>
