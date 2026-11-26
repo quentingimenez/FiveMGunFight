@@ -22,7 +22,7 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[1]
 RESSOURCES = RACINE / "server-data" / "resources"
-RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone", "gf_lobby", "gf_vehicles")
+RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone", "gf_lobby", "gf_stats", "gf_vehicles")
 MAPS_JSON = RESSOURCES / "[gunfight]" / "gf_maps" / "data" / "maps.json"
 
 MOTS_SCRIPTS = (
@@ -123,6 +123,9 @@ class ManifestesFiveM(unittest.TestCase):
 
     def test_manifeste_declare_version_et_jeu(self) -> None:
         for manifeste in manifestes():
+            # [standalone] : ressource tierce vendorisée (oxmysql, game 'common').
+            if manifeste.parent.parent.name == "[standalone]":
+                continue
             texte = lire(manifeste)
             with self.subTest(manifeste=str(manifeste.relative_to(RACINE))):
                 self.assertRegex(texte, r"fx_version\s+'cerulean'", "fx_version attendu")
@@ -130,6 +133,9 @@ class ManifestesFiveM(unittest.TestCase):
 
     def test_fichiers_declares_existent(self) -> None:
         for manifeste in manifestes():
+            # [standalone] : ressource tierce vendorisée (oxmysql, game 'common').
+            if manifeste.parent.parent.name == "[standalone]":
+                continue
             for chemin in chemins_declares(manifeste):
                 with self.subTest(manifeste=str(manifeste.relative_to(RACINE)), chemin=chemin):
                     self.assertTrue(
@@ -353,6 +359,7 @@ class EnvironnementsCompose(unittest.TestCase):
             ("txdata", "gunfight-prod-txdata"),
             ("dbdata", "gunfight-prod-dbdata"),
             ("maps", "gunfight-prod-maps"),
+            ("characters", "gunfight-prod-characters"),
         ):
             with self.subTest(volume=volume):
                 self.assertEqual(prod.get(volume), nom, "volume de production mal nommé")
@@ -363,6 +370,46 @@ class EnvironnementsCompose(unittest.TestCase):
         bloc = self.bloc(self.SOCLE, "fxserver")
         self.assertNotRegex(bloc, r"(?m)^\s+build:", "le socle ne doit pas construire d'image")
         self.assertNotRegex(bloc, r"(?m)^\s+image:", "le socle ne doit pas choisir d'image")
+
+
+class StatistiquesPersistantes(unittest.TestCase):
+    """gf_stats, oxmysql et les événements de statistiques restent câblés."""
+
+    def test_server_cfg_demarre_oxmysql_avant_gf_stats(self) -> None:
+        texte = lire(RACINE / "server-data" / "server.cfg")
+        ox = texte.find("ensure oxmysql")
+        stats = texte.find("ensure gf_stats")
+        self.assertGreaterEqual(ox, 0, "ensure oxmysql absent")
+        self.assertGreater(stats, ox, "gf_stats doit démarrer après oxmysql")
+
+    def test_schema_cree_la_table_gf_stats_players(self) -> None:
+        texte = lire(RACINE / "docker" / "db" / "init" / "01-schema.sql")
+        self.assertIn("CREATE TABLE IF NOT EXISTS gf_stats_players", texte)
+
+    def test_oxmysql_vendorise_present(self) -> None:
+        base = RESSOURCES / "[standalone]" / "oxmysql"
+        for nom in ("fxmanifest.lua", "LICENSE"):
+            with self.subTest(fichier=nom):
+                self.assertTrue((base / nom).is_file(), "fichier oxmysql manquant")
+
+    def test_gf_stats_depend_de_oxmysql(self) -> None:
+        texte = lire(RESSOURCES / "[gunfight]" / "gf_stats" / "fxmanifest.lua")
+        self.assertRegex(texte, r"dependency\s+'oxmysql'")
+
+    def test_les_modes_emettent_les_evenements_de_stats(self) -> None:
+        for mode in ("gf_attack", "gf_redzone"):
+            texte = lire(RESSOURCES / "[gunfight]" / mode / "server.lua")
+            with self.subTest(mode=mode):
+                self.assertIn("gf:modeKill", texte)
+                self.assertIn("gf:matchEnded", texte)
+
+    def test_prod_monte_le_volume_characters(self) -> None:
+        texte = lire(RACINE / "docker-compose.prod.yml")
+        self.assertIn(
+            "characters:/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data",
+            texte,
+            "volume characters absent de la production",
+        )
 
 
 class MapsEnJeu(unittest.TestCase):

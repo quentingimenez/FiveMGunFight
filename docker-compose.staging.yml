@@ -66,6 +66,7 @@ services:
     volumes:
       - txdata:/opt/fivem/txData
       - maps:/opt/fivem/server-data/resources/[gunfight]/gf_maps/data
+      - characters:/opt/fivem/server-data/resources/[gunfight]/gf_lobby/data
     depends_on:
       mariadb:
         condition: service_healthy
@@ -130,6 +131,8 @@ volumes:
     name: gunfight-staging-dbdata
   maps:
     name: gunfight-staging-maps
+  characters:
+    name: gunfight-staging-characters
 
 secrets:
   # Mêmes noms et mêmes chemins que la production : la préproduction vérifie

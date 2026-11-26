@@ -36,6 +36,8 @@ exclude_files = {
   "server-data/resources/**/baseevents/**",
   "server-data/resources/**/mapmanager/**",
   "server-data/resources/**/spawnmanager/**",
+  -- Ressource tierce vendorisée, comme [cfx-default] : non maintenue ici.
+  "server-data/resources/**/oxmysql/**",
 }
 
 -- Les lignes longues restantes sont héritées du code gunfight existant. La
