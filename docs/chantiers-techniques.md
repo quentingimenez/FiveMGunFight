@@ -40,7 +40,7 @@ tout correctif.
 | C12 | Migrations de schéma | haute avant [`must-have.md`](must-have.md) § 1 | ⬜ | — | D4 |
 | C13 | Suivi d'oxmysql | basse | ⬜ | — | E3 |
 | C14 | Rendu du lobby comparé à une référence | basse | ⬜ | — | V6 |
-| C15 | Documentation contradictoire | basse | ⬜ | — | — |
+| C15 | Documentation contradictoire | basse | ✅ | — | — |
 | C16 | Délais, boucles par image et taille des fichiers | basse | ⬜ | C7 | A4, A6, P1 |
 
 ## C1 — Validation des tirs

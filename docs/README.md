@@ -45,6 +45,8 @@ Outils associés : `scripts/verifier-sante.sh` (santé), `scripts/deployer.sh`
 
 ## Règles en une ligne
 
-Une branche, une pull request, une revue, une CI verte, puis fusion en squash.
-Aucun envoi direct sur `main`. La protection GitHub de `main` reste **à
-activer** : le dépôt privé est sur un plan gratuit (voir l'ADR 0001).
+Une branche, une pull request, une CI verte, puis fusion en squash. Aucun
+envoi direct sur `main`. La protection GitHub de `main` est **active** : le
+ruleset « Protection de main » s'applique au dépôt public. Une revue de
+`@WardenPro` ou `@Zhics` reste bienvenue, mais elle n'est pas exigée. Voir
+[`protection-branche.md`](protection-branche.md).

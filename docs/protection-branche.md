@@ -5,26 +5,36 @@
 Empêcher tout envoi direct sur `main` et n'autoriser une fusion que si :
 
 1. la modification est arrivée par une **pull request** ;
-2. elle a été **relue et approuvée** par l'autre collaborateur ;
-3. la **CI est verte** (vérifications statiques, tests de cohérence,
+2. la **CI est verte** (vérifications statiques, tests de cohérence,
    construction de l'image, démarrage réel du serveur) ;
-4. toutes les **conversations de revue sont résolues**.
+3. toutes les **conversations de revue sont résolues**.
+
+Aucune approbation n'est exigée ; une revue reste bienvenue.
 
 ## Règles appliquées
 
-Le contenu exact est dans [`.github/branch-protection.json`](../.github/branch-protection.json).
+Le ruleset actif « Protection de main » fait foi ; il s'applique à la branche
+par défaut du dépôt public. Le fichier
+[`.github/branch-protection.json`](../.github/branch-protection.json) est un
+**ancien modèle** (une approbation, trois checks) et ne décrit plus l'état
+réel : ne pas s'y fier.
 
 | Règle | Effet |
 |---|---|
 | Pull request obligatoire | `git push origin main` est refusé côté GitHub |
-| 1 approbation | l'auteur ne peut pas s'auto-approuver |
-| Revue `CODEOWNERS` obligatoire | `@WardenPro` ou `@Zhics` doit approuver |
-| Approbation invalidée après un nouvel envoi | une modification après revue doit être relue |
-| Status checks requis (non stricts) | `Qualité du dépôt`, `Construire et publier l'image` et `Vérifier le démarrage des ressources` doivent passer ; la branche n'a pas à être à jour avec `main` (sinon chaque fusion relancerait la CI complète de toutes les PR ouvertes), l'envoi sur `main` rejoue la CI après fusion |
+| Fusion en squash uniquement | seules les fusions squash sont autorisées par le dépôt |
+| 0 approbation requise | le ruleset ne demande aucune approbation |
+| Revue `CODEOWNERS` non requise | `@WardenPro` ou `@Zhics` sont bienvenus, sans obligation |
 | Conversations résolues | aucun commentaire bloquant ne reste ouvert |
+| 4 checks requis, non stricts | les quatre jobs de CI doivent passer, sans exiger que la branche soit à jour avec `main` |
 | Force-push interdit | pas de réécriture d'historique sur `main` |
 | Suppression interdite | `main` ne peut pas être supprimée |
-| `enforce_admins: true` | le propriétaire est soumis aux mêmes règles |
+| `bypass_actors` vide | aucun acteur ni application ne contourne le ruleset |
+
+Les quatre checks sont `Qualité du dépôt`, `Sécurité de l'historique`,
+`Construire et publier l'image` et `Vérifier le démarrage des ressources`. La
+branche n'a pas à être à jour avec `main` (sinon chaque fusion relancerait la CI
+de toutes les PR ouvertes) ; l'envoi sur `main` rejoue la CI après fusion.
 
 Le check **`Vérifier le démarrage des ressources`** est requis même quand le
 secret `CFX_LICENSE_KEY` manque. Sur une PR de fork ou de Dependabot, qui n'a
@@ -33,96 +43,65 @@ statique sans licence tourne quand même). Partout ailleurs (push sur `main`,
 PR interne, planification), un secret absent **fait échouer** le job : le
 démarrage réel ne peut pas être sauté en silence.
 
-## Contrainte de plan GitHub
+## Historique
 
-Sur un **dépôt privé en plan gratuit**, GitHub refuse la protection de branche
-et les rulesets. L'API répond :
-
-```text
-gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)
-```
-
-Constat vérifié sur ce dépôt (25/11/2026) : `PUT /branches/main/protection` et
-`POST /rulesets` répondent tous deux `403` avec ce message. L'interface
-**Settings → Branches** affiche bien « Add branch ruleset » et « Add classic
-branch protection rule », mais l'enregistrement échoue de la même façon.
-Ce qui est déjà actif, en revanche : fusion en **squash** uniquement, branche
-supprimée après fusion, `CODEOWNERS`, modèle de pull request, hook local
-`pre-push` et la CI « Qualité » bloquante dès qu'une protection existe.
-
-Deux solutions, au choix :
-
-- **GitHub Pro** (~4 $/mois, dépôt conservé privé) — recommandé, aucun code
-  exposé ;
-- **dépôt public** — la protection devient gratuite ; le dépôt ne contient
-  aucun secret (vérifié : `.env`, `secrets/` et `server-data/secrets.cfg` sont
-  ignorés et les tests le contrôlent), mais tout le code et la configuration de jeu
-  deviennent visibles.
-
-La procédure ci-dessous s'applique aussitôt après le changement de plan.
+Le 25/11/2026, l'API GitHub refusait (403) la protection de branche et les
+rulesets sur le dépôt privé en plan gratuit. Le dépôt est ensuite devenu public
+et le ruleset « Protection de main » a été créé.
 
 ## Procédure A — interface web
 
 À faire dans l'ordre. Les noms de cases viennent de l'interface GitHub
-(Settings → Branches) en anglais ; ils sont explicites pour éviter les erreurs.
+(Settings → Rules → Rulesets) en anglais ; ils sont explicites pour éviter les
+erreurs.
 
-1. Ouvrir **Settings → Branches** du dépôt.
-2. **Add branch protection rule** (ou modifier celle qui existe).
-3. `Branch name pattern` : `main`.
+1. Ouvrir **Settings → Rules → Rulesets** du dépôt.
+2. **New ruleset → New branch ruleset**, ou modifier « Protection de main ».
+3. `Enforcement status` : `Active` ; `Target branches` : la branche par défaut.
 4. Cocher :
-   - `Require a pull request before merging` → `Require approvals` : **1** ;
-   - `Dismiss stale pull request approvals when new commits are pushed` ;
-   - `Require review from Code Owners` ;
+   - `Require a pull request before merging` → `Required approvals` : **0** ;
+   - `Require review from Code Owners` : **décoché** ;
    - `Require conversation resolution before merging` ;
-   - `Require status checks to pass before merging`, **sans** cocher
+   - `Require status checks to pass`, **sans** cocher
      `Require branches to be up to date before merging` ;
    - dans la liste des checks, sélectionner **`Qualité du dépôt`**,
-     **`Construire et publier l'image`** et
+     **`Sécurité de l'historique`**, **`Construire et publier l'image`** et
      **`Vérifier le démarrage des ressources`** (ils n'apparaissent qu'après un
      premier run de CI sur une pull request) ;
-   - `Do not allow bypassing the above settings` (équivalent de
-     `enforce_admins`) ;
-   - `Do not allow force pushes` et `Do not allow deletions` restent décochés au
-     sens « autoriser » : laisser les cases d'autorisation **sans cocher**.
-5. **Create** / **Save changes**.
-6. Recommencer éventuellement pour la branche `master` si elle réapparaît.
+   - `Block force pushes` et `Restrict deletions` : activés.
+5. Dans **Settings → General → Pull requests**, n'autoriser que la fusion en
+   **squash** (décocher merge commit et rebase).
+6. Vérifier que la liste `Bypass list` reste **vide**.
+7. **Create** / **Save changes**.
 
 ## Procédure B — ligne de commande
 
-Identique à la procédure A, à partir du fichier de règles versionné :
+Le ruleset actif se consulte avec l'API des rulesets :
 
 ```bash
-bash scripts/appliquer-protection.sh --check   # lit l'état, explique un refus de plan
-bash scripts/appliquer-protection.sh --apply   # envoie le JSON versionné
+gh api repos/quentingimenez/FiveMGunFight/rulesets
 ```
 
-Le script vérifie l'authentification `gh`, applique
-`.github/branch-protection.json` avec `PUT /repos/{owner}/{repo}/branches/main/protection`,
-puis relit la configuration et affiche l'état. Il échoue proprement avec le
-message à afficher si le plan ne le permet pas encore, ne paie rien et ne
-modifie jamais le JSON. `scripts/proteger-branche.sh` reste l'ancien nom.
+`scripts/appliquer-protection.sh` et le fichier
+`.github/branch-protection.json` décrivent l'**ancien modèle** (une
+approbation, trois checks) et ne doivent pas servir à recréer le ruleset actif.
+Le script reste disponible et `scripts/proteger-branche.sh` reste son ancien
+nom, mais ce n'est plus la procédure d'application actuelle.
 
 ## Vérifier que la protection est active
 
 ```bash
-gh api repos/WardenPro/FiveMGunFight/branches/main/protection
+gh api repos/quentingimenez/FiveMGunFight/rulesets
+gh api repos/quentingimenez/FiveMGunFight/rulesets/<id>
 ```
 
-Attendu : `required_pull_request_reviews` non nul,
-`required_status_checks.contexts` contenant les trois noms de jobs,
-`allow_force_pushes.enabled: false`, `enforce_admins.enabled: true`.
+Attendu : un ruleset nommé « Protection de main », `enforcement: active`,
+`bypass_actors` vide, les quatre checks requis et la fusion en squash.
 
-Test réel, sans risque pour `main` :
+La preuve est la lecture du ruleset par l'API (commandes ci-dessus) : on ne
+teste jamais un envoi direct sur `main`.
 
-```bash
-git switch main && git commit --allow-empty -m "test: push direct"
-git push                     # doit être refusé
-git reset --hard origin/main # annule le commit local
-```
-
-Sans protection, ce même envoi passe : c'est le symptôme d'un plan sans droits.
-
-## Filet local (disponible dès maintenant, sans plan payant)
+## Filet local
 
 Le dépôt fournit un hook `pre-push` qui refuse les envois directs vers `main`
 depuis ta machine. Il ne remplace pas la protection serveur (on peut le
@@ -141,11 +120,9 @@ Désinstallation :
 git config --unset core.hooksPath
 ```
 
-Contournement volontaire et exceptionnel (dépannage uniquement) :
-
-```bash
-GF_ALLOW_MAIN=1 git push
-```
+Le hook peut être contourné (`GF_ALLOW_MAIN=1`, `--no-verify`) ; c'est un
+filet local, jamais une garantie serveur. Ne pas contourner la protection
+pour pousser directement sur `main`.
 
 ## Ce que la protection ne couvre pas
 
@@ -153,8 +130,8 @@ GF_ALLOW_MAIN=1 git push
   dépôt, mais reste fusionnable selon les mêmes règles.
 - **Applications GitHub** et jetons disposant d'un droit de contournement :
   aucun n'est configuré ici ; ne pas en ajouter sans revue.
-- **Branches non couvertes** : toute branche autre que `main` (et `master`)
-  n'est pas protégée tant que la règle n'est pas étendue.
+- **Branches non couvertes** : toute branche autre que la branche par défaut
+  n'est pas protégée tant que le ruleset n'est pas étendu.
 - **Qualité du contenu** : la revue humaine reste indispensable pour la logique
   de jeu (autorité serveur, anti-triche, équilibrage).
 
@@ -162,7 +139,6 @@ GF_ALLOW_MAIN=1 git push
 
 | Symptôme | Cause probable | Solution |
 |---|---|---|
-| `HTTP 403 ... Upgrade to GitHub Pro` | dépôt privé en plan gratuit | passer à GitHub Pro ou rendre le dépôt public, puis relancer |
 | Les checks n'apparaissent pas dans la liste | aucun run de CI sur une pull request n'existe encore | ouvrir une pull request, attendre le premier run, puis éditer la règle |
 | Une pull request reste « blocked » | un check requis est en échec ou jamais lancé | corriger et relancer ; vérifier les noms exacts des jobs dans `.github/workflows/` |
-| Urgence en production | `enforce_admins: true` bloque aussi le propriétaire | modifier temporairement la règle dans l'interface, corriger, puis remettre la règle immédiatement après |
+| Urgence en production | le ruleset n'a aucun contournement | ouvrir une pull request prioritaire et suivre la boucle habituelle ; ne jamais pousser directement sur `main` |

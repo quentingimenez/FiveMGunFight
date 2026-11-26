@@ -271,9 +271,10 @@ registre) et la démarre ; sur `main` et les tags, il télécharge l'image publi
 Le test utilise le secret dédié `CFX_LICENSE_KEY` : sans lui, il affiche une
 note et saute le démarrage sans échouer.
 
-Les trois checks (`Qualité du dépôt`, `Construire et publier l'image`,
-`Vérifier le démarrage des ressources`) sont déclarés **bloquants** dans la
-protection de `main` : voir [`protection-branche.md`](protection-branche.md).
+Les quatre checks (`Qualité du dépôt`, `Sécurité de l'historique`,
+`Construire et publier l'image`, `Vérifier le démarrage des ressources`) sont
+déclarés **bloquants** par le ruleset « Protection de main » : voir
+[`protection-branche.md`](protection-branche.md).
 
 Les actions GitHub sont épinglées par SHA de commit et les images par digest
 (Dockerfile, MariaDB, images de base). `.github/dependabot.yml` propose chaque
@@ -282,9 +283,14 @@ pour garder les changements de version manuels.
 
 ## Limites connues
 
-- La logique de jeu Lua n'a **pas encore** de tests unitaires : la couverture
-  automatique porte sur la syntaxe, les manifestes, la configuration et le
-  démarrage réel des ressources.
+- La logique Lua a des tests unitaires dans `tests/lua/` : `lobby_backdrop.lua`
+  couvre la géométrie du fond du lobby (plan, triangles, ligne de sol,
+  hauteur du regard) ; `lobby_nui_callbacks.lua` vérifie que chaque callback
+  NUI répond une fois, référence de fonction FiveM comprise ; `run.lua` couvre
+  les modules purs de `gf_core` (netId, distance, véhicule, rate-limit, crédit
+  des kills, confirmation de mort). `tests/test_lobby_nui.py` les lance avec
+  `lua5.4` ou `lua`, et saute le test si l'interpréteur manque. La plupart de
+  la logique de jeu (`gf_attack`, le reste de `gf_core`…) n'est pas couverte.
 - Le test de démarrage nécessite le secret `CFX_LICENSE_KEY` ; sans lui (PR de
   fork ou de Dependabot), le job reste vert mais le démarrage n'est pas testé.
   Les autres vérifications restent bloquantes.
