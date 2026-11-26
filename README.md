@@ -225,7 +225,7 @@ scripts/appliquer-protection.sh  lit ou applique la protection de main (GitHub P
 scripts/proteger-branche.sh  ancien nom du script de protection (conservé)
 tests/                  tests automatiques du dépôt (unittest)
 docs/                   architecture, lobby, qualité, exploitation, décisions
-docs/runbooks/          incident, restauration, mise à jour, rotation des secrets
+docs/runbooks/          incident, restauration, mise à jour, rotation des secrets, déploiement Unraid
 docs/adr/               décisions d'architecture (protection, FXServer épinglé)
 .githooks/pre-push      refuse un envoi direct sur main
 CONTRIBUTING.md         branches, commits, pull requests, revue
@@ -491,6 +491,11 @@ complète : [docs/runbooks/mise-a-jour.md](docs/runbooks/mise-a-jour.md).
 l'ancien digest dans `IMAGE_REF` et relance `--force`. Les volumes ne sont pas
 supprimés par un changement d'image. Voir
 [docs/runbooks/incident.md](docs/runbooks/incident.md).
+
+Sur **Unraid**, ne monte pas `server-data` complet : cela masquerait les
+ressources de l'image et figerait le badge du lobby. Seuls `gf_maps/data`,
+`gf_lobby/data` et `txData` doivent persister. Migration et gabarit de conteneur neuf :
+[docs/runbooks/deploiement-unraid.md](docs/runbooks/deploiement-unraid.md).
 
 La préproduction se lance avec une image désignée par digest et n'expose pas
 les ports de production :
