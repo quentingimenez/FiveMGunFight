@@ -73,8 +73,10 @@ hadolint, gitleaks, ruff, Docker CLI et Compose).
 En CI, l'image est construite par Buildx avec ses couches dans le cache GitHub
 Actions (`scope=verifier`) : elle n'est reconstruite que si
 `docker/verifier/` change, puis réutilisée via `GF_VERIFIER_IMAGE`. Quand le
-cache manque, l'argument `APT_MIRROR` fait passer `apt-get` par le miroir Azure
-des runners GitHub au lieu d'`archive.ubuntu.com`, dont le débit varie trop.
+cache manque, les arguments `APT_MIRROR` et `APT_SECURITY_MIRROR` font passer
+`apt-get` par le miroir Azure des runners GitHub au lieu d'`archive.ubuntu.com`
+et de `security.ubuntu.com`, dont le débit varie trop et qui renvoient parfois
+un index en cours de synchronisation.
 
 | Étape | Outil | Ce qu'elle attrape |
 |---|---|---|

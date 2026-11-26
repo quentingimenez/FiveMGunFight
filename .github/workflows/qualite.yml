@@ -40,7 +40,8 @@ jobs:
       # le cache GitHub Actions (scope distinct de l'image FXServer de
       # docker.yml) : elle n'est reconstruite que si docker/verifier change.
       # Les pull requests lisent le cache rempli par main. Sur un cache
-      # manquant, le miroir Azure d'Ubuntu évite la lenteur d'archive.ubuntu.com.
+      # manquant, le miroir Azure d'Ubuntu remplace archive.ubuntu.com et
+      # security.ubuntu.com, lents et parfois en cours de synchronisation.
       - name: Configurer Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -56,6 +57,7 @@ jobs:
           provenance: false
           build-args: |
             APT_MIRROR=http://azure.archive.ubuntu.com/ubuntu
+            APT_SECURITY_MIRROR=http://azure.archive.ubuntu.com/ubuntu
           cache-from: type=gha,scope=verifier
           cache-to: type=gha,scope=verifier,mode=max
 
