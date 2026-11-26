@@ -26,6 +26,10 @@ exports('DeleteModeVehicle', deleteModeVehicle)
 exports('GetModeVehicle', function() return modeVehicle end)
 
 local function giveVehicle(model, x, y, z, heading)
+    -- Véhicule de base choisi par un admin (/customveh, ressource gf_vehicles)
+    if GetResourceState('gf_vehicles') == 'started' and type(GlobalState.gf_vehicle_base) == 'string' then
+        model = GlobalState.gf_vehicle_base
+    end
     local hash = joaat(model)
     if not IsModelInCdimage(hash) or not IsModelAVehicle(hash) then
         print(('[gf_core] Modèle de véhicule inconnu : %s'):format(model))

@@ -1,10 +1,20 @@
 Config = {}
 
--- Véhicule montré dans le menu de customisation (/customveh, admin)
-Config.CustomModel = 'gstbisxl3'
+-- Véhicules disponibles sur le serveur (onglet « Véhicule » de /customveh).
+-- Pour en ajouter un : modèles dans stream/, réglages dans data/<modèle>/*.meta,
+-- puis une ligne ici. Photo facultative : html/img/vehicles/<modèle>.png
+-- (déclarée dans files {} du fxmanifest) ; sans photo, une silhouette s'affiche.
+Config.Vehicles = {
+    { model = 'gstbisxl3', label = 'Bison XL Hellfire' },
+    { model = 'keyhawk',   label = 'Jeep Trackhawk' },
+}
 
--- Fichier où la custom est enregistrée (dans la ressource)
--- Format : { default = { ...propriétés... } } ; plus tard : une custom par joueur et par mode.
+-- Véhicule de base tant qu'aucun admin n'en a choisi un autre
+Config.DefaultModel = 'gstbisxl3'
+
+-- Fichier où le véhicule de base et les customs sont enregistrés (dans la ressource)
+-- Format : { base = modèle, customs = { [modèle] = { ...propriétés... } } }.
+-- Plus tard : un véhicule et une custom par joueur et par mode.
 Config.CustomFile = 'custom/custom.json'
 
 -- Pièces proposées dans le menu (types de mods GTA). Seules celles que le modèle
