@@ -139,6 +139,24 @@ esac
 # Le chmod peut échouer sans conséquence sur certains montages Windows.
 chmod 600 "$DATA/secrets.cfg" 2>/dev/null || true
 
+# --- rcon de développement (scripts/fivem_rcon.py) ---
+# Recharger une ressource sans recréer le conteneur : seule la surcouche
+# docker-compose.dev.yml fixe GF_DEV_RCON=true, et seulement en mode direct
+# (le mode moniteur passe par la console txAdmin). Le mot de passe est tiré au
+# hasard à chaque démarrage et écrit dans cache/ (ignoré par git) pour le
+# script de l'hôte. Sans ce bloc, rcon_password reste vide : rcon est fermé.
+RCON_FICHIER="$DATA/cache/rcon_password"
+rm -f "$RCON_FICHIER"
+if [ "${GF_DEV_RCON:-}" = "true" ] && [ "$TXADMIN" != "true" ]; then
+  RCON_MDP="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
+  mkdir -p "$DATA/cache"
+  printf '%s\n' "$RCON_MDP" > "$RCON_FICHIER"
+  # `set` et non `rcon_password ...` : FXServer déclare cette convar en lecture
+  # seule (ConVar_ReadOnly) ; la forme commande est ignorée depuis un .cfg.
+  echo "set rcon_password \"$RCON_MDP\"" >> "$DATA/secrets.cfg"
+  echo "rcon             : actif (développement, mot de passe dans cache/rcon_password)"
+fi
+
 # En production, gf_maps/data est un volume. Docker recopie le contenu de
 # l'image dans un volume nommé neuf, mais un volume créé vide (ancien
 # déploiement, volume préparé à la main) n'a pas de maps.json : on l'amorce avec

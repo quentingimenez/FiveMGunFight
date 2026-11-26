@@ -13,6 +13,7 @@ décrivent le fonctionnement interne et l'exploitation.
 | [`must-have.md`](must-have.md) | tu veux connaître les fonctionnalités prévues et l'ordre dans lequel les construire |
 | [`qualite.md`](qualite.md) | tu modifies du code et tu veux savoir ce que la CI vérifie |
 | [`debug-test.md`](debug-test.md) | tu veux les accès (ports, logs, console, admin) et les scénarios de test local |
+| [`pieges-fivem.md`](pieges-fivem.md) | tu touches au rendu, à la caméra, au ped ou à un natif, ou tu dois tester en jeu vite (outils d'essai, pièges mesurés) |
 | [`ajouter-un-modele.md`](ajouter-un-modele.md) | tu ajoutes un véhicule (ou une autre famille de modèles) et sa photo dans les menus |
 | [`protection-branche.md`](protection-branche.md) | tu dois configurer ou vérifier les règles de la branche `main` |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | tu ouvres ta première pull request |

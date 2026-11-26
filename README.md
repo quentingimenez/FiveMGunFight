@@ -239,6 +239,10 @@ scripts/deployer.sh     déploie un digest, contrôle la santé, rollback
 scripts/verifier-sante.sh  santé HTTP, conteneurs, base, disque, redémarrages
 scripts/appliquer-protection.sh  lit ou applique la protection de main (GitHub Pro requis)
 scripts/proteger-branche.sh  ancien nom du script de protection (conservé)
+scripts/native.py       signature d'un natif FiveM/GTA, hors ligne (docs/pieges-fivem.md)
+scripts/fivem_rcon.py   commande console en dev, ex. restart gf_lobby (TXADMIN=false)
+scripts/journal_client.py  erreurs du journal client FiveM, natifs nommés
+scripts/capturer-jeu.ps1  capture de la fenêtre du jeu (une à la fois)
 tests/                  tests automatiques du dépôt (unittest)
 docs/                   architecture, lobby, qualité, exploitation, décisions
 docs/runbooks/          incident, restauration, mise à jour, rotation des secrets, déploiement Unraid

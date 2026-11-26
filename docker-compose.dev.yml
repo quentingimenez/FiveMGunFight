@@ -35,6 +35,10 @@ services:
       LICENSE_KEY: ${LICENSE_KEY:-}
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-}
       STEAM_WEB_API_KEY: ${STEAM_WEB_API_KEY:-}
+      # rcon pour scripts/fivem_rcon.py (restart d'une ressource sans recréer
+      # le conteneur) : actif seulement si TXADMIN=false, mot de passe aléatoire
+      # tiré par docker/entrypoint.sh. Jamais dans le socle, la prod ou le staging.
+      GF_DEV_RCON: "true"
 
   mariadb:
     environment:
