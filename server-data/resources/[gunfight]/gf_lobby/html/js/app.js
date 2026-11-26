@@ -297,8 +297,10 @@
 
   function revealApp() {
     var app = $('#app');
+    var sceneFx = $('#scene-fx');
     var boot = $('#boot');
     if (app) app.classList.remove('hidden');
+    if (sceneFx) sceneFx.classList.remove('hidden');
     if (boot) boot.classList.add('hidden');
     document.body.classList.remove('booting');
     if (bootFallback) {
@@ -333,7 +335,9 @@
     stopHeartbeat();
     hideTransition();
     var app = $('#app');
+    var sceneFx = $('#scene-fx');
     if (app) app.classList.add('hidden');
+    if (sceneFx) sceneFx.classList.add('hidden');
     var boot = $('#boot');
     if (boot) boot.classList.add('hidden');
     document.body.classList.remove('booting');
