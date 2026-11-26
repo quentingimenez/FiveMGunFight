@@ -38,6 +38,7 @@ local function fermerMenu()
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
     SendNUIMessage({ type = 'close' })
+    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
 end
 
 local function ouvrirMenu()
@@ -147,6 +148,45 @@ RegisterNUICallback('quit', function(data, cb)
     repondre(cb, { ok = true })
 end)
 
+-- Le Casier et le catalogue admin partagent le focus du menu Échap.
+local function transmettreArmes(kind, data)
+    if type(data) ~= 'table' then return end
+    CreateThread(function()
+        local weapons = kind == 'locker' and data.weapons or data
+        local ids = {}
+        for _, weapon in ipairs(weapons or {}) do ids[#ids + 1] = weapon.name end
+        local photos = {}
+        if GetResourceState('gf_thumbs') == 'started' then
+            local ok, result = pcall(function() return exports.gf_thumbs:Get('weapons', ids) end)
+            if ok and type(result) == 'table' then photos = result end
+        end
+        if menuOuvert then SendNUIMessage({ type = kind, data = data, photos = photos }) end
+    end)
+end
+
+RegisterNetEvent('gf_inventory:locker', function(data) transmettreArmes('locker', data) end)
+RegisterNetEvent('gf_inventory:adminData', function(data) transmettreArmes('armory', data) end)
+RegisterNetEvent('gf_inventory:openAdmin', function(data)
+    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', true) end
+    ouvrirMenu()
+    transmettreArmes('armory', data)
+end)
+
+RegisterNUICallback('locker', function(_, cb)
+    TriggerServerEvent('gf_inventory:requestLocker')
+    repondre(cb, { ok = true })
+end)
+
+RegisterNUICallback('equipWeapon', function(data, cb)
+    if type(data) == 'table' then TriggerServerEvent('gf_inventory:equip', data.slot, data.id) end
+    repondre(cb, { ok = true })
+end)
+
+RegisterNUICallback('giveWeapon', function(data, cb)
+    if type(data) == 'table' then TriggerServerEvent('gf_inventory:adminGive', data.id) end
+    repondre(cb, { ok = true })
+end)
+
 -- -------------------------------------------------------------- Fin de ressource
 
 AddEventHandler('onResourceStop', function(resourceName)
@@ -154,5 +194,6 @@ AddEventHandler('onResourceStop', function(resourceName)
     if menuOuvert then
         SetNuiFocus(false, false)
         SetNuiFocusKeepInput(false)
+        if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
     end
 end)

@@ -266,6 +266,8 @@ server-data/
     gf_maps     éditeur de maps en jeu (/editor) + sauvegarde data/maps.json
     gf_ui       interface : HUD, kill feed, dégâts, multi-kills, sons, classement
     gf_vehicles véhicules du serveur (stream/, data/<modèle>/*.meta, son) : Bison XL « gstbisxl3 », Trackhawk « keyhawk »
+    gf_weapons  armes ajoutées (stream/, data/<ARME>/*.meta), via scripts/ajouter_arme.py
+    gf_inventory armes possédées et équipées par joueur
     gf_stats    statistiques persistantes (MariaDB via oxmysql)
     gf_journal  journal JSON des événements de match (morts, tueurs, résultats)
     gf_menu     menu pause NUI (Échap) : profil, règlement, chat, Discord, quitter
@@ -275,6 +277,13 @@ Chaque mode a son propre « monde » (routing bucket) : les joueurs du lobby, de
 l'Attaque et de la Redzone ne se voient pas. Le score et les victoires sont décidés
 **uniquement par le serveur** ; les tirs sur coéquipiers ou joueurs protégés sont annulés
 côté serveur.
+
+
+Les administrateurs utilisent `/armes` en partie pour ajouter une arme à leur
+Casier. Le menu Échap permet ensuite d'équiper les armes possédées dans les
+emplacements 1 et 2. Le choix est enregistré par joueur et utilisé au prochain
+spawn en Redzone ou par défaut au choix des armes en Attaque. Les photos
+manquantes sont créées à l'arrivée d'un admin au lobby.
 
 ## 8. Base de données MariaDB
 

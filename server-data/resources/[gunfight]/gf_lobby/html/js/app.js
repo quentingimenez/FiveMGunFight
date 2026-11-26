@@ -348,6 +348,10 @@
     var message = event && event.data;
     if (!message || typeof message.type !== 'string') return;
     var payload = message.data || {};
+    if (message.type === 'menuOverlay') {
+      document.body.classList.toggle('menu-overlay', payload.open === true);
+      return;
+    }
     if (message.type === 'state') {
       applyState(payload);
       return;

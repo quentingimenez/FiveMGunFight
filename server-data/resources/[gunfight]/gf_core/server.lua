@@ -348,15 +348,38 @@ exports('DeleteVehicle', deleteVehicle)
 
 -- ---------------------------------------------------------------- Armes au choix
 -- Armes possédées par un joueur : liste d'entrées { id, label, category }.
--- Aujourd'hui tout le monde a Config.StarterWeapons ; le futur système de
--- caisses ajoutera ici les armes gagnées (lues en base de données).
+-- Config.StarterWeapons pour tout le monde, plus les armes obtenues (admin,
+-- plus tard caisses) enregistrées en base par gf_inventory.
+local function inventory()
+    return GetResourceState('gf_inventory') == 'started' and exports.gf_inventory or nil
+end
+
 local function ownedWeapons(src)
-    local list = {}
-    for _, id in ipairs(Config.StarterWeapons) do
+    local list, seen = {}, {}
+    local function add(id)
         local w = Config.Weapons[id]
-        if w then list[#list + 1] = { id = id, label = w.label, category = w.category } end
+        if w and not seen[id] then
+            seen[id] = true
+            list[#list + 1] = { id = id, label = w.label, category = w.category, name = w.name }
+        end
+    end
+    for _, id in ipairs(Config.StarterWeapons) do add(id) end
+    local inv = inventory()
+    if inv then
+        local ok, ids = pcall(function() return inv:GetObtained(src) end)
+        if ok and type(ids) == 'table' then
+            for _, id in ipairs(ids) do add(id) end
+        end
     end
     return list
+end
+
+-- Armes équipées dans le Casier ({ id1, id2 }), vide si rien d'équipé
+local function equippedWeapons(src)
+    local inv = inventory()
+    if not inv then return {} end
+    local ok, ids = pcall(function() return inv:GetEquipped(src) end)
+    return ok and type(ids) == 'table' and ids or {}
 end
 
 local function owns(src, id)
@@ -367,9 +390,11 @@ local function owns(src, id)
 end
 
 -- Valide un choix envoyé par le client : Config.SelectionCount armes
--- différentes, toutes possédées. Sinon : choix par défaut.
+-- différentes, toutes possédées. Sans choix : les armes équipées dans le
+-- Casier, complétées par le choix par défaut.
 local function resolveSelection(src, ids)
     local result, seen = {}, {}
+    if type(ids) ~= 'table' or #ids == 0 then ids = equippedWeapons(src) end
     if type(ids) == 'table' then
         for _, id in ipairs(ids) do
             if type(id) == 'string' and not seen[id] and owns(src, id) and #result < Config.SelectionCount then
@@ -413,6 +438,21 @@ local function giveWeapons(src, ids, armour)
 end
 
 exports('GetOwnedWeapons', ownedWeapons)
+exports('GetEquippedWeapons', equippedWeapons)
+exports('OwnsWeapon', owns)
+-- Catalogue complet : { { id, name, label, category }, ... } trié par catégorie puis nom
+exports('GetWeaponCatalog', function()
+    local list = {}
+    for id, w in pairs(Config.Weapons) do
+        list[#list + 1] = { id = id, name = w.name, label = w.label, category = w.category }
+    end
+    table.sort(list, function(a, b)
+        if a.category ~= b.category then return a.category < b.category end
+        return a.label < b.label
+    end)
+    return list
+end)
+exports('GetStarterWeapons', function() return Config.StarterWeapons end)
 exports('ResolveSelection', resolveSelection)
 exports('BuildWeaponList', buildWeaponList)
 exports('GiveWeapons', giveWeapons)

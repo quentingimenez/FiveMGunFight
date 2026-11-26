@@ -116,11 +116,19 @@ local function spawnPlayer(src)
     local x = sp.x + (math.random() * 2 - 1) * 2.5
     local y = sp.y + (math.random() * 2 - 1) * 2.5
 
-    core:Spawn(src, {
+    -- Sans choix enregistré, conserver l'équipement de départ de la Redzone.
+    local equipped = core:GetEquippedWeapons(src)
+    local options = {
         x = x, y = y, z = sp.z, heading = sp.h or 0.0,
-        loadout = 'redzone',
         protected = S.phase ~= 'live',
-    })
+    }
+    if #equipped > 0 then
+        options.weapons = core:BuildWeaponList(core:ResolveSelection(src, equipped))
+        options.armour = core:GetSelectionSettings().armour
+    else
+        options.loadout = 'redzone'
+    end
+    core:Spawn(src, options)
 end
 
 local function kd(p)

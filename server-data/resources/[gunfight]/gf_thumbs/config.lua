@@ -23,7 +23,7 @@ Config.Kinds = {
         provider = { resource = 'gf_core', export = 'GetWeaponThumbList' },
         subject = 'weapon',
         width = 512, height = 256,
-        auto = false, -- aucun menu ne les affiche encore : /thumbs weapons à la main
+        auto = true,
     },
 }
 

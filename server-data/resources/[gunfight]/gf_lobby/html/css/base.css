@@ -1056,3 +1056,5 @@ button {
     padding: 15px;
   }
 }
+
+body.menu-overlay #app, body.menu-overlay #scene-fx, body.menu-overlay #boot { visibility: hidden; }

@@ -353,7 +353,7 @@ jobs:
             tail -n 200 smoke.log
             exit 1
           fi
-          for r in gf_db gf_journal gf_thumbs gf_vehicles gf_ui gf_core gf_lobby gf_maps gf_attack gf_redzone gf_stats gf_menu; do
+          for r in gf_db gf_journal gf_weapons gf_thumbs gf_vehicles gf_ui gf_core gf_lobby gf_maps gf_attack gf_redzone gf_stats gf_menu; do
             if ! grep -q "Started resource $r" smoke.log; then
               echo "::error::La ressource $r n'a pas démarré."
               tail -n 200 smoke.log
