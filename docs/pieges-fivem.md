@@ -101,6 +101,9 @@ essai**.
 - **Lancer le client par l'explorateur** :
   `Start-Process explorer.exe 'fivem://connect/127.0.0.1:30120'`. Un
   lancement direct de `FiveM.exe` depuis un autre programme peut être refusé.
+- **Refermer le client qu'on a lancé soi-même** (AGENTS.md § 5) : un agent qui
+  a ouvert FiveM sans que l'utilisateur le demande le ferme en fin de tâche
+  (`Get-Process -Name 'FiveM*' | Stop-Process -Force`).
 - **Chargement bloqué (« Loading game », 64 %)** : fermer FiveM et relancer ;
   aucune modification du serveur n'est en cause.
 - **Pas de captures en rafale** : plusieurs `PrintWindow` par seconde font
