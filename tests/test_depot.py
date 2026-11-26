@@ -544,6 +544,16 @@ class Documentation(unittest.TestCase):
                 self.assertTrue(chemin.is_file(), "document manquant")
                 self.assertGreater(len(lire(chemin).strip()), 200, "document vide ou presque")
 
+    def test_claude_md_importe_agents_md_et_impose_la_fusion(self) -> None:
+        # Claude Code ne lit que CLAUDE.md : sans import explicite, il ignore
+        # le déroulé d'AGENTS.md et laisse des PR vertes sans les fusionner.
+        chemin = RACINE / "CLAUDE.md"
+        self.assertTrue(chemin.is_file(), "CLAUDE.md manquant")
+        texte = lire(chemin)
+        self.assertRegex(texte, r"(?m)^@AGENTS\.md\s*$", "CLAUDE.md doit importer AGENTS.md")
+        self.assertIn("gh pr merge", texte, "CLAUDE.md doit rappeler la fusion par l'agent")
+        self.assertIn("gh pr checks", texte, "CLAUDE.md doit imposer le suivi de la CI jusqu'au vert")
+
     def test_readme_cite_chaque_ressource(self) -> None:
         texte = lire(RACINE / "README.md")
         for ressource in RESSOURCES_GUNFIGHT:
