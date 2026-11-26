@@ -18,6 +18,7 @@
 local cache = {}     -- [kind] = { [id] = dataURL | false }
 local pending = {}   -- [reqId] = promise
 local nextReq = 0
+local requestBusy = false
 
 RegisterNetEvent('gf_thumbs:data', function(reqId, kind, result)
     local p = pending[reqId]
@@ -31,7 +32,7 @@ RegisterNetEvent('gf_thumbs:updated', function(kind, id)
 end)
 
 local function get(kind, ids)
-    if type(kind) ~= 'string' or type(ids) ~= 'table' then return {} end
+    if type(kind) ~= 'string' or type(ids) ~= 'table' then return {}, false end
     cache[kind] = cache[kind] or {}
     local missing, out = {}, {}
     for _, id in ipairs(ids) do
@@ -39,23 +40,37 @@ local function get(kind, ids)
         if v == nil then missing[#missing + 1] = id
         elseif v then out[id] = v end
     end
-    if #missing > 0 then
+    if #missing == 0 then return out, true end
+    local complete = true
+    while requestBusy do Wait(50) end
+    requestBusy = true
+    -- Des petits lots évitent les délais dépassés pour les catalogues volumineux.
+    for start = 1, #missing, 8 do
+        local batch = {}
+        for i = start, math.min(start + 7, #missing) do batch[#batch + 1] = missing[i] end
+        -- Le serveur limite les requêtes ; sérialiser aussi les différents menus.
+        Wait(300)
         nextReq = nextReq + 1
         local p = promise.new()
         pending[nextReq] = p
-        TriggerServerEvent('gf_thumbs:request', nextReq, kind, missing)
-        -- Si le serveur ne répond pas (anti-spam), on n'attend pas indéfiniment
+        TriggerServerEvent('gf_thumbs:request', nextReq, kind, batch)
         local reqId = nextReq
-        SetTimeout(8000, function()
-            if pending[reqId] then pending[reqId] = nil p:resolve({ result = {} }) end
+        SetTimeout(30000, function()
+            if pending[reqId] then pending[reqId] = nil p:resolve({ timeout = true }) end
         end)
-        local res = Citizen.Await(p).result or {}
-        for _, id in ipairs(missing) do
-            cache[kind][id] = res[id] or false
-            if res[id] then out[id] = res[id] end
+        local reply = Citizen.Await(p)
+        if reply.timeout then
+            complete = false
+        else
+            local res = reply.result or {}
+            for _, id in ipairs(batch) do
+                cache[kind][id] = res[id] or false
+                if res[id] then out[id] = res[id] end
+            end
         end
     end
-    return out
+    requestBusy = false
+    return out, complete
 end
 exports('Get', get)
 
@@ -176,7 +191,7 @@ local function frame(cam, ent, view)
     return center, radius, camPos
 end
 
-local function shoot(kind, id, version)
+local function shoot(kind, id, version, automatic)
     local def = Config.Kinds[kind]
     local subject = Subjects[def.subject]
     local s = Config.Studio
@@ -249,7 +264,7 @@ local function shoot(kind, id, version)
     DeleteEntity(ent)
 
     if type(data) == 'table' and type(data.url) == 'string' then
-        TriggerLatentServerEvent('gf_thumbs:save', 200000, kind, id, data.url)
+        TriggerLatentServerEvent('gf_thumbs:save', 200000, kind, id, data.url, automatic == true)
         return true
     end
     print(('[gf_thumbs] %s/%s : capture échouée%s'):format(kind, id, data and data.error and (' (' .. data.error .. ')') or ''))
@@ -284,7 +299,7 @@ local function runBatch(jobs, why)
         if why == 'automatique' and LocalPlayer.state.gf_mode ~= 'lobby' then break end
         SendNUIMessage({ type = 'progress', text = ('Préparation des photos des menus… %d/%d'):format(i, #jobs) })
         print(('[gf_thumbs] Photo %d/%d : %s/%s (%s)'):format(i, #jobs, job.kind, job.id, why))
-        if shoot(job.kind, job.id, job.version) then
+        if shoot(job.kind, job.id, job.version, why == 'automatique') then
             ok = ok + 1
             DeleteResourceKvp(badKey(job.kind, job.id)) -- refait avec succès : plus « cassé »
         end
@@ -329,11 +344,15 @@ RegisterNetEvent('gf_thumbs:autoCapture', function()
             local items, ids = listOf(kind), {}
             for _, item in ipairs(items) do ids[#ids + 1] = item.id end
             if #ids > 0 then
-                local have = get(kind, ids)
-                for _, item in ipairs(items) do
-                    if not have[item.id] and not isBad(kind, item.id, item.version) then
-                        jobs[#jobs + 1] = { kind = kind, id = item.id, version = item.version }
+                local have, complete = get(kind, ids)
+                if complete then
+                    for _, item in ipairs(items) do
+                        if not have[item.id] and not isBad(kind, item.id, item.version) then
+                            jobs[#jobs + 1] = { kind = kind, id = item.id, version = item.version }
+                        end
                     end
+                else
+                    print(('[gf_thumbs] Photos %s indisponibles : capture automatique reportée'):format(kind))
                 end
             end
         end

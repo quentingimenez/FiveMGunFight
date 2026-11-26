@@ -57,11 +57,17 @@ RegisterCommand('thumbs', function(src, args)
     TriggerClientEvent('gf_thumbs:capture', src, kind, id)
 end, false)
 
-RegisterNetEvent('gf_thumbs:save', function(kind, id, url)
+RegisterNetEvent('gf_thumbs:save', function(kind, id, url, automatic)
     local src = source
     if not core:IsAdmin(src) then return end
     if not Config.Kinds[kind] or not validId(id) then return end
     if type(url) ~= 'string' or url:sub(1, #PNG_PREFIX) ~= PNG_PREFIX then return end
+    -- Une capture automatique ne remplace jamais une photo déjà disponible.
+    if automatic == true and LoadResourceFile(RES, photoPath(kind, id)) then
+        if Cache[kind] then Cache[kind][id] = nil end
+        TriggerClientEvent('gf_thumbs:updated', -1, kind, id)
+        return
+    end
     local raw = Base64.decode(url:sub(#PNG_PREFIX + 1))
     if not raw or #raw > Config.MaxImageBytes or raw:sub(1, 8) ~= PNG_MAGIC then return end
 
