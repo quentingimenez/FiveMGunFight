@@ -8,6 +8,7 @@ Config.Vehicles = {
     { model = 'gstbisxl3', label = 'Bison XL Hellfire' },
     { model = 'keyhawk',   label = 'Jeep Trackhawk' },
     { model = 'gbbisonhf', label = 'Bison HF' },
+    { model = 'astronmans', label = 'Astron Mansory' },
 }
 
 -- Véhicule de base tant qu'aucun admin n'en a choisi un autre
