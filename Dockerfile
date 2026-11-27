@@ -28,7 +28,11 @@ ARG FX_CHANNEL=recommended
 ARG FX_URL=""
 ARG FX_SHA256=""
 
+# L'image de base épinglée peut retarder sur les correctifs de sécurité Debian
+# (ex. CVE-2025-6020, libpam) : l'upgrade au build les applique ; Dependabot propose les nouveaux digests.
+# hadolint ignore=DL3005
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
  && rm -rf /var/lib/apt/lists/*
 
