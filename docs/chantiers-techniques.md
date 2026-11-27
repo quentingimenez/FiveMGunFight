@@ -36,8 +36,8 @@ faire · ✅ fait · ❓ hypothèse à vérifier avant tout correctif.
 | C8 | Charge et réseau mesurés | moyenne | ⬜ | C2 | P5, V7 |
 | C9 | Playtests et équilibre des maps | moyenne | ⬜ | C2 | V8 |
 | C10 | Une seule commande de vérification | moyenne | ✅ | — | V1 |
-| C11 | Mutation, propriétés et fuzzing | moyenne | ⬜ | C10 | V4, U2, U3 |
-| C12 | Migrations de schéma | haute avant [`must-have.md`](must-have.md) § 1 | 🟡 | — | D4 |
+| C11 | Mutation, propriétés et fuzzing | moyenne | 🟡 | C10 | V4, U2, U3 |
+| C12 | Migrations de schéma | haute avant [`must-have.md`](must-have.md) § 1 | ✅ | — | D4 |
 | C13 | Suivi d'oxmysql | basse | ✅ | — | E3 |
 | C14 | Rendu du lobby comparé à une référence | basse | ⬜ | — | V6 |
 | C15 | Documentation contradictoire | basse | ✅ | — | — |
@@ -51,19 +51,21 @@ de développement.
 
 | # | PR | Fait | Reste à faire |
 |---|---|---|---|
-| C1 | #55 | Module `ShotValidation` : arme hors loadout, plafond de dégât, cadence ; refus journalisés | Remplir `damageCaps` et `fireIntervals` à partir de C6, avec exemption des touches mortelles ou plafond au-dessus de 750 |
+| C1 | #55 | Module `ShotValidation` : arme hors loadout, plafond de dégât, cadence ; refus journalisés | Les plafonds ne peuvent pas encore être remplis sans risque : une touche mortelle annonce 484, 572, 605 ou 730 de dégât, sans rapport stable avec l'arme, et `willKill` vient du client du tireur, donc exempter les touches mortelles ouvrirait une faille ; il faut d'abord la mesure de C6 en jeu |
 | C2 | #59 | Ressource `gf_journal` (table `gf_match_events`), `scripts/recalculer_match.py`, `scripts/exporter_journal.sh` | — |
 | C3 | #62 | Ressource `gf_audit` : anomalies `soin-sans-objet` et `touche-mortelle-sans-mort`, sans sanction | Une anomalie quand une ressource de test force un soin ; mesurer le taux de fausses alertes sur plus de parties avant toute sanction |
 | C4 | #61 | Le serveur décide depuis ses tables (`Proteges`, `Equipes`, `Modes`) ; un garde rétablit les state bags réécrits par un client et journalise l'anomalie | En jeu, un client : `LocalPlayer.state:set('gf_protected', true, true)` doit produire une ligne `anomalie` et la valeur revenir à `false` |
 | C5 | — | Rien | Tout, avec une partie de test : le véhicule de mode devient créé par le serveur |
 | C6 | #64 | Tableau des tirs et du temps pour tuer : [`equilibrage-armes.md`](equilibrage-armes.md) (build 1.0.3889.0) | Compter les tirs pour tuer en jeu, à 10, 25 et 50 m, et comparer au tableau ; puis la part des kills de chaque arme (C2) avant tout réglage |
-| C7 | #58 | Module `AttackRules` (machine à états, 26 tests, 500 suites aléatoires) ; défaut du départ en sélection ou en placement vidant une équipe corrigé (branche `fix/attack-empty-team-at-live`) | Voir le correctif en jeu à deux clients |
-| C12 | #56 | Ressource `gf_db` : migrations numérotées et table `gf_schema_version`, prouvées sur la base de développement | Sauvegarde puis restauration du runbook après migration |
+| C7 | #58, #90, #97 | Module `AttackRules` (machine à états, 26 tests, 500 suites aléatoires) ; #90 vu en jeu : la manche se termine au passage en live quand un départ en sélection ou en placement a vidé une équipe ; #97 : un match commencé avec deux équipes peuplées se termine par forfait dès qu'une équipe n'a plus de joueur, à toute phase y compris la pause entre deux manches, manches de test en solo inchangées, 43 tests | Voir le forfait de #97 en jeu à deux clients |
+| C11 | #100 | Lecteur RPF7 de `scripts/ajouter_vehicule.py` durci : traversée de chemin, lectures hors bornes, cycles de répertoires, profondeur des `.rpf` imbriqués limitée à 8, bombe de décompression (512 Mo par fichier, 4 Go au total) ; 14 tests, dont un fuzz déterministe de 2 000 mutations (bibliothèque standard) ; 8 vrais packs extraits à l'identique de l'ancien code | Test de mutation, Hypothesis et atheris avec fuzz nocturne en CI (dépendance et CI à décider) |
+| C12 | #56, #95 | Ressource `gf_db` : migrations numérotées et table `gf_schema_version` ; preuve #95 : une base en version 2 (migrations 1 et 2) a migré au démarrage jusqu'à la version 4, avec sauvegarde, vérification et restauration en local sur piles jetables, serveur restauré en marche | La seule variante « en CI » de la preuve n'est pas automatisée |
 | C13 | #57 | `vendorise.json` et `scripts/suivre_vendorise.py`, testés | — |
 | C16 | #58 | Délais de `gf_attack` passés à `GetGameTimer()` | Mesurer chaque `Wait(0)` avec `resmon` ; découper `gf_lobby/server.lua`, `gf_lobby/client.lua` et `gf_attack/server.lua` (644 lignes) |
 
-Le smoke de la CI vérifie aussi le démarrage de `gf_db`, `gf_journal` et
-`gf_stats` (#60), mais pas encore celui de `gf_audit`.
+Le smoke de la CI (#96) lit la liste des ressources vérifiées dans les lignes
+`ensure gf_` de `server-data/server.cfg` : `gf_audit` et `gf_inventory`,
+auparavant oubliées, sont désormais vérifiées.
 
 ### Preuves tirées du journal de production (26 novembre 2026)
 
@@ -80,10 +82,26 @@ contient 896 événements de 16 h 31 à 23 h 27.
 | C7 | Les manches d'Attaque ont enchaîné leurs phases normalement : scores, raisons de fin, départs en placement et en live | Un départ pendant la sélection ou le placement vidant une équipe laissait la manche passer en live et durer tout le chrono sans adversaire ; corrigé par la branche `fix/attack-empty-team-at-live`, à voir en jeu à deux clients |
 | C12 | Migrations 1 et 2 le 26/11 à 16 h 30, puis migration 3 à chaud à 18 h 55 sur une base en version 2 | Preuve d'une base de la version précédente migrée, en production plutôt qu'en CI ; restent la sauvegarde et la restauration du runbook après migration |
 
-Une touche mortelle à la tête annonce un dégât très supérieur à celui de
-l'arme : jusqu'à 730 relevé, contre 31 à 50 pour une touche normale. Un
-plafond tiré du tableau de C6 refuserait ces kills légitimes : il faut
-exempter les touches mortelles ou fixer le plafond au-dessus de 750.
+Une touche mortelle à la tête annonce un dégât sans rapport stable avec
+l'arme : 484, 572, 605 et 730 relevés, contre 31 à 50 pour une touche
+normale. `willKill` vient du client du tireur : exempter les touches
+mortelles ouvrirait une faille. Les plafonds ne peuvent donc pas encore
+être remplis sans risque ; il faut d'abord la mesure de C6 en jeu.
+
+### Preuves du 27 novembre 2026
+
+Le 27 novembre 2026, #90 a été vu en jeu ; les autres preuves viennent de
+tests, de piles jetables locales et du code de la CI.
+
+| # | Résultat | Preuve |
+|---|---|---|
+| C7 | #90 vu en jeu, #97 prouvé par 43 tests | En jeu, l'adversaire a quitté et l'utilisateur a gagné la manche aussitôt : un départ en sélection ou en placement vidant une équipe termine la manche au passage en live. Les 43 tests de #97 prouvent le forfait d'un match commencé avec deux équipes peuplées dès qu'une équipe n'a plus de joueur, à toute phase y compris la pause entre deux manches, sans changer les manches de test en solo. Reste à voir ce forfait en jeu à deux clients |
+| C11 | #100, durcissement du lecteur RPF7 | Traversée de chemin démontrée (une entrée `../x` écrivait hors du dossier de sortie), lectures hors bornes, cycles de répertoires, profondeur des `.rpf` imbriqués limitée à 8, bombe de décompression (512 Mo par fichier, 4 Go au total) ; 14 tests, dont un fuzz déterministe de 2 000 mutations (bibliothèque standard) ; 8 vrais packs extraits à l'identique de l'ancien code |
+| C12 | #95, preuve complète en local sur piles jetables | Une base en version 2 (migrations 1 et 2) a migré au démarrage jusqu'à la version 4 ; `scripts/sauvegarder.sh` (code 0), `scripts/restaurer.sh --verifier`, puis extraction et import dans la pile `gunfight-restore` du runbook. Le test a trouvé un défaut du runbook : le serveur restauré s'arrêtait aussitôt (« Ctrl-C pressed in server console », pas d'entrée standard) ; corrigé dans #95 (`init`, `stdin_open`, `tty`). Après correction : serveur restauré en marche, 15 ressources démarrées, `gf_db` « schéma à jour (version 4) » sans migration rejouée |
+| Smoke | #96 : `gf_audit` et `gf_inventory`, auparavant oubliées, sont vérifiées | La liste des ressources vérifiées est lue dans les lignes `ensure gf_` de `server-data/server.cfg` |
+
+Avec la preuve en production du 26/11, C12 passe à ✅ ; la variante « en CI »
+de la preuve n'est pas automatisée.
 
 ## C1 — Validation des tirs
 
