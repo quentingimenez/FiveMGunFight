@@ -198,7 +198,6 @@ local spectateNom = ''
 local spectatePed = 0 -- ped de la cible actuellement suivi
 local spectatePos = nil -- dernières coordonnées reçues (x, y, z)
 local spectateSauvegarde = nil
-local spectateThread = nil
 local spectateDernierMouvement = 0
 
 --- Un nombre doit être fini : NaN et infinis sont rejetés.
@@ -249,7 +248,6 @@ local function arreter(prevenirServeur)
     NetworkSetInSpectatorMode(false, PlayerPedId())
     restaurerEtat(ped, spectateSauvegarde)
 
-    spectateThread = nil
     spectatePed = 0
     spectateCible = nil
     spectateNom = ''
@@ -275,7 +273,7 @@ end
 
 --- Thread unique de la vue : texte chaque frame, déplacement toutes les 500 ms.
 local function threadSpectate(maSession)
-    spectateThread = CreateThread(function()
+    CreateThread(function()
         while spectateActif and session == maSession do
             Wait(0)
             -- arreter() peut être intervenu pendant le Wait : sortir sans
