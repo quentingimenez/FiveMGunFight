@@ -113,8 +113,9 @@ sont précisés dans `details` (`VARCHAR(255)`, nullable), qui contient les
 informations complémentaires de l'action.
 
 Les actions journalisées sont `setmode`, `setteam`, `startround`, `endmatch`,
-`nextzone`, `endgame`, `nextmap`, `give`, `admin_give`, `resetchar`, `map_save`,
-`map_enable`, `map_delete` et `vehicle_custom`. L'écriture a lieu **uniquement
+`nextzone`, `endgame`, `nextmap`, `give`, `admin_give`, `resetchar`, `kick`,
+`goto`, `bring`, `heal`, `freeze`, `announce`, `map_save`, `map_enable`,
+`map_delete` et `vehicle_custom`. L'écriture a lieu **uniquement
 après le succès** de l'action : un refus ou un échec n'ajoute aucune ligne. Elle
 est asynchrone et ne se fait que si `gf_db` est démarrée et prête
 (`exports.gf_db:Pret()` renvoie vrai). Chaque action produit également une courte

@@ -37,17 +37,26 @@ local coords = {
 local journal = {}      -- { { kind, name, target, data, ordre }, ... }
 local notices = {}      -- { { src, message }, ... }
 local prints = {}       -- lignes produites par le print de env
-local drops = {}        -- { { src, reason }, ... }
+local drops = {}        -- { { src, reason, ordre }, ... }
 local freezes = {}      -- { { src, etat }, ... }
+local audits = {}       -- { { src, action, cible, details, ordre }, ... }
 local commands = {}     -- RegisterCommand : commands[nom] = handler
 local handlers = {}     -- RegisterNetEvent
 local eventHandlers = {} -- AddEventHandler
 
 local now = 1000
 
+-- Ordre partagé entre DropPlayer et LogAction : prouve que kick journalise
+-- avant d'expulser une cible qui n'a alors plus de nom ni de licence.
+local sequence = 0
+local function prochainOrdre()
+    sequence = sequence + 1
+    return sequence
+end
+
 -- Archivage avant chaque remise à zéro : le contrôle d'absence d'identifiant
 -- porte sur tout ce que la suite de tests a produit, pas seulement le dernier cas.
-local archive = { journal = {}, notices = {}, prints = {}, drops = {}, freezes = {} }
+local archive = { journal = {}, notices = {}, prints = {}, drops = {}, freezes = {}, audits = {} }
 
 local core = {
     IsAdmin = function(_, src) return admins[src] == true end,
@@ -61,7 +70,17 @@ local core = {
 
 local env = setmetatable({
     source = 1,
-    exports = { gf_core = core },
+    exports = {
+        gf_core = core,
+        gf_admin = {
+            LogAction = function(_, src, action, cible, details)
+                audits[#audits + 1] = {
+                    src = src, action = action, cible = cible, details = details,
+                    ordre = prochainOrdre(),
+                }
+            end,
+        },
+    },
     print = function(...)
         local parts = {}
         for i = 1, select('#', ...) do parts[i] = tostring((select(i, ...))) end
@@ -74,8 +93,9 @@ local env = setmetatable({
     GetPlayerPed = function(id) return peds[id] end,
     GetEntityCoords = function(ped) return coords[ped] end,
     GetGameTimer = function() return now end,
+    GetResourceState = function() return 'started' end,
     DropPlayer = function(src, reason)
-        drops[#drops + 1] = { src = src, reason = reason }
+        drops[#drops + 1] = { src = src, reason = reason, ordre = prochainOrdre() }
     end,
     TriggerClientEvent = function(name, target, data)
         journal[#journal + 1] = {
@@ -113,7 +133,8 @@ local function reinitialiser()
     for _, v in ipairs(prints) do archive.prints[#archive.prints + 1] = v end
     for _, v in ipairs(drops) do archive.drops[#archive.drops + 1] = v end
     for _, v in ipairs(freezes) do archive.freezes[#archive.freezes + 1] = v end
-    journal, notices, prints, drops, freezes = {}, {}, {}, {}, {}
+    for _, v in ipairs(audits) do archive.audits[#archive.audits + 1] = v end
+    journal, notices, prints, drops, freezes, audits = {}, {}, {}, {}, {}, {}
     now = now + 1000
 end
 
@@ -170,8 +191,19 @@ end
 local function aucunEffet(kind)
     if kind == nil then
         return #journal == 0 and #drops == 0 and #freezes == 0 and #prints == 0
+            and #audits == 0
     end
     return #entries(kind) == 0 and #drops == 0 and #freezes == 0 and #prints == 0
+        and #audits == 0
+end
+
+-- Un succès doit produire exactement un appel LogAction avec les valeurs exactes.
+local function verifierAudit(src, action, cible, details, label)
+    check(#audits == 1, ('%s : un seul appel LogAction'):format(label))
+    local a = audits[1]
+    check(a ~= nil and a.src == src and a.action == action
+        and a.cible == cible and a.details == details,
+        ('%s : src, action, cible et details exacts'):format(label))
 end
 
 local USAGE = 'Usage : announce <texte> (ex. announce Redémarrage dans 5 minutes)'
@@ -236,7 +268,8 @@ appeler('kick', 1, { '1' })
 check(#notices == 1 and notices[1].src == 1
     and notices[1].message == 'Tu ne peux pas t’expulser toi-même.',
     'kick soi-même : message exact')
-check(#drops == 0 and #journal == 0 and #prints == 0, 'kick soi-même : aucun drop ni effet')
+check(#drops == 0 and #journal == 0 and #prints == 0 and #audits == 0,
+    'kick soi-même : aucun drop ni effet')
 
 -- ---------------------------------------------------------------------------
 -- 3. kick : raison nettoyée, raison par défaut, cible inconnue.
@@ -249,6 +282,8 @@ check(drops[1] ~= nil and drops[1].src == 3
     'kick normal : raison nettoyée et espaces réduits')
 check(notice(1, 'Charlie expulsé.') ~= nil, 'kick normal : reply exact')
 check(#notices == 1, 'kick normal : une seule notification')
+verifierAudit(1, 'kick', 3, 'raison=Triche rapide', 'kick normal')
+check(audits[1].ordre < drops[1].ordre, 'kick normal : LogAction avant DropPlayer')
 
 reinitialiser()
 appeler('kick', 1, { '3' })
@@ -256,6 +291,7 @@ check(#drops == 1 and drops[1].src == 3
     and drops[1].reason == 'Expulsé par un administrateur : aucune raison',
     'kick sans raison : raison par défaut')
 check(notice(1, 'Charlie expulsé.') ~= nil, 'kick sans raison : reply exact')
+verifierAudit(1, 'kick', 3, 'raison=aucune raison', 'kick sans raison')
 
 reinitialiser()
 appeler('kick', 1, { '3', string.rep('a', 100) })
@@ -265,11 +301,13 @@ check(#drops == 1 and drops[1].src == 3
 check(drops[1] ~= nil and drops[1].reason ~= 'Expulsé par un administrateur : ' .. string.rep('a', 100),
     'kick raison 100 caractères : la raison complète n’est pas transmise')
 check(notice(1, 'Charlie expulsé.') ~= nil, 'kick raison 100 caractères : reply exact')
+verifierAudit(1, 'kick', 3, 'raison=' .. string.rep('a', 80), 'kick raison 100 caractères')
 
 reinitialiser()
 appeler('kick', 1, { '999' })
 check(notice(1, 'Joueur 999 introuvable.') ~= nil, 'kick cible inconnue : message exact')
-check(#drops == 0 and #journal == 0, 'kick cible inconnue : aucun drop ni événement')
+check(#drops == 0 and #journal == 0 and #audits == 0,
+    'kick cible inconnue : aucun drop ni événement')
 
 -- ---------------------------------------------------------------------------
 -- 4. goto / bring : buckets, téléportations, cible égale à soi, console.
@@ -279,13 +317,15 @@ buckets[3] = 5
 appeler('goto', 1, { '3' })
 check(notice(1, 'Charlie est dans un autre mode : utilise d’abord setmode.') ~= nil,
     'goto bucket différent : message exact')
-check(#entries('client', 'gf_admin:teleport') == 0, 'goto bucket différent : aucun téléport')
+check(#entries('client', 'gf_admin:teleport') == 0 and #audits == 0,
+    'goto bucket différent : aucun téléport ni audit')
 
 reinitialiser()
 appeler('bring', 1, { '3' })
 check(notice(1, 'Charlie est dans un autre mode : utilise d’abord setmode.') ~= nil,
     'bring bucket différent : message exact')
-check(#entries('client', 'gf_admin:teleport') == 0, 'bring bucket différent : aucun téléport')
+check(#entries('client', 'gf_admin:teleport') == 0 and #audits == 0,
+    'bring bucket différent : aucun téléport ni audit')
 buckets[3] = 0
 
 reinitialiser()
@@ -296,6 +336,7 @@ check(tpGoto ~= nil and type(tpGoto.data) == 'table'
     and tpGoto.data.x == 11.5 and tpGoto.data.y == 20 and tpGoto.data.z == 30,
     'goto : coordonnées exactes de la cible')
 check(notice(1, 'Téléporté près de Charlie.') ~= nil, 'goto : reply exact')
+verifierAudit(1, 'goto', 3, nil, 'goto succès')
 
 reinitialiser()
 appeler('bring', 1, { '3' })
@@ -306,28 +347,31 @@ check(tpBring ~= nil and type(tpBring.data) == 'table'
     'bring : coordonnées exactes de l’administrateur')
 check(notice(3, 'Un administrateur t’a téléporté.') ~= nil, 'bring : notification de la cible')
 check(notice(1, 'Charlie téléporté près de toi.') ~= nil, 'bring : reply exact')
+verifierAudit(1, 'bring', 3, nil, 'bring succès')
 
 reinitialiser()
 appeler('goto', 1, { '1' })
 check(notice(1, 'Tu ne peux pas te téléporter toi-même.') ~= nil, 'goto soi-même : message exact')
-check(#entries('client') == 0, 'goto soi-même : aucun téléport')
+check(#entries('client') == 0 and #audits == 0, 'goto soi-même : aucun téléport ni audit')
 
 reinitialiser()
 appeler('bring', 1, { '1' })
 check(notice(1, 'Tu ne peux pas te ramener toi-même.') ~= nil, 'bring soi-même : message exact')
-check(#entries('client') == 0, 'bring soi-même : aucun téléport')
+check(#entries('client') == 0 and #audits == 0, 'bring soi-même : aucun téléport ni audit')
 
 reinitialiser()
 appeler('goto', 0, { '3' })
 check(#prints == 1 and prints[1] == '[gf_admin] Commande à utiliser en jeu.',
     'goto console : print exact')
-check(#entries('client') == 0 and #notices == 0, 'goto console : aucun téléport ni notification')
+check(#entries('client') == 0 and #notices == 0 and #audits == 0,
+    'goto console : aucun téléport, notification ni audit')
 
 reinitialiser()
 appeler('bring', 0, { '3' })
 check(#prints == 1 and prints[1] == '[gf_admin] Commande à utiliser en jeu.',
     'bring console : print exact')
-check(#entries('client') == 0 and #notices == 0, 'bring console : aucun téléport ni notification')
+check(#entries('client') == 0 and #notices == 0 and #audits == 0,
+    'bring console : aucun téléport, notification ni audit')
 
 -- Le harnais est bien pilotable : remettre la cible 2 dans le même bucket.
 reinitialiser()
@@ -337,6 +381,7 @@ local tpPilote = entry('client', 'gf_admin:teleport')
 check(tpPilote ~= nil and tpPilote.target == 1
     and type(tpPilote.data) == 'table' and tpPilote.data.x == 201.5,
     'bucket pilotable : goto réussi après changement de bucket')
+verifierAudit(1, 'goto', 2, nil, 'bucket pilotable goto')
 buckets[2] = 5
 
 -- ---------------------------------------------------------------------------
@@ -353,6 +398,7 @@ check(audit ~= nil and soinClient ~= nil and audit.ordre < soinClient.ordre,
     'heal : audit avant le client')
 check(notice(3, 'Un administrateur t’a soigné.') ~= nil, 'heal : notification de la cible')
 check(notice(1, 'Charlie soigné.') ~= nil, 'heal : reply exact')
+verifierAudit(1, 'heal', 3, nil, 'heal')
 
 -- ---------------------------------------------------------------------------
 -- 6. freeze : bascule, messages exacts, remise à zéro à la déconnexion.
@@ -365,6 +411,7 @@ check(#notices == 2 and notices[1].src == 3
     and notices[1].message == 'Un administrateur t’a gelé.'
     and notices[2].src == 1 and notices[2].message == 'Charlie gelé.',
     'freeze premier appel : notifications exactes')
+verifierAudit(1, 'freeze', 3, 'etat=gele', 'freeze premier appel')
 
 reinitialiser()
 appeler('freeze', 1, { '3' })
@@ -374,6 +421,7 @@ check(#notices == 2 and notices[1].src == 3
     and notices[1].message == 'Un administrateur t’a dégelé.'
     and notices[2].src == 1 and notices[2].message == 'Charlie dégelé.',
     'freeze second appel : notifications exactes')
+verifierAudit(1, 'freeze', 3, 'etat=degele', 'freeze second appel')
 
 reinitialiser()
 appeler('freeze', 1, { '3' })
@@ -384,6 +432,7 @@ appeler('freeze', 1, { '3' })
 check(#freezes == 1 and freezes[1].src == 3 and freezes[1].etat == true,
     'freeze après playerDropped : état remis à zéro, toujours gelé')
 check(notice(3, 'Un administrateur t’a gelé.') ~= nil, 'freeze après playerDropped : message exact')
+verifierAudit(1, 'freeze', 3, 'etat=gele', 'freeze après playerDropped')
 
 -- ---------------------------------------------------------------------------
 -- 7. announce : événement global, reply, journal ; refus des textes invalides.
@@ -401,6 +450,7 @@ check(#prints == 1 and prints[1] == '[gf_admin] Annonce de Alpha : Bonjour monde
     'announce : print avec auteur et texte')
 check(prints[1]:find('Alpha', 1, true) ~= nil and prints[1]:find('Bonjour monde', 1, true) ~= nil,
     'announce : le print contient l’auteur et le texte')
+verifierAudit(1, 'announce', nil, 'texte=Bonjour monde', 'announce normal')
 
 -- Borne acceptée : exactement 120 caractères.
 local texte120 = string.rep('a', 120)
@@ -414,6 +464,7 @@ check(annonce120 ~= nil and type(annonce120.data) == 'table'
 check(notice(1, 'Annonce envoyée.') ~= nil, 'announce 120 : reply exact')
 check(#prints == 1 and prints[1] == '[gf_admin] Annonce de Alpha : ' .. texte120,
     'announce 120 : print avec auteur et texte')
+verifierAudit(1, 'announce', nil, 'texte=' .. texte120, 'announce 120')
 
 -- Console : reply et auteur passent par print, aucune notification.
 reinitialiser()
@@ -427,16 +478,25 @@ check(#prints == 2 and prints[1] == '[gf_admin] Annonce envoyée.'
     and prints[2] == '[gf_admin] Annonce de console : Test console',
     'announce console : deux prints dans l’ordre, reply puis auteur')
 check(#notices == 0, 'announce console : aucune notification')
+verifierAudit(0, 'announce', nil, 'texte=Test console', 'announce console')
+
+reinitialiser()
+appeler('announce', 1, {})
+check(notice(1, USAGE) ~= nil, 'announce sans argument : message d’usage exact')
+check(#journal == 0 and #prints == 0 and #audits == 0,
+    'announce sans argument : aucun événement, print ni audit')
 
 reinitialiser()
 appeler('announce', 1, { string.rep('a', 121) })
 check(notice(1, USAGE) ~= nil, 'announce 121 caractères : message d’usage exact')
-check(#journal == 0 and #prints == 0, 'announce 121 caractères : aucun événement ni print')
+check(#journal == 0 and #prints == 0 and #audits == 0,
+    'announce 121 caractères : aucun événement ni print ni audit')
 
 reinitialiser()
 appeler('announce', 1, { '; | \\ ` " \n' })
 check(notice(1, USAGE) ~= nil, 'announce vide après nettoyage : message d’usage exact')
-check(#journal == 0 and #prints == 0, 'announce vide après nettoyage : aucun événement ni print')
+check(#journal == 0 and #prints == 0 and #audits == 0,
+    'announce vide après nettoyage : aucun événement ni print ni audit')
 
 -- ---------------------------------------------------------------------------
 -- 8. Aucun identifiant (license:, ip:, discord:) dans notices, prints, drops,

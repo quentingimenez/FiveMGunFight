@@ -123,6 +123,9 @@ RegisterCommand('kick', function(src, args)
 
     local raison = nettoyerTexte(joindreArgs(args, 2), 80)
     if raison == '' then raison = 'aucune raison' end
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'kick', cible, 'raison=' .. raison) end)
+    end
     DropPlayer(cible, 'Expulsé par un administrateur : ' .. raison)
     reply(src, ('%s expulsé.'):format(nom))
 end, false)
@@ -161,6 +164,9 @@ RegisterCommand('goto', function(src, args)
         x = coords.x + 1.5, y = coords.y, z = coords.z,
     })
     reply(src, ('Téléporté près de %s.'):format(nom))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'goto', cible, nil) end)
+    end
 end, false)
 
 -- bring <id> : amène la cible près de l'administrateur (en jeu seulement).
@@ -198,6 +204,9 @@ RegisterCommand('bring', function(src, args)
     })
     core:Notify(cible, 'Un administrateur t’a téléporté.')
     reply(src, ('%s téléporté près de toi.'):format(nom))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'bring', cible, nil) end)
+    end
 end, false)
 
 -- heal <id> : soin accordé, tracé par gf_audit avant le signalement client.
@@ -221,6 +230,9 @@ RegisterCommand('heal', function(src, args)
     TriggerClientEvent('gf_admin:heal', cible)
     core:Notify(cible, 'Un administrateur t’a soigné.')
     reply(src, ('%s soigné.'):format(nom))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'heal', cible, nil) end)
+    end
 end, false)
 
 -- freeze <id> : bascule le gel côté cible.
@@ -250,6 +262,9 @@ RegisterCommand('freeze', function(src, args)
         core:Notify(cible, 'Un administrateur t’a dégelé.')
         reply(src, ('%s dégelé.'):format(nom))
     end
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'freeze', cible, nouvelEtat and 'etat=gele' or 'etat=degele') end)
+    end
 end, false)
 
 -- announce <texte...> : annonce globale, sans identifiant dans le texte.
@@ -274,6 +289,9 @@ RegisterCommand('announce', function(src, args)
     local auteur = 'console'
     if src ~= 0 then auteur = GetPlayerName(src) or ('joueur %d'):format(src) end
     print(('[gf_admin] Annonce de %s : %s'):format(auteur, texte))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'announce', nil, 'texte=' .. texte) end)
+    end
 end, false)
 
 AddEventHandler('playerDropped', function()
