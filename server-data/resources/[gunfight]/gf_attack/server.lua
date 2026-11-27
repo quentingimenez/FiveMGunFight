@@ -711,8 +711,14 @@ RegisterCommand('startround', function(src)
         return
     end
     local ok, msg = startTestRound(src)
-    if not ok then reply(src, msg)
-    elseif msg then reply(src, msg) end
+    if not ok then
+        reply(src, msg)
+    else
+        if msg then reply(src, msg) end
+        if GetResourceState('gf_admin') == 'started' then
+            pcall(function() exports.gf_admin:LogAction(src, 'startround', nil, 'mode=attack') end)
+        end
+    end
 end, false)
 
 -- /endmatch : arrête le match et remet les scores à zéro
@@ -723,6 +729,9 @@ RegisterCommand('endmatch', function(src)
     end
     -- Les effets font les remises à zéro, l'annonce et les apparitions.
     executer(AttackRules.finMatch(etat))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'endmatch', nil, 'mode=attack') end)
+    end
 end, false)
 
 -- /nextzone : passe à la zone suivante (en attente uniquement)
@@ -735,6 +744,9 @@ RegisterCommand('nextzone', function(src)
     loadMap(zoneIndex + 1)
     executer(AttackRules.allerEnAttente(etat))
     reply(src, 'Zone : ' .. zone().name)
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'nextzone', nil, 'zone=' .. zone().name) end)
+    end
 end, false)
 
 -- /setteam [id] [A|B]
@@ -748,6 +760,9 @@ RegisterCommand('setteam', function(src, args)
         return reply(src, 'Utilisation : /setteam [id] [A|B] (le joueur doit être dans le mode Attaque)')
     end
     executer(AttackRules.changerEquipe(etat, target, t, GetGameTimer()))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'setteam', target, 'equipe=' .. t) end)
+    end
 end, false)
 
 -- Une map a été créée / modifiée / supprimée avec /editor

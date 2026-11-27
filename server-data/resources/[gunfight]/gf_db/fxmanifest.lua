@@ -21,4 +21,5 @@ files {
     'migrations/0002_gf_match_events.sql',
     'migrations/0003_gf_player_weapons.sql',
     'migrations/0004_gf_weapon_accessories.sql',
+    'migrations/0005_gf_admin_log.sql',
 }

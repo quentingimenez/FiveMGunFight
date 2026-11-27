@@ -1502,6 +1502,10 @@ RegisterCommand('resetchar', function(src, args)
     end
 
     if src ~= 0 then notify(src, 'Personnage réinitialisé.', 'success') end
+
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'resetchar', target, 'personnage') end)
+    end
 end, false)
 
 CreateThread(function()

@@ -96,6 +96,41 @@ des commandes et leurs effets sont décrits dans le
 - L'événement d'ouverture `gf_admin:open` est un événement **client local** : il
   ne traverse pas le réseau et ne modifie aucun droit.
 
+## Journal des actions
+
+Chaque action d'administration réussie est enregistrée dans la table MariaDB
+`gf_admin_log`, créée par la migration `0005` de `gf_db`. Le journal répond aux
+questions qui, quoi, sur qui et quand. `id` est une clé primaire auto-incrémentée
+(`BIGINT UNSIGNED`) ; `created_at` est l'horodatage de l'action, avec
+`CURRENT_TIMESTAMP` comme valeur par défaut, et un index accélère les
+consultations triées par date. `admin_name` (`VARCHAR(64)`, obligatoire) donne
+le nom de l'administrateur et `admin_identifier` (`VARCHAR(64)`, nullable) son
+identifiant lorsqu'il est connu. `action` (`VARCHAR(32)`, obligatoire) nomme la
+commande exécutée. `target_name` (`VARCHAR(64)`, nullable) et
+`target_identifier` (`VARCHAR(64)`, nullable) désignent le joueur concerné
+quand il y en a un ; pour une map ou un véhicule, le kind, l'id ou le modèle
+sont précisés dans `details` (`VARCHAR(255)`, nullable), qui contient les
+informations complémentaires de l'action.
+
+Les actions journalisées sont `setmode`, `setteam`, `startround`, `endmatch`,
+`nextzone`, `endgame`, `nextmap`, `give`, `admin_give`, `resetchar`, `map_save`,
+`map_enable`, `map_delete` et `vehicle_custom`. L'écriture a lieu **uniquement
+après le succès** de l'action : un refus ou un échec n'ajoute aucune ligne. Elle
+est asynchrone et ne se fait que si `gf_db` est démarrée et prête
+(`exports.gf_db:Pret()` renvoie vrai). Chaque action produit également une courte
+ligne dans la console du serveur, **sans identifiant** : aucune licence ni
+adresse IP n'y figure.
+
+Le panneau ne dispose pas encore d'un affichage de ce journal : la consultation
+se fait par SQL sur la base `gunfight`. Par exemple :
+
+```sql
+SELECT created_at, admin_name, action, target_name, details
+FROM gf_admin_log
+ORDER BY created_at DESC
+LIMIT 100;
+```
+
 ## Limites connues
 
 Le panneau ne propose pas encore la vue du joueur.

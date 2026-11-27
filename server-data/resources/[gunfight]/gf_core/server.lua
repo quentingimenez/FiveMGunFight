@@ -891,7 +891,12 @@ RegisterCommand('setmode', function(src, args)
         else print('Le match est déjà en cours ou complet.') end
         return
     end
-    setMode(target, mode)
+    local change = setMode(target, mode)
+    if change then
+        if GetResourceState('gf_admin') == 'started' then
+            pcall(function() exports.gf_admin:LogAction(src, 'setmode', target, 'mode=' .. mode) end)
+        end
+    end
 end, false)
 
 -- Un client signale qu'un modèle de véhicule l'a fait planter au chargement

@@ -160,6 +160,9 @@ RegisterNetEvent('gf_maps:save', function(kind, data)
     print(('[gf_maps] %s a enregistré la map "%s" (%s)'):format(GetPlayerName(src), clean.name, kind))
     TriggerClientEvent('gf_maps:saved', src, Maps, clean.id)
     TriggerEvent('gf_maps:updated', kind)
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'map_save', nil, 'map=' .. kind .. '/' .. clean.id) end)
+    end
 end)
 
 -- Cocher / décocher une map (en jeu ou non)
@@ -174,6 +177,9 @@ RegisterNetEvent('gf_maps:setEnabled', function(kind, id, enabled)
                 m.enabled and 'activé' or 'désactivé', m.name, kind))
             TriggerClientEvent('gf_maps:list', src, Maps)
             TriggerEvent('gf_maps:updated', kind)
+            if GetResourceState('gf_admin') == 'started' then
+                pcall(function() exports.gf_admin:LogAction(src, 'map_enable', nil, 'map=' .. kind .. '/' .. id .. '=' .. (m.enabled and 'true' or 'false')) end)
+            end
             return
         end
     end
@@ -189,6 +195,9 @@ RegisterNetEvent('gf_maps:delete', function(kind, id)
             print(('[gf_maps] %s a supprimé la map "%s" (%s)'):format(GetPlayerName(src), m.name, kind))
             TriggerClientEvent('gf_maps:saved', src, Maps, nil)
             TriggerEvent('gf_maps:updated', kind)
+            if GetResourceState('gf_admin') == 'started' then
+                pcall(function() exports.gf_admin:LogAction(src, 'map_delete', nil, 'map=' .. kind .. '/' .. id) end)
+            end
             return
         end
     end
