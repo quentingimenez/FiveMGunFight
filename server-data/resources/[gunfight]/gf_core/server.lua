@@ -149,7 +149,11 @@ local function playersInMode(mode)
 end
 
 local function isAdmin(src)
-    return src == 0 or IsPlayerAceAllowed(src, Config.AdminAce)
+    if src == 0 then return true end
+    -- En Lua FiveM un natif BOOL rend 1 pour vrai (false pour faux) : on
+    -- normalise ici pour tous les appelants, export IsAdmin compris.
+    local allowed = IsPlayerAceAllowed(src, Config.AdminAce)
+    return allowed == true or allowed == 1
 end
 
 local function setProtected(src, on)
