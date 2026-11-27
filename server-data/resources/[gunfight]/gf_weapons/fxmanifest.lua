@@ -372,6 +372,7 @@ files {
     'data/WEAPON_VVSMPXQPURPLE/components/GF_CLIP60/weaponcomponents.meta',
     'data/WEAPON_VVSMPXQROSE/components/GF_CLIP60/weaponcomponents.meta',
     'data/WEAPON_VVSMPXQYELLOW/components/GF_CLIP60/weaponcomponents.meta',
+    'data/WEAPON_DBCARROT/components/COMPONENT_DBCARROT_CLIP_01/weaponcomponents.meta',
     'data/WEAPON_DBCARROT/names.json',
     'data/WEAPON_DBCARROT/pedpersonality.meta',
     'data/WEAPON_DBCARROT/weaponanimations.meta',
