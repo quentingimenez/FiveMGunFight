@@ -677,7 +677,8 @@
       { node: refs.gotoBtn, command: 'goto' },
       { node: refs.bringBtn, command: 'bring' },
       { node: refs.healBtn, command: 'heal' },
-      { node: refs.freezeBtn, command: 'freeze' }
+      { node: refs.freezeBtn, command: 'freeze' },
+      { node: refs.spectateBtn, command: 'spectate' }
     ];
     for (var a = 0; a < playerActionButtons.length; a += 1) {
       (function (action) {
@@ -777,6 +778,7 @@
       refs.bringBtn = byId('btn-bring');
       refs.healBtn = byId('btn-heal');
       refs.freezeBtn = byId('btn-freeze');
+      refs.spectateBtn = byId('btn-spectate');
       refs.kickBtn = byId('btn-kick');
       refs.announceText = byId('announce-text');
       refs.announceCount = byId('announce-count');

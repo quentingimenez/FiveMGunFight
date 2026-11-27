@@ -76,14 +76,38 @@ affiche `isAdmin === true`, c'est bien le serveur qui décide de l'accès. La li
 des commandes et leurs effets sont décrits dans le
 [README](../README.md#4-commandes-en-jeu).
 
+### Vue du joueur
+
+La commande `spectate <id>` permet à un administrateur de regarder un joueur,
+et `spectate` seule arrête la vue en cours. Elle est réservée aux
+administrateurs et utilisable **en jeu seulement**. Depuis le panneau, l'action
+`spectate` ferme le panneau (`GFAdminCommands.opensUi('spectate')`) pour rendre
+la main au jeu.
+
+Pendant la vue, l'administrateur suit la cible dans son monde (routing bucket)
+et retrouve son monde d'origine à l'arrêt. Il est invisible et intouchable près
+de la cible, qui n'est pas prévenue. La vue s'arrête automatiquement si la cible
+quitte le serveur, avec le message « Le joueur a quitté le serveur : vue
+arrêtée. ». Rejouer la même commande ou taper `spectate` seule arrête la vue.
+Changer de cible arrête silencieusement la vue précédente puis démarre la
+nouvelle.
+
+Au démarrage, une ligne d'action `spectate` avec la cible est journalisée ; elle
+ne contient aucun identifiant (license, IP). Aucune ligne n'est ajoutée à
+l'arrêt.
+
+La vue utilise la caméra de spectateur du jeu, et non l'écran exact du joueur :
+un menu de triche affiché seulement chez lui reste invisible. Une capture
+d'écran est une évolution possible, avec une ressource dédiée.
+
 ## Sécurité
 
 - Les droits sont revérifiés côté serveur sur `gf_admin:requestData`
   (`core:IsAdmin(src)`) **et** sur chaque commande exécutée depuis le panneau,
   même si le client affiche déjà `isAdmin === true`. Les commandes d'action
-  (`kick`, `goto`, `bring`, `heal`, `freeze`, `announce`) sont enregistrées avec
-  `RegisterCommand` côté serveur : **aucun nouveau message client → serveur**
-  n'est ajouté pour elles, la surface réseau décrite dans
+  (`kick`, `goto`, `bring`, `heal`, `freeze`, `announce`, `spectate`) sont
+  enregistrées avec `RegisterCommand` côté serveur : **aucun nouveau message
+  client → serveur** n'est ajouté pour elles, la surface réseau décrite dans
   [les événements serveur](evenements-serveur.md) reste inchangée.
 - `gf_admin:requestData` ne prend **aucun argument** : le serveur utilise
   uniquement `source`, vérifie que le joueur est connecté et répond en lecture
@@ -114,7 +138,7 @@ informations complémentaires de l'action.
 
 Les actions journalisées sont `setmode`, `setteam`, `startround`, `endmatch`,
 `nextzone`, `endgame`, `nextmap`, `give`, `admin_give`, `resetchar`, `kick`,
-`goto`, `bring`, `heal`, `freeze`, `announce`, `map_save`, `map_enable`,
+`goto`, `bring`, `heal`, `freeze`, `announce`, `spectate`, `map_save`, `map_enable`,
 `map_delete` et `vehicle_custom`. L'écriture a lieu **uniquement
 après le succès** de l'action : un refus ou un échec n'ajoute aucune ligne. Elle
 est asynchrone et ne se fait que si `gf_db` est démarrée et prête
@@ -134,7 +158,8 @@ LIMIT 100;
 
 ## Limites connues
 
-Le panneau ne propose pas encore la vue du joueur.
+La vue du joueur utilise la caméra de spectateur du jeu : elle ne capture pas
+l'écran exact du joueur.
 
 ## Comment tester
 
