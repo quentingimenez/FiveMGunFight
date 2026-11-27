@@ -24,7 +24,7 @@ end
 
 local RESOURCES = repoRoot() .. '/server-data/resources/[gunfight]/'
 
-local ADMIN_REQUIS = 'Réservé aux administrateurs. Tape /whoami pour voir ton identifiant.'
+local ADMIN_REQUIS = 'Réservé aux administrateurs. Ouvre la console (F8) et tape whoami pour voir ton identifiant.'
 local IDENTIFIANTS = 'Identifiants : license:abc, fivem:42, discord:99'
 local AIDE_ADMIN = 'Pour devenir admin, ajoute un de ces identifiants à la variable ADMIN_IDENTIFIERS du serveur (.env ou gabarit Unraid), puis redémarre-le.'
 

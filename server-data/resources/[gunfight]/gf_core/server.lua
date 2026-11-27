@@ -33,7 +33,7 @@ local Vehicles = {}     -- [src] = netId du véhicule de mode (redzone)
 local lastDamager = {}  -- [victime] = { src = tireur, at, weapon } (dégât serveur autorisé)
 local Armes = {}        -- [src] = ensemble de hash d'armes autorisées (loadout)
 local etatTirs = {}     -- [src] = historique des tirs (cadence), géré par ShotValidation
-local ADMIN_REQUIS = 'Réservé aux administrateurs. Tape /whoami pour voir ton identifiant.'
+local ADMIN_REQUIS = 'Réservé aux administrateurs. Ouvre la console (F8) et tape whoami pour voir ton identifiant.'
 
 -- Règles statiques construites une seule fois au démarrage à partir de Config.
 -- Elles sont partagées par tous les tirs : aucun ensemble n'est reconstruit
