@@ -321,7 +321,7 @@ class InfraDocker(unittest.TestCase):
         texte = lire(RACINE / "Dockerfile")
         self.assertRegex(
             texte,
-            r"(?m)^FROM\s+\S+@sha256:[0-9a-f]{64}\s*$",
+            r"(?m)^FROM\s+\S+@sha256:[0-9a-f]{64}(?:\s+AS\s+\w+)?\s*$",
             "l'image de base doit être épinglée par digest",
         )
 

@@ -115,6 +115,24 @@ jobs:
             type=ref,event=tag
             type=sha,format=long,prefix=ci-
 
+      # Seule l'étape « base » du Dockerfile (paquets Debian, FXServer) est
+      # exportée dans le cache GitHub : elle ne change qu'avec le digest Debian
+      # ou la version FXServer, et ce passage ne prend alors que quelques
+      # secondes. Les couches de server-data changent à chaque commit : les
+      # exporter coûtait jusqu'à 12 minutes par run sans jamais servir.
+      - name: Mettre en cache la base de l'image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: base
+          outputs: type=cacheonly
+          build-args: |
+            FX_URL=${{ env.FX_URL }}
+            FX_SHA256=${{ env.FX_SHA256 }}
+          provenance: false
+          cache-from: type=gha,scope=base
+          cache-to: type=gha,mode=max,scope=base
+
       # Sur PR, l'image est chargée localement pour Trivy et le smoke. Le
       # docker exporter de Buildx ne sait pas exporter d'attestations avec
       # --load : provenance et SBOM sont donc réservés aux images publiées.
@@ -132,8 +150,7 @@ jobs:
             FX_SHA256=${{ env.FX_SHA256 }}
           provenance: ${{ github.event_name == 'pull_request' && 'false' || 'mode=max' }}
           sbom: ${{ github.event_name != 'pull_request' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=base
 
       # Le scan tourne sur l'image PR réellement construite. Une vulnérabilité
       # corrigeable CRITICAL/HIGH fait échouer le job.
