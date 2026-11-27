@@ -46,14 +46,13 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="NULL" />
-          <WeaponSwapClipSetHash>weapons@holster_fat_2h</WeaponSwapClipSetHash>
-          <AimGrenadeThrowNormalClipsetHash />
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <WeaponSwapClipSetHash>weapons@holster_fat_2h</WeaponSwapClipSetHash>
+		  <AimGrenadeThrowNormalClipsetHash />
+		  <AimGrenadeThrowAlternateClipsetHash />		  
         </Item>
       </WeaponAnimations>
     </Item>
     <Item key="Default">
-      <Fallback>Default</Fallback>
       <WeaponAnimations>
         <Item key="WEAPON_dbcarrot">
           <CoverMovementClipSetHash />
@@ -96,8 +95,8 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="SWAP_DEFAULT" />
-          <AimGrenadeThrowNormalClipsetHash>Wpn_Thrown_Grenade_Aiming_Rifle</AimGrenadeThrowNormalClipsetHash>
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <AimGrenadeThrowNormalClipsetHash>Wpn_Thrown_Grenade_Aiming_Rifle</AimGrenadeThrowNormalClipsetHash>
+		  <AimGrenadeThrowAlternateClipsetHash />	
         </Item>
       </WeaponAnimations>
     </Item>
@@ -145,8 +144,8 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="NULL" />
-          <AimGrenadeThrowNormalClipsetHash />
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <AimGrenadeThrowNormalClipsetHash />
+		  <AimGrenadeThrowAlternateClipsetHash />	
         </Item>
       </WeaponAnimations>
     </Item>
@@ -154,7 +153,7 @@
       <Fallback>Default</Fallback>
       <WeaponAnimations>
         <Item key="WEAPON_dbcarrot">
-          <MovementOverrideClipSetHash>move_m@generic</MovementOverrideClipSetHash>
+		  <MovementOverrideClipSetHash>move_m@generic</MovementOverrideClipSetHash>
           <CoverMovementClipSetHash>cover@move@base@2h</CoverMovementClipSetHash>
           <CoverMovementExtraClipSetHash>cover@move@extra@2h</CoverMovementExtraClipSetHash>
           <CoverAlternateMovementClipSetHash>cover@move@ai@base@2h</CoverAlternateMovementClipSetHash>
@@ -195,8 +194,8 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="SWAP_DEFAULT" />
-          <AimGrenadeThrowNormalClipsetHash>weapons@first_person@aim_rng@generic@assault_rifle@shared@core</AimGrenadeThrowNormalClipsetHash>
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <AimGrenadeThrowNormalClipsetHash>weapons@first_person@aim_rng@generic@assault_rifle@shared@core</AimGrenadeThrowNormalClipsetHash>
+		  <AimGrenadeThrowAlternateClipsetHash />	
           <FPSTransitionFromRNGHash>weapons@first_person@aim_rng@p_m_zero@assault_rifle@shared@aim_trans@rng_to_idle</FPSTransitionFromRNGHash>
           <FPSTransitionFromLTHash>weapons@first_person@aim_lt@p_m_zero@assault_rifle@shared@aim_trans@lt_to_idle</FPSTransitionFromLTHash>
           <FPSTransitionFromScopeHash>weapons@first_person@aim_scope@p_m_zero@assault_rifle@shared@aim_trans@scope_to_idle</FPSTransitionFromScopeHash>
@@ -204,7 +203,7 @@
           <FPSTransitionFromStealthHash>weapons@first_person@aim_stealth@p_m_zero@assault_rifle@shared@aim_trans@stealth_to_idle</FPSTransitionFromStealthHash>
           <FPSTransitionToStealthHash>weapons@first_person@aim_idle@p_m_zero@assault_rifle@shared@aim_trans@idle_to_stealth</FPSTransitionToStealthHash>
           <FPSTransitionToStealthFromUnholsterHash>weapons@first_person@aim_stealth@p_m_zero@assault_rifle@shared@aim_trans@unholster_to_stealth</FPSTransitionToStealthFromUnholsterHash>
-          <WeaponClipSetHashForClone>weapons@first_person@aim_idle@remote_clone@assault_rifle@shared@core</WeaponClipSetHashForClone>
+	      <WeaponClipSetHashForClone>weapons@first_person@aim_idle@remote_clone@assault_rifle@shared@core</WeaponClipSetHashForClone>
           <FPSFidgetClipsetHashes />
         </Item>
       </WeaponAnimations>
@@ -253,11 +252,11 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="SWAP_DEFAULT" />
-          <AimGrenadeThrowNormalClipsetHash>weapons@first_person@aim_rng@generic@assault_rifle@shared@core</AimGrenadeThrowNormalClipsetHash>
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <AimGrenadeThrowNormalClipsetHash>weapons@first_person@aim_rng@generic@assault_rifle@shared@core</AimGrenadeThrowNormalClipsetHash>
+		  <AimGrenadeThrowAlternateClipsetHash />	
           <FPSTransitionFromIdleHash>weapons@first_person@aim_idle@p_m_zero@assault_rifle@shared@aim_trans@idle_to_lt</FPSTransitionFromIdleHash>
           <FPSTransitionFromRNGHash>weapons@first_person@aim_rng@p_m_zero@assault_rifle@shared@aim_trans@rng_to_lt</FPSTransitionFromRNGHash>
-          <FPSTransitionFromLTHash />
+          <FPSTransitionFromLTHash></FPSTransitionFromLTHash>
           <FPSTransitionFromScopeHash>weapons@first_person@aim_scope@p_m_zero@assault_rifle@shared@aim_trans@scope_to_lt</FPSTransitionFromScopeHash>
           <FPSTransitionFromUnholsterHash>weapons@first_person@aim_lt@p_m_zero@assault_rifle@shared@aim_trans@unholster_to_lt</FPSTransitionFromUnholsterHash>
           <FPSTransitionFromStealthHash>weapons@first_person@aim_stealth@p_m_zero@assault_rifle@shared@aim_trans@stealth_to_lt</FPSTransitionFromStealthHash>
@@ -310,10 +309,10 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="SWAP_DEFAULT" />
-          <AimGrenadeThrowNormalClipsetHash>weapons@first_person@aim_rng@generic@assault_rifle@shared@core</AimGrenadeThrowNormalClipsetHash>
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <AimGrenadeThrowNormalClipsetHash>weapons@first_person@aim_rng@generic@assault_rifle@shared@core</AimGrenadeThrowNormalClipsetHash>
+		  <AimGrenadeThrowAlternateClipsetHash />	
           <FPSTransitionFromIdleHash>weapons@first_person@aim_idle@p_m_zero@assault_rifle@shared@aim_trans@idle_to_rng</FPSTransitionFromIdleHash>
-          <FPSTransitionFromRNGHash />
+          <FPSTransitionFromRNGHash></FPSTransitionFromRNGHash>
           <FPSTransitionFromLTHash>weapons@first_person@aim_lt@p_m_zero@assault_rifle@shared@aim_trans@lt_to_rng</FPSTransitionFromLTHash>
           <FPSTransitionFromScopeHash>weapons@first_person@aim_scope@p_m_zero@assault_rifle@shared@aim_trans@scope_to_rng</FPSTransitionFromScopeHash>
           <FPSTransitionFromUnholsterHash>weapons@first_person@aim_rng@p_m_zero@assault_rifle@shared@aim_trans@unholster_to_rng</FPSTransitionFromUnholsterHash>
@@ -367,12 +366,12 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="SWAP_DEFAULT" />
-          <AimGrenadeThrowNormalClipsetHash>weapons@first_person@aim_rng@generic@assault_rifle@shared@core</AimGrenadeThrowNormalClipsetHash>
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <AimGrenadeThrowNormalClipsetHash>weapons@first_person@aim_rng@generic@assault_rifle@shared@core</AimGrenadeThrowNormalClipsetHash>
+		  <AimGrenadeThrowAlternateClipsetHash />	
           <FPSTransitionFromIdleHash>weapons@first_person@aim_idle@p_m_zero@assault_rifle@shared@aim_trans@idle_to_scope</FPSTransitionFromIdleHash>
           <FPSTransitionFromRNGHash>weapons@first_person@aim_rng@p_m_zero@assault_rifle@shared@aim_trans@rng_to_scope</FPSTransitionFromRNGHash>
           <FPSTransitionFromLTHash>weapons@first_person@aim_lt@p_m_zero@assault_rifle@shared@aim_trans@lt_to_scope</FPSTransitionFromLTHash>
-          <FPSTransitionFromScopeHash />
+          <FPSTransitionFromScopeHash></FPSTransitionFromScopeHash>
           <FPSTransitionFromUnholsterHash>weapons@first_person@aim_scope@p_m_zero@assault_rifle@shared@aim_trans@unholster_to_scope</FPSTransitionFromUnholsterHash>
           <FPSTransitionFromStealthHash>weapons@first_person@aim_stealth@p_m_zero@assault_rifle@shared@aim_trans@stealth_to_scope</FPSTransitionFromStealthHash>
           <FPSTransitionToStealthHash>weapons@first_person@aim_scope@p_m_zero@assault_rifle@shared@aim_trans@scope_to_stealth</FPSTransitionToStealthHash>
@@ -423,9 +422,9 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="NULL" />
-          <WeaponSwapClipSetHash>weapons@holster_fat_2h</WeaponSwapClipSetHash>
-          <AimGrenadeThrowNormalClipsetHash />
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <WeaponSwapClipSetHash>weapons@holster_fat_2h</WeaponSwapClipSetHash>
+		  <AimGrenadeThrowNormalClipsetHash />
+		  <AimGrenadeThrowAlternateClipsetHash />		  
         </Item>
       </WeaponAnimations>
     </Item>
@@ -473,9 +472,9 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="NULL" />
-          <WeaponSwapClipSetHash>weapons@holster_superfat_2h</WeaponSwapClipSetHash>
-          <AimGrenadeThrowNormalClipsetHash />
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <WeaponSwapClipSetHash>weapons@holster_superfat_2h</WeaponSwapClipSetHash>
+		  <AimGrenadeThrowNormalClipsetHash />
+		  <AimGrenadeThrowAlternateClipsetHash />		  
         </Item>
       </WeaponAnimations>
     </Item>
@@ -523,8 +522,8 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="NULL" />
-          <AimGrenadeThrowNormalClipsetHash />
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <AimGrenadeThrowNormalClipsetHash />
+		  <AimGrenadeThrowAlternateClipsetHash />		  
         </Item>
       </WeaponAnimations>
     </Item>
@@ -572,8 +571,8 @@
           <UseFromStrafeUpperBodyAimNetwork value="true" />
           <AimingDownTheBarrel value="true" />
           <WeaponSwapData ref="NULL" />
-          <AimGrenadeThrowNormalClipsetHash />
-          <AimGrenadeThrowAlternateClipsetHash />
+		  <AimGrenadeThrowNormalClipsetHash />
+		  <AimGrenadeThrowAlternateClipsetHash />		  
         </Item>
       </WeaponAnimations>
     </Item>
