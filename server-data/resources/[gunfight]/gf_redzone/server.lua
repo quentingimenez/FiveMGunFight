@@ -7,7 +7,7 @@
 
 local core = exports.gf_core
 
-local ADMIN_REQUIS = 'Réservé aux administrateurs. Tape /whoami pour voir ton identifiant.'
+local ADMIN_REQUIS = 'Réservé aux administrateurs. Ouvre la console (F8) et tape whoami pour voir ton identifiant.'
 
 local S = {
     phase = 'idle',
@@ -293,7 +293,7 @@ AddEventHandler('gf:modeJoined', function(src, mode)
     sendMap(src)
     spawnPlayer(src)
     announce(src, 'Redzone', (S.map and S.map.name or '') .. ' · rejoins la zone !', 3000)
-    core:Notify(src, 'Prends ta voiture au point véhicule (E), roule jusqu\'à la zone rouge, F pour sortir. On ne peut tirer que DANS la zone. /lobby pour quitter.')
+    core:Notify(src, 'Prends ta voiture au point véhicule (E), roule jusqu\'à la zone rouge, F pour sortir. On ne peut tirer que DANS la zone. Console (F8) : lobby pour quitter.')
 end)
 
 AddEventHandler('gf:modeLeft', function(src, mode)

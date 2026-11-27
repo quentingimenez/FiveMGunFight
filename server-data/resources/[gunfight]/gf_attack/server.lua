@@ -12,7 +12,7 @@
 
 local core = exports.gf_core
 
-local ADMIN_REQUIS = 'Réservé aux administrateurs. Tape /whoami pour voir ton identifiant.'
+local ADMIN_REQUIS = 'Réservé aux administrateurs. Ouvre la console (F8) et tape whoami pour voir ton identifiant.'
 
 -- SEUL point de conversion des secondes (Config) vers les millisecondes (règles).
 local CONFIG_MANCHES = {
@@ -446,7 +446,7 @@ executer = function(effets)
             core:SetProtected(e.src, e.protege)
         elseif e.type == 'notifier' then
             if e.modele == 'rejoint' then
-                core:Notify(e.src, ("Tu rejoins l'%s. Tape /lobby pour quitter."):format(Config.Teams[e.equipe].label))
+                core:Notify(e.src, ("Tu rejoins l'%s. Ouvre la console (F8) et tape lobby pour quitter."):format(Config.Teams[e.equipe].label))
             elseif e.modele == 'equilibrage' then
                 -- Une escouade entière est déplacée : le message s'adresse au groupe.
                 if e.escouade then
