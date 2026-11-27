@@ -7,15 +7,12 @@
 # =============================================================================
 # Digest figé : Debian bookworm-slim, résolu le 2026-11-25. Dependabot propose
 # les mises à jour de digest ; on ne change pas de distribution sans test.
-FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e
-
-# Version du build : sha court du commit, injecté par la CI au moment de la
-# construction (.github/workflows/docker.yml, étape « Calculer le sha du
-# build »). L'entrypoint la recopie dans secrets.cfg sous forme de convar
-# (gf_build_sha) : le lobby affiche ainsi le commit réellement déployé, même
-# quand server-data est monté en volume. Hors CI la valeur reste « dev ».
-ARG BUILD_SHA=dev
-ENV GF_BUILD_SHA=${BUILD_SHA}
+#
+# Deux étapes : « base » (paquets Debian, utilisateur, FXServer) ne change que
+# si le digest Debian ou la version FXServer change ; la CI la met seule en
+# cache. L'étape finale ajoute server-data, qui change à chaque commit : il
+# serait inutile, et très lent, de l'exporter dans le cache.
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e AS base
 
 # Quelle version de FXServer télécharger :
 #   FX_CHANNEL = recommended (stable, conseillé) | latest
@@ -60,25 +57,39 @@ RUN set -eux; \
     fi; \
     tar -xJf /tmp/fx.tar.xz -C /opt/fivem/server; \
     rm -f /tmp/fx.tar.xz; \
-    echo "$url" > /opt/fivem/server/FX_VERSION.txt
+    echo "$url" > /opt/fivem/server/FX_VERSION.txt; \
+    chown -R 10001:10001 /opt/fivem
+
+FROM base
+
+# Version du build : sha court du commit, injecté par la CI au moment de la
+# construction (.github/workflows/docker.yml, étape « Calculer le sha du
+# build »). L'entrypoint la recopie dans secrets.cfg sous forme de convar
+# (gf_build_sha) : le lobby affiche ainsi le commit réellement déployé, même
+# quand server-data est monté en volume. Hors CI la valeur reste « dev ».
+# Déclarée dans l'étape finale : un nouveau sha n'invalide pas la base en cache.
+ARG BUILD_SHA=dev
+ENV GF_BUILD_SHA=${BUILD_SHA}
 
 # Script de démarrage
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod 0755 /entrypoint.sh
 
 # Copie par défaut des scripts du serveur (utile sur un VPS sans montage)
-COPY server-data/ /opt/fivem/server-data/
+COPY --chown=10001:10001 server-data/ /opt/fivem/server-data/
 # Copie de référence : sert à amorcer maps.json dans un volume vide (production)
-COPY server-data/ /opt/fivem/defaults/
+COPY --chown=10001:10001 server-data/ /opt/fivem/defaults/
 
-# Droits de l'utilisateur fivem :
+# Droits de l'utilisateur fivem, donnés à la copie (--chown) et dans l'étape
+# base pour FXServer ; un chown -R ici réécrirait tout server-data dans une
+# couche de plus (plusieurs Go à exporter et à télécharger) :
 #  - txData : volume nommé de txAdmin (comptes, configuration) ;
 #  - server-data : secrets.cfg est généré ici au démarrage, FXServer y écrit
 #    aussi cache/ et les journaux ;
 #  - le dossier data de gf_maps : point de montage du volume « maps » en prod.
 # Docker recopie le propriétaire de ces dossiers dans un volume nommé neuf.
 RUN mkdir -p /opt/fivem/txData \
- && chown -R 10001:10001 /opt/fivem
+ && chown 10001:10001 /opt/fivem /opt/fivem/txData
 
 # HOME évite que FXServer ou txAdmin tentent d'écrire dans /root.
 ENV HOME=/opt/fivem

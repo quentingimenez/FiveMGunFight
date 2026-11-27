@@ -314,13 +314,24 @@ class UtilisateurNonRoot(unittest.TestCase):
     def test_utilisateur_active_en_dernier(self) -> None:
         texte = lire(DOCKERFILE)
         index_user = texte.rindex("USER 10001:10001")
-        for apres in ("COPY server-data/ /opt/fivem/defaults/", "chown -R 10001:10001 /opt/fivem"):
+        for apres in (
+            "COPY --chown=10001:10001 server-data/ /opt/fivem/defaults/",
+            "chown 10001:10001 /opt/fivem /opt/fivem/txData",
+        ):
             self.assertLess(texte.index(apres), index_user, f"{apres} doit précéder USER")
 
     def test_dossiers_inscriptibles_par_fivem(self) -> None:
         texte = lire(DOCKERFILE)
         self.assertIn("chown -R 10001:10001 /opt/fivem", texte)
         self.assertIn("mkdir -p /opt/fivem/txData", texte)
+        # Le chown récursif reste dans l'étape base, avant la copie de
+        # server-data : placé après, il dupliquerait tout server-data dans une
+        # couche de plusieurs Go (image deux fois plus lourde, CI lente).
+        lignes = [ligne for ligne in texte.splitlines() if not ligne.lstrip().startswith("#")]
+        copie = next(i for i, ligne in enumerate(lignes) if "server-data/ /opt/fivem/server-data/" in ligne)
+        recursifs = [i for i, ligne in enumerate(lignes) if "chown -R" in ligne]
+        self.assertTrue(recursifs)
+        self.assertLess(max(recursifs), copie, "aucun chown -R après la copie de server-data")
         self.assertIn("ENV HOME=/opt/fivem", texte)
 
     def test_curl_present_pour_le_healthcheck(self) -> None:
