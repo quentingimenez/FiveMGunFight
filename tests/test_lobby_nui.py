@@ -68,5 +68,73 @@ class CreatorErrorText(unittest.TestCase):
                 self.assertRegex(line, r"errorText\(\s*(?:response|result)\.error\b")
 
 
+RESSOURCES = ROOT / "server-data" / "resources" / "[gunfight]"
+
+FOCUS_NUI = re.compile(r"SetNuiFocus\s*\(\s*true\b")
+OVERLAY_TRUE = re.compile(
+    r"TriggerEvent\s*\(\s*['\"]gf_lobby:menuOverlay['\"]\s*,\s*true\s*\)"
+)
+OVERLAY_FALSE = re.compile(
+    r"TriggerEvent\s*\(\s*['\"]gf_lobby:menuOverlay['\"]\s*,\s*false\s*\)"
+)
+
+# Ressources exclues de la règle, avec leur justification (vérifiée dans leur client.lua) :
+EXCEPTIONS_NUI = {
+    # Fournit l'événement menuOverlay : son SetNuiFocus(true) est dans le
+    # gestionnaire qui réaffiche la page, pas dans un ouvreur à masquer.
+    "gf_lobby": "fournit l'overlay; son focus est le gestionnaire menuOverlay",
+    # N'ouvre que le choix des armes en partie via gf_ui:loadout_open, lancé par
+    # gf_attack/server.lua pendant une manche : jamais au lobby.
+    "gf_ui": "loadout de partie (gf_ui:loadout_open), jamais au lobby",
+}
+
+
+class NuiFocusLobbyOverlay(unittest.TestCase):
+    """Toute NUI ouverte au lobby masque puis réaffiche la page du lobby."""
+
+    def test_nui_focus_ouverts_masquent_le_lobby(self) -> None:
+        candidats = sorted(RESSOURCES.glob("gf_*/client.lua"))
+        self.assertTrue(
+            candidats, f"aucun client.lua gf_* trouvé dans {RESSOURCES}"
+        )
+        controllees = {
+            chemin.parent.name
+            for chemin in candidats
+            if chemin.parent.name not in EXCEPTIONS_NUI
+            and FOCUS_NUI.search(chemin.read_text(encoding="utf-8"))
+        }
+        # Garde-fou : les ouvreurs connus ne doivent pas disparaître du contrôle.
+        for attendue in ("gf_admin", "gf_menu", "gf_maps", "gf_vehicles"):
+            with self.subTest(ressource=attendue, verification="presente"):
+                self.assertIn(
+                    attendue,
+                    controllees,
+                    f"{attendue} n'est plus contrôlée : "
+                    "son SetNuiFocus(true) a disparu ou la ressource a été exclue",
+                )
+        for chemin in candidats:
+            nom = chemin.parent.name
+            if nom in EXCEPTIONS_NUI:
+                continue
+            source = chemin.read_text(encoding="utf-8")
+            if not FOCUS_NUI.search(source):
+                continue
+            with self.subTest(ressource=nom):
+                self.assertRegex(
+                    source,
+                    OVERLAY_TRUE,
+                    f"{nom} ouvre une NUI avec SetNuiFocus(true) sans "
+                    "TriggerEvent('gf_lobby:menuOverlay', true) : "
+                    "la page du lobby resterait au-dessus",
+                )
+                self.assertRegex(
+                    source,
+                    OVERLAY_FALSE,
+                    f"{nom} ouvre une NUI avec SetNuiFocus(true) sans "
+                    "TriggerEvent('gf_lobby:menuOverlay', false) : "
+                    "la page du lobby ne serait jamais réaffichée",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
