@@ -9,12 +9,14 @@ version '1.0.0'
 ui_page 'html/index.html'
 
 shared_script 'commands.lua'
-server_script 'server.lua'
+server_scripts {
+    '@oxmysql/lib/MySQL.lua',
+    'audit.lua',
+    'server.lua',
+}
 client_script 'client.lua'
 
-dependencies {
-    'gf_core',
-}
+dependencies { 'oxmysql', 'gf_core', 'gf_db' }
 
 files {
     'html/index.html',

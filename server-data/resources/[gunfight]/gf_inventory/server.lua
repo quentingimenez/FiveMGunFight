@@ -222,6 +222,11 @@ RegisterNetEvent('gf_inventory:adminGive', function(weaponId)
         if not ok or (status ~= 'granted' and status ~= 'already') then return end
         core:Notify(src, ('%s ajoutée à ton Casier.'):format(chosen.label))
         TriggerClientEvent('gf_inventory:adminData', src, adminData(src))
+        if status == 'granted' then
+            if GetResourceState('gf_admin') == 'started' then
+                pcall(function() exports.gf_admin:LogAction(src, 'admin_give', src, 'arme=' .. weaponId) end)
+            end
+        end
     end)
 end)
 
@@ -276,4 +281,7 @@ RegisterCommand('give', function(src, args)
     core:Notify(target, ('%s ajoutée à ton Casier par un administrateur.'):format(chosen.label))
     local auteur = src == 0 and 'console' or GetPlayerName(src)
     print(('[gf_inventory] %s a donné %s à %s'):format(auteur, weaponId, nom))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'give', target, 'arme=' .. weaponId) end)
+    end
 end, false)

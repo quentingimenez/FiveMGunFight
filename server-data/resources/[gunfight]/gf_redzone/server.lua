@@ -361,7 +361,12 @@ RegisterCommand('endgame', function(src)
         core:Notify(src, ADMIN_REQUIS)
         return
     end
-    if S.phase == 'live' then endGame() end
+    if S.phase == 'live' then
+        endGame()
+        if GetResourceState('gf_admin') == 'started' then
+            pcall(function() exports.gf_admin:LogAction(src, 'endgame', nil, 'mode=redzone') end)
+        end
+    end
 end, false)
 
 -- /nextmap : passe directement à la map suivante
@@ -370,5 +375,10 @@ RegisterCommand('nextmap', function(src)
         core:Notify(src, ADMIN_REQUIS)
         return
     end
-    if next(S.players) then startGame() end
+    if next(S.players) then
+        startGame()
+        if GetResourceState('gf_admin') == 'started' then
+            pcall(function() exports.gf_admin:LogAction(src, 'nextmap', nil, 'mode=redzone') end)
+        end
+    end
 end, false)

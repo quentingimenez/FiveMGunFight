@@ -9,4 +9,5 @@ Migrations = {
     { version = 2, nom = 'gf_match_events', fichier = 'migrations/0002_gf_match_events.sql' },
     { version = 3, nom = 'gf_player_weapons', fichier = 'migrations/0003_gf_player_weapons.sql' },
     { version = 4, nom = 'gf_weapon_accessories', fichier = 'migrations/0004_gf_weapon_accessories.sql' },
+    { version = 5, nom = 'gf_admin_log', fichier = 'migrations/0005_gf_admin_log.sql' },
 }

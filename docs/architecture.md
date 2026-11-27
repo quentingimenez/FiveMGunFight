@@ -176,7 +176,7 @@ modifiées, démarrées avant nos ressources.
 | `gf_db` | migrations du schéma MariaDB au démarrage via `oxmysql`, sommes enregistrées dans `gf_schema_version` | `server.lua`, `migrations.lua`, `migrations/` |
 | `gf_stats` | statistiques persistantes (MariaDB via `oxmysql`), export `GetPlayerStats` | `server.lua` |
 | `gf_menu` | menu pause NUI (Échap) remplaçant le frontend natif : profil, règlement, Discord, déconnexion | `html/` (page `ui_page`), `config.lua`, `menu_state.lua`, `server.lua`, `client.lua` ; dépend de `gf_core` et `gf_stats` |
-| `gf_admin` | panneau d'administration : joueurs, parties, outils ; ouverture par F10 ou depuis le menu Échap, données via `gf_admin:requestData` | `html/` (page `ui_page`), `commands.lua` (liste blanche des commandes, partagé), `server.lua`, `client.lua` |
+| `gf_admin` | panneau d'administration : joueurs, parties, outils ; ouverture par F10 ou depuis le menu Échap, données via `gf_admin:requestData`, actions réussies journalisées dans `gf_admin_log` | `html/` (page `ui_page`), `commands.lua` (liste blanche des commandes, partagé), `@oxmysql/lib/MySQL.lua`, `audit.lua` (`LogAction`), `server.lua`, `client.lua` ; dépend de `gf_core`, `gf_db` et `oxmysql` |
 
 Chaque ressource déclare ses scripts dans `fxmanifest.lua`
 (`fx_version 'cerulean'`, `game 'gta5'`, `lua54 'yes'`). Les tests vérifient que
@@ -256,10 +256,13 @@ Tant qu'aucune map n'est cochée pour un mode, les zones de secours des
 Base `gunfight`, utilisateur `gunfight`, réglages InnoDB/`utf8mb4` dans
 `docker/mariadb.cnf`. Le jeu utilise désormais cette base : les ressources
 `oxmysql` et `gf_stats` enregistrent kills, morts, parties et victoires dans la
-table `gf_stats_players`. Les tables sont créées et mises à jour par les
-migrations de `gf_db` au démarrage de FXServer, même sur une base existante ;
-`gf_schema_version` y enregistre la version et la somme de chaque migration
-appliquée. La chaîne `mysql_connection_string` est générée dans `secrets.cfg`.
+table `gf_stats_players`. La table `gf_admin_log` (migration `0005`) reçoit le
+journal des actions d'administration réussies, écrit de façon asynchrone par
+`gf_admin` via `oxmysql` lorsque `gf_db` est démarrée et prête. Les tables
+sont créées et mises à jour par les migrations de `gf_db` au démarrage de
+FXServer, même sur une base existante ; `gf_schema_version` y enregistre la
+version et la somme de chaque migration appliquée. La chaîne
+`mysql_connection_string` est générée dans `secrets.cfg`.
 Les personnages du lobby sont conservés dans le volume `gf_lobby/data`
 (`characters`).
 

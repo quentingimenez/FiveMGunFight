@@ -133,4 +133,7 @@ RegisterNetEvent('gf_vehicles:saveCustom', function(model, props)
     publish()
     core:Notify(src, 'Véhicule de base enregistré : il s\'applique aux prochains véhicules.')
     print(('[gf_vehicles] Véhicule de base %s choisi (avec sa custom) par %s'):format(model, GetPlayerName(src) or src))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'vehicle_custom', nil, 'modele=' .. model) end)
+    end
 end)
