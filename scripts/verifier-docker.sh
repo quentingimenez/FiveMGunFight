@@ -35,6 +35,22 @@ else
   racine="$(pwd)"
 fi
 
+# En fin de course, réussite ou échec : images orphelines jetées et cache de
+# construction borné (scripts/nettoyer-docker.sh). Sauté en CI (runner jetable)
+# et avec GF_GARDER_CACHE=1. Le code de sortie de la vérification est conservé.
+nettoyer() {
+  statut=$?
+  if [ -z "${CI:-}" ] && [ "${GF_GARDER_CACHE:-0}" != "1" ]; then
+    if bash scripts/nettoyer-docker.sh >/dev/null 2>&1; then
+      echo "Docker : images orphelines et cache de construction nettoyés."
+    else
+      echo "Docker : nettoyage impossible, relancer bash scripts/nettoyer-docker.sh." >&2
+    fi
+  fi
+  exit "$statut"
+}
+trap nettoyer EXIT
+
 if [ -z "${GF_VERIFIER_IMAGE:-}" ]; then
   docker build --tag "$image" --file docker/verifier/Dockerfile docker/verifier
 fi

@@ -287,7 +287,14 @@ git fetch --prune
 git branch -D type/sujet-en-kebab-case   # -D : après squash, les commits ne sont pas ancêtres
 git status -sb
 git rev-parse HEAD origin/main           # les deux sha doivent être identiques
+bash scripts/nettoyer-docker.sh          # libère le cache et les images <none> des builds
 ```
+
+`verifier-docker.sh` nettoie déjà seul après chaque vérification ; le
+nettoyage final couvre les constructions du serveur (`compose ... build`).
+Quand le disque est plein, `--tout` vide tout le cache et les images
+qu'aucun conteneur n'utilise ([`docs/debug-test.md`](docs/debug-test.md)
+§ 5, « Espace disque »).
 
 Si `scripts/fusionner-pr.sh` a signalé une CI de `main` rouge, ouvrir une pull
 request de correction immédiatement — jamais de commit direct sur `main`.

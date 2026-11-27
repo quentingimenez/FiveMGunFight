@@ -326,6 +326,31 @@ pas été terminé : c'est attendu, pas une panne du jeu.
 - `Ctrl+P` puis `Ctrl+Q` détache la console **sans** arrêter le serveur. Ne
   ferme pas la fenêtre brutalement si tu veux garder les logs.
 
+### Espace disque
+
+Chaque construction (`verifier-docker.sh`, `compose ... --build`) laisse des
+images `<none>` et des couches de cache : des dizaines de Go en quelques jours.
+
+- `bash scripts/verifier-docker.sh` nettoie seul en fin de course : images
+  orphelines supprimées, cache de construction ramené sous 4 Go
+  (`GF_CACHE_MAX=8GB` pour garder plus, `GF_GARDER_CACHE=1` pour sauter).
+- Après une reconstruction du serveur, ou en fin de session :
+  `bash scripts/nettoyer-docker.sh` (même nettoyage borné), ou
+  `bash scripts/nettoyer-docker.sh --tout` (tout le cache, et les images
+  qu'aucun conteneur n'utilise). Conteneurs et volumes (base, txAdmin) ne
+  sont jamais touchés.
+- Sous Windows, le disque virtuel de Docker Desktop
+  (`%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx`) ne rétrécit pas tout
+  seul : l'espace libéré sert aux constructions suivantes mais ne revient à
+  Windows qu'après compactage, dans un PowerShell **administrateur**, Docker
+  Desktop quitté :
+
+  ```powershell
+  wsl --shutdown
+  "select vdisk file=`"$env:LOCALAPPDATA\Docker\wsl\disk\docker_data.vhdx`"`nattach vdisk readonly`ncompact vdisk`ndetach vdisk" | Out-File -Encoding ascii "$env:TEMP\compacter.txt"
+  diskpart /s "$env:TEMP\compacter.txt"
+  ```
+
 ### Erreurs fréquentes
 
 | Symptôme | Piste |
