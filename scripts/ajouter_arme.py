@@ -25,6 +25,7 @@ Les dossiers « Replace » (remplacement d'armes du jeu) sont ignorés.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -114,6 +115,13 @@ def main() -> int:
     if modele and not any(f.stem.lower() == modele for f in stream):
         print(f"Modèle 3D {modele} absent du pack : il faut le dossier stream.", file=sys.stderr)
         return 1
+    # Change si le modèle ou ses textures changent : le studio retentera une
+    # photo d'un modèle précédemment marqué comme défectueux après un correctif.
+    empreinte = hashlib.sha256()
+    for f in sorted(stream, key=lambda path: (path.name.lower(), str(path))):
+        empreinte.update(f.name.lower().encode('utf-8'))
+        empreinte.update(hashlib.sha256(f.read_bytes()).digest())
+    version_photo = empreinte.hexdigest()[:16]
     metas = [f for f in fichiers if f.name.lower() in METAS]
     noms = noms_du_pack(fichiers)
     nom = args.nom or joli(noms.get(arme, "")) or ident
@@ -172,7 +180,7 @@ def main() -> int:
         f_ = config.index(NL + "}", d)
         nom_lua = nom.replace("\\", "").replace("'", "\\'")
         cat_lua = categorie.replace("'", "\\'")
-        ligne = f"{NL}    {ident} = {{ name = '{arme}', label = '{nom_lua}', category = '{cat_lua}', ammo = {munitions} }},"
+        ligne = f"{NL}    {ident} = {{ name = '{arme}', label = '{nom_lua}', category = '{cat_lua}', ammo = {munitions}, thumbVersion = '{version_photo}' }},"
         config = config[:f_] + ligne + config[f_:]
 
     # Refuse les collisions avant toute écriture pour protéger les modèles existants.

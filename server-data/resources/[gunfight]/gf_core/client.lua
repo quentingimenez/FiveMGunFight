@@ -147,11 +147,21 @@ end
 -- Emplacements d'armes : slots[1] = arme sur la touche 1, slots[2] = touche 2...
 -- Remplis dans l'ordre où les armes ont été choisies (ou listées dans la config).
 local slots = {}
+local componentsApplied = {}
+
+local function componentSignature(weapon)
+    local values = {}
+    for _, item in ipairs(weapon.removeComponents or {}) do values[#values + 1] = '-' .. item end
+    for _, item in ipairs(weapon.components or {}) do values[#values + 1] = '+' .. item end
+    table.sort(values)
+    return table.concat(values, '|')
+end
 
 local function applyLoadout(ped, name)
     RemoveAllPedWeapons(ped, true)
     SetPedArmour(ped, 0)
     slots = {}
+    componentsApplied = {}
     local lo = name and Config.Loadouts[name]
     if not lo then return end
     for _, w in ipairs(lo.weapons) do
@@ -167,13 +177,16 @@ end
 local function applyWeapons(ped, list, armour)
     RemoveAllPedWeapons(ped, true)
     slots = {}
+    componentsApplied = {}
     for _, w in ipairs(list or {}) do
         local hash = joaat(w.name)
         GiveWeaponToPed(ped, hash, w.ammo or 250, false, false)
         SetPedInfiniteAmmo(ped, true, hash) -- réserve illimitée, il faut quand même recharger
+        for _, comp in ipairs(w.removeComponents or {}) do RemoveWeaponComponentFromPed(ped, hash, joaat(comp)) end
         for _, comp in ipairs(w.components or {}) do
             GiveWeaponComponentToPed(ped, hash, joaat(comp))
         end
+        componentsApplied[hash] = componentSignature(w)
         if w.tint then SetPedWeaponTintIndex(ped, hash, w.tint) end
         slots[#slots + 1] = hash
     end
@@ -192,7 +205,9 @@ end
 -- Liste pour le studio photo (gf_thumbs, famille « weapons ») : une photo par arme du catalogue
 exports('GetWeaponThumbList', function()
     local list = {}
-    for _, w in pairs(Config.Weapons) do list[#list + 1] = { id = w.name, label = w.label } end
+    for _, w in pairs(Config.Weapons) do
+        list[#list + 1] = { id = w.name, label = w.label, version = w.thumbVersion }
+    end
     table.sort(list, function(x, y) return x.id < y.id end)
     return list
 end)
@@ -405,17 +420,21 @@ RegisterNetEvent('gf_core:updateRedzoneWeapons', function(list)
         nextSlots[#nextSlots + 1] = hash
     end
     for _, hash in ipairs(slots) do
-        if not wanted[hash] then RemoveWeaponFromPed(ped, hash) end
+        if not wanted[hash] then RemoveWeaponFromPed(ped, hash) componentsApplied[hash] = nil end
     end
     for i, weapon in ipairs(list) do
         local hash = nextSlots[i]
-        if not HasPedGotWeapon(ped, hash, false) then
+        local missing = not HasPedGotWeapon(ped, hash, false)
+        if missing then
             GiveWeaponToPed(ped, hash, weapon.ammo or 250, false, false)
             SetPedInfiniteAmmo(ped, true, hash)
-            for _, comp in ipairs(weapon.components or {}) do
-                GiveWeaponComponentToPed(ped, hash, joaat(comp))
-            end
             if weapon.tint then SetPedWeaponTintIndex(ped, hash, weapon.tint) end
+        end
+        local signature = componentSignature(weapon)
+        if missing or componentsApplied[hash] ~= signature then
+            for _, comp in ipairs(weapon.removeComponents or {}) do RemoveWeaponComponentFromPed(ped, hash, joaat(comp)) end
+            for _, comp in ipairs(weapon.components or {}) do GiveWeaponComponentToPed(ped, hash, joaat(comp)) end
+            componentsApplied[hash] = signature
         end
     end
     slots = nextSlots

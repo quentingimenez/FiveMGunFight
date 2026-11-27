@@ -413,3 +413,25 @@ kbd {
 .weapon-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; }
 .weapon-actions .btn { font-size: 10px; padding: 7px; }
 .weapon-actions .is-equipped { background: #6550ae; color: white; opacity: 1; }
+.weapon-accessories { margin-top: 4px; font-size: 10px; }
+.accessory-preview { display: block; width: min(100%, 540px); height: 150px; object-fit: contain; margin: 12px auto; }
+.accessory-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 18px 0; }
+.accessory-group { display: flex; flex-direction: column; gap: 6px; color: #c5b8e0; font-size: 12px; }
+.accessory-select { color: white; background: #211735; border: 1px solid #ffffff35; border-radius: 6px; padding: 10px; }
+.accessory-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.accessory-preview-active #veil {
+  background: linear-gradient(90deg, rgba(10, 7, 19, .82), transparent 32%, transparent 67%, rgba(10, 7, 19, .82));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.accessory-preview-active #profile { display: none; }
+.accessory-preview-active #stage {
+  position: fixed;
+  right: 24px;
+  top: 100px;
+  bottom: 76px;
+  width: min(390px, 35vw);
+  overflow-y: auto;
+}
+.accessory-preview-active #stage .stage-panel { max-height: 100%; overflow-y: auto; }
+.accessory-preview-active .accessory-groups { grid-template-columns: 1fr; }

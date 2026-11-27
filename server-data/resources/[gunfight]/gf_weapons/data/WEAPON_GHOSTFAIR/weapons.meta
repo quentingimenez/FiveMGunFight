@@ -283,7 +283,8 @@
 									<Default value="true"/>
 									<Name>COMPONENT_GHOSTFAIR_CLIP_01</Name>
 								</Item>
-							</Components>
+                <Item><Name>GF_GHOSTFAIR_CLIP_60</Name><Default value="false" /></Item>
+              </Components>
 						</Item>
 					</AttachPoints>
 					<GunFeedBone/>

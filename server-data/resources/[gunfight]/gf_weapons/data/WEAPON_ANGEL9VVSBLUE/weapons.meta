@@ -256,7 +256,8 @@
 									<Default value="true"/>
 									<Name>w_sb_angel9vvsblue_mag1</Name>
 								</Item>
-							</Components>
+                <Item><Name>GF_ANGEL9VVSBLUE_CLIP_60</Name><Default value="false" /></Item>
+              </Components>
 						</Item>
 					</AttachPoints>
 					<GunFeedBone/>

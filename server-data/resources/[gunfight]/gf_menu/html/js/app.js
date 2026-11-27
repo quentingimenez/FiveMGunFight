@@ -20,6 +20,8 @@
   var state = null;
   var visible = false;
   var weaponScreen = null;
+  var accessoryWeaponId = null;
+  var accessoryPreviewRevision = 0;
 
   function $(id) {
     return document.getElementById(id);
@@ -154,6 +156,19 @@
         });
       }
       card.appendChild(actions);
+      if (!admin && weapon.accessories && Object.keys(weapon.accessories).some(function (kind) {
+        return !weapon.accessories[kind].hidden;
+      })) {
+        var customize = el('button', 'btn weapon-accessories', 'ACCESSOIRES');
+        customize.type = 'button';
+        customize.addEventListener('click', function () {
+          accessoryWeaponId = weapon.id;
+          accessoryPreviewRevision = 0;
+          send('previewAccessories', { id: weapon.id, choices: weapon.selections || {} });
+          showAccessories(data, photos);
+        });
+        card.appendChild(customize);
+      }
       grid.appendChild(card);
     });
     panel.appendChild(grid);
@@ -165,7 +180,73 @@
     if (!stage || !visible) return;
     weaponScreen = kind;
     put('section-label', kind === 'armory' ? 'ARMES ADMIN' : 'CASIER');
+    if (kind === 'locker' && accessoryWeaponId) {
+      showAccessories(data, photos);
+      return;
+    }
     stage.replaceChildren(weaponPanel(kind, data, photos));
+  }
+
+  function accessoryLabel(kind, name, index) {
+    if (kind === 'clip' && /^GF_[A-Z0-9_]+_CLIP_60$/.test(name)) return 'Chargeur 60 balles';
+    if (kind === 'clip') return index === 0 ? 'Chargeur standard' : index === 1 ? 'Chargeur allongé' : 'Chargeur grande capacité';
+    if (kind === 'sight' && name.indexOf('MACRO') >= 0) return 'Viseur compact';
+    if (kind === 'sight' && name === 'SCARH_AIMPOINT') return 'Viseur Aimpoint';
+    if (kind === 'sight' && name === 'SCARH_EOTECH') return 'Viseur EOTech';
+    if (kind === 'sight' && (name === 'COMPONENT_AT_SCOPE_MAX' || name === 'GF_SCARH_SCOPE_TALL')) return 'Lunette de sniper';
+    if (kind === 'sight' && name.indexOf('LARGE') >= 0) return 'Lunette longue portée';
+    if (kind === 'sight' && name.indexOf('MEDIUM') >= 0) return 'Viseur moyen';
+    return (kind === 'sight' ? 'Viseur' : kind === 'grip' ? 'Poignée' : kind === 'light' ? 'Lampe' : kind === 'laser' ? 'Laser' : 'Silencieux') + (index ? ' ' + (index + 1) : '');
+  }
+
+  function showAccessories(data, photos) {
+    var stage = $('stage');
+    var weapon = (data.weapons || []).find(function (item) { return item.id === accessoryWeaponId; });
+    if (!weapon) { accessoryWeaponId = null; showWeapons('locker', data, photos); return; }
+    var panel = basePanel('CASIER', 'ACCESSOIRES');
+    panel.classList.add('weapon-panel');
+    addText(panel, weapon.label);
+    var status = el('p', 'stage-text', 'Choisis les accessoires pour les voir sur ton arme. Enregistre pour les conserver.');
+    status.id = 'accessory-status';
+    panel.appendChild(status);
+    var selections = Object.assign({}, weapon.selections || {});
+    var groups = weapon.accessories || {};
+    var form = el('div', 'accessory-groups');
+    Object.keys(groups).sort().forEach(function (kind) {
+      var group = groups[kind];
+      if (group.hidden) return;
+      var label = el('label', 'accessory-group');
+      label.appendChild(el('span', 'accessory-label', group.label));
+      var select = el('select', 'accessory-select');
+      if (kind !== 'clip') {
+        var none = el('option', '', 'Aucun'); none.value = ''; select.appendChild(none);
+      }
+      (group.options || []).forEach(function (name, index) {
+        var option = el('option', '', accessoryLabel(kind, name, index));
+        option.value = name; select.appendChild(option);
+      });
+      select.value = Object.prototype.hasOwnProperty.call(selections, kind) ? selections[kind] : (group.default || '');
+      select.addEventListener('change', function () {
+        selections[kind] = select.value;
+        put('accessory-status', 'Aperçu modifié. Enregistre pour conserver tes choix.');
+        accessoryPreviewRevision += 1;
+        send('updateAccessoryPreview', { id: weapon.id, choices: selections, revision: accessoryPreviewRevision });
+      });
+      label.appendChild(select); form.appendChild(label);
+    });
+    panel.appendChild(form);
+    var actions = el('div', 'accessory-actions');
+    var back = el('button', 'btn', 'RETOUR'); back.type = 'button';
+    back.addEventListener('click', function () {
+      send('closeAccessoryPreview', {});
+      document.body.classList.remove('accessory-preview-active');
+      accessoryWeaponId = null;
+      showWeapons('locker', data, photos);
+    });
+    var save = el('button', 'btn is-equipped', 'ENREGISTRER'); save.type = 'button';
+    save.addEventListener('click', function () { send('setAccessories', { id: weapon.id, choices: selections }); });
+    actions.appendChild(back); actions.appendChild(save); panel.appendChild(actions);
+    stage.replaceChildren(panel);
   }
 
   function rulesPanel() {
@@ -310,6 +391,10 @@
   }
 
   function activate(node) {
+    if (accessoryWeaponId) {
+      send('closeAccessoryPreview', {});
+      document.body.classList.remove('accessory-preview-active');
+    }
     var key = node.getAttribute('data-key');
     var child = node.querySelector('.rail-item-label');
     var label = child ? child.textContent : '';
@@ -323,6 +408,7 @@
     if (!stage) return;
     stage.replaceChildren();
     var panel;
+    accessoryWeaponId = null;
     weaponScreen = key === 'loadout' ? 'locker' : null;
     if (key === 'loadout') {
       panel = basePanel('ÉQUIPEMENT', 'CASIER');
@@ -339,6 +425,7 @@
 
   function hide() {
     visible = false;
+    document.body.classList.remove('accessory-preview-active');
     var menu = $('menu');
     if (menu) {
       menu.classList.add('hidden');
@@ -352,6 +439,7 @@
       document.activeElement.blur();
     }
     weaponScreen = null;
+    accessoryWeaponId = null;
     resetStage();
     setFocus(0);
   }
@@ -374,6 +462,9 @@
   function onKeyDown(event) {
     if (!visible) return;
     var key = event.key;
+    var stage = $('stage');
+    if (stage && event.target && stage.contains(event.target) && event.target.tagName === 'SELECT'
+        && (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' || key === ' ')) return;
     if (key === 'ArrowDown' || key === 'ArrowUp') {
       event.preventDefault();
       var delta = key === 'ArrowDown' ? 1 : -1;
@@ -388,7 +479,6 @@
       return;
     }
     if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
-      var stage = $('stage');
       if (stage && event.target && stage.contains(event.target)) return;
       event.preventDefault();
       if (items[current]) activate(items[current]);
@@ -399,6 +489,17 @@
     var message = event && event.data;
     if (!message || typeof message !== 'object' || typeof message.type !== 'string') return;
     var data = message.data && typeof message.data === 'object' ? message.data : {};
+    if (message.type === 'accessoryPreviewReady' && visible && accessoryWeaponId) {
+      document.body.classList.add('accessory-preview-active');
+      return;
+    }
+    if (message.type === 'accessorySaved' && visible && accessoryWeaponId) {
+      document.body.classList.remove('accessory-preview-active');
+      accessoryWeaponId = null;
+      send('close', {});
+      hide();
+      return;
+    }
     if (message.type === 'armory' && visible) {
       showWeapons('armory', message.data || [], message.photos || {});
       return;

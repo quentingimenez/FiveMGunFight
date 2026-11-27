@@ -67,9 +67,13 @@ erreur dans les logs.
 
 ### 3. Photo : automatique
 
-**Aucune action** : à la prochaine connexion d'un admin, une fois au lobby
-(`Config.AutoCaptureDelay`, 8 s), son jeu prend les photos manquantes des
-familles marquées `auto` (véhicules). L'écran affiche « Préparation des photos
+**Aucune action en jeu** : à la prochaine connexion d'un admin, une fois au lobby
+(`Config.AutoCaptureDelay`, 3 s), son jeu prend les photos manquantes des
+familles marquées `auto` (armes en priorité, puis véhicules). Si une ressource
+ou une photo n'est pas encore disponible, la recherche est retentée pendant le
+séjour au lobby et au retour suivant. La capture nécessite un client FiveM
+connecté : un serveur sans joueur ne peut pas rendre les modèles 3D seul.
+L'écran affiche « Préparation des photos
 des menus… » quelques secondes, puis le lobby revient. Jamais pendant une
 partie. Ça marche aussi en production : la photo est écrite dans le volume
 `thumbs`.
@@ -117,11 +121,14 @@ Familles existantes (`gf_thumbs/config.lua`, `Config.Kinds`) :
 | Famille | Liste fournie par | Pose | Auto |
 |---|---|---|---|
 | `vehicles` | `exports.gf_vehicles:GetThumbList()` | véhicule de trois quarts avant | oui |
-| `weapons` | `exports.gf_core:GetWeaponThumbList()` (catalogue `Config.Weapons`) | arme de profil | non (aucun menu ne les affiche encore) |
+| `weapons` | `exports.gf_core:GetWeaponThumbList()` (catalogue `Config.Weapons`) | arme de profil | oui |
 
 Photos automatiques : à l'arrivée au lobby, le client envoie
 `gf_thumbs:lobbyReady` ; si c'est un admin, le serveur répond
 `gf_thumbs:autoCapture` et son jeu photographie ce qui manque (familles `auto`).
+La recherche est retentée toutes les 30 secondes au lobby ; les captures déjà
+présentes ne sont pas écrasées. Le script d'ajout donne une version au modèle
+pour réessayer après la correction d'un fichier ayant fait planter une capture.
 `Config.AutoCapture = false` désactive le mécanisme.
 
 ## Ajouter une nouvelle famille (ex. tenues)

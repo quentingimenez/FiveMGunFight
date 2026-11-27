@@ -253,7 +253,7 @@
 							<AttachBone>WAPSupp</AttachBone>
 							<Components>
 								<Item>
-									<Default value="true"/>
+									<Default value="false"/>
 									<Name>COMPONENT_AT_QUEENBEE16YELLOW_SUPP</Name>
 								</Item>
 							</Components>

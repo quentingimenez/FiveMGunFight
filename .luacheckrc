@@ -40,6 +40,7 @@ globals = {
   "MySQL",
   "RateLimit",
   "Validation",
+  "WeaponAccessories",
   "ShotValidation",
 }
 

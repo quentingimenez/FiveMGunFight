@@ -194,7 +194,7 @@ local function spawnRole(src, opts)
     local x, y, z, h = spawnPos(src, inVehicle)
     local weapons = nil
     if opts.weapons then
-        weapons = core:BuildWeaponList(core:ResolveSelection(src, Choix[src]))
+        weapons = core:BuildWeaponList(core:ResolveSelection(src, Choix[src]), src)
     end
     core:Spawn(src, {
         x = x, y = y, z = z, heading = h,

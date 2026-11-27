@@ -415,12 +415,21 @@ local function resolveSelection(src, ids)
 end
 
 -- Liste d'armes prête à donner (accessoires et couleur compris)
-local function buildWeaponList(ids)
+local function buildWeaponList(ids, src)
     local list = {}
     for _, id in ipairs(ids or {}) do
         local w = Config.Weapons[id]
         if w then
-            list[#list + 1] = { name = w.name, ammo = w.ammo or 250, components = w.components, tint = w.tint }
+            local remove, selected = {}, {}
+            local inv = src and inventory()
+            if inv then
+                local ok, a, b = pcall(function() return inv:GetWeaponAccessories(src, id, w.name) end)
+                if ok and type(a) == 'table' and type(b) == 'table' then remove, selected = a, b end
+            end
+            local components = {}
+            for _, component in ipairs(w.components or {}) do components[#components + 1] = component end
+            for _, component in ipairs(selected) do components[#components + 1] = component end
+            list[#list + 1] = { name = w.name, ammo = w.ammo or 250, components = components, removeComponents = remove, tint = w.tint }
         end
     end
     return list
@@ -428,7 +437,7 @@ end
 
 -- Donne les armes choisies (ids) à un joueur déjà apparu
 local function giveWeapons(src, ids, armour)
-    local liste = buildWeaponList(ids)
+    local liste = buildWeaponList(ids, src)
     local noms = {}
     for _, entree in ipairs(liste) do
         if entree.name then noms[#noms + 1] = entree.name end
@@ -441,7 +450,7 @@ end
 -- Le changement en Redzone conserve la vie, le gilet et les armes inchangées.
 local function updateRedzoneWeapons(src, ids)
     if Modes[src] ~= 'redzone' then return end
-    local liste = buildWeaponList(resolveSelection(src, ids))
+    local liste = buildWeaponList(resolveSelection(src, ids), src)
     local noms = {}
     for _, entree in ipairs(liste) do noms[#noms + 1] = entree.name end
     Armes[src] = ShotValidation.ensembleArmes(noms)

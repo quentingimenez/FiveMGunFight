@@ -30,7 +30,9 @@ Config.Kinds = {
 -- Photos manquantes prises automatiquement à l'arrivée d'un admin au lobby
 Config.AutoCapture = true
 -- Attente après l'arrivée au lobby (ms), le temps que tout soit chargé
-Config.AutoCaptureDelay = 8000
+Config.AutoCaptureDelay = 3000
+-- Réessayer si le catalogue ou une capture n'était pas encore disponible.
+Config.AutoCaptureRetryMs = 30000
 
 -- Studio : point isolé au-dessus de l'océan, loin de tout décor
 Config.Studio = { x = -1800.0, y = -4200.0, z = 700.0 }

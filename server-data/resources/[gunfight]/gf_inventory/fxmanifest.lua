@@ -8,7 +8,8 @@ version '1.0.0'
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    'accessories.lua',
     'server.lua',
 }
 
-dependencies { 'oxmysql', 'gf_db', 'gf_core' }
+dependencies { 'oxmysql', 'gf_db', 'gf_core', 'gf_weapons' }

@@ -15,7 +15,7 @@ La page `html/index.html` se décompose en quatre zones :
 
 - un rail de navigation à gauche, organisé en groupes **PARTIE** (REPRENDRE),
   **ÉQUIPEMENT** (CASIER, CROSSHAIR, BOUTIQUE, CAISSES, PASS DE COMBAT,
-  CONTRIBUTEUR — tous marqués « BIENTÔT ») et **SERVEUR** (RÉGLEMENT,
+  CONTRIBUTEUR — les sections autres que le Casier sont marquées « BIENTÔT ») et **SERVEUR** (RÉGLEMENT,
   DISCORD, PARAMÈTRES DU JEU « BIENTÔT », QUITTER LE SERVEUR) ;
 - une carte de profil à droite : pseudo, ID, K/D, victoires, parties, durée de
   session, date d'adhésion (« membre depuis ») et libellé du mode ;
@@ -25,6 +25,23 @@ La page `html/index.html` se décompose en quatre zones :
   ligne ainsi que le build quand il est fourni.
 
 La page est autonome : elle ne charge aucune bibliothèque ni URL externe.
+
+## Accessoires d'armes
+
+Dans le Casier, le bouton **ACCESSOIRES** apparaît pour les armes possédées
+qui disposent de composants configurables. Le joueur choisit les pièces par
+catégorie et visualise immédiatement les pièces sur une copie locale de son
+personnage. L'enregistrement conserve ses préférences par arme ; quitter l'aperçu
+sans enregistrer ne les modifie pas. La scène d'aperçu se déroule sur la Maze Bank :
+les autres joueurs sont masqués localement et le vrai personnage reste à sa place.
+Après l'enregistrement, le menu se ferme et restaure la caméra normale et la
+visibilité ; le bouton Retour permet également de quitter l'aperçu sans enregistrer.
+Le serveur refuse les composants incompatibles et les armes non
+possédées. En Redzone, le changement est autorisé hors de la zone de combat ;
+en Attaque de zone, il s'applique aux prochaines distributions d'équipement.
+Les composants des armes natives viennent du catalogue serveur ; ceux des
+armes ajoutées sont lus dans leurs fichiers `weapons.meta`. Un pack qui ne
+fournit pas de laser, de lampe ou d'autre composant ne l'affiche pas.
 
 ## Touches
 
@@ -95,7 +112,7 @@ L'ordre de démarrage est décrit dans [l'architecture](architecture.md) :
 
 ## Limites connues
 
-- Les sections CASIER, CROSSHAIR, BOUTIQUE, CAISSES, PASS DE COMBAT,
+- Les sections CROSSHAIR, BOUTIQUE, CAISSES, PASS DE COMBAT,
   CONTRIBUTEUR et PARAMÈTRES DU JEU sont « à venir » : elles s'affichent avec
   un badge et ne proposent aucune action.
 - Le menu est indisponible quand l'interface du lobby est ouverte.
