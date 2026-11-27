@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponModelInfo__InitDataList>
+	<InitDatas>
+		<Item>
+			<modelName>did_rrc3_achromic_supp</modelName>
+			<txdName>did_rrc3_achromic</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>did_rrc3_achromic_scope2</modelName>
+			<txdName>did_rrc3_achromic</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>did_rrc3_achromic_scope1</modelName>
+			<txdName>did_rrc3_achromic</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>did_rrc3_achromic_mag2</modelName>
+			<txdName>did_rrc3_achromic</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>did_rrc3_achromic_mag1</modelName>
+			<txdName>did_rrc3_achromic</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>did_rrc3_achromic_afgrip</modelName>
+			<txdName>did_rrc3_achromic</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="300"/>
+		</Item>
+		<Item>
+			<modelName>did_rrc3_achromic</modelName>
+			<txdName>did_rrc3_achromic</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+	</InitDatas>
+</CWeaponModelInfo__InitDataList>

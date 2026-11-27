@@ -156,6 +156,8 @@ Config.Weapons = {
     vvsmpxqyellow = { name = 'WEAPON_VVSMPXQYELLOW', label = 'MPXQUEEN YELLOW', category = 'Fusil d\'assaut', ammo = 300 },
     scarh = { name = 'WEAPON_SCARH', label = 'SCAR-H', category = 'Fusil d\'assaut', ammo = 300, thumbVersion = '8469f6df31811840' },
     dbcarrot = { name = 'WEAPON_DBCARROT', label = 'DB Carrot', category = 'Fusil à pompe', ammo = 60, thumbVersion = 'c94c79e5e57665c5' },
+    rrc3_achromic = { name = 'WEAPON_RRC3_ACHROMIC', label = 'RRC3 Achromic', category = 'Mitraillette', ammo = 360, thumbVersion = '0fb3a9508b99534f' },
+    wolfrifle = { name = 'WEAPON_WOLFRIFLE', label = 'Wolf Rifle', category = 'Fusil d\'assaut', ammo = 300, thumbVersion = '95aaacdbe2494bd3' },
 }
 
 -- Armes que tout le monde possède dès le départ (identifiants de Config.Weapons)

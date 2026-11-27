@@ -53,7 +53,15 @@ local labels = { clip = 'Chargeur', sight = 'Viseur', grip = 'Poignée', light =
 local bones = { wapclip = 'clip', aapclip = 'clip', wapscop = 'sight', wapscop_2 = 'sight',
     wapsupp = 'suppressor', wapgrip = 'grip', wapflsh = 'light', wapflshlasr = 'light', waplaser = 'laser' }
 -- Ce composant est facultatif pour GTA mais reste installé initialement en jeu.
-local optionalDefaults = { WEAPON_QUEENBEE16YELLOW = { suppressor = 'COMPONENT_AT_QUEENBEE16YELLOW_SUPP' } }
+local optionalDefaults = {
+    WEAPON_QUEENBEE16YELLOW = { suppressor = 'COMPONENT_AT_QUEENBEE16YELLOW_SUPP' },
+    WEAPON_RRC3_ACHROMIC = {
+        suppressor = 'did_rrc3_achromic_supp',
+        sight = 'did_rrc3_achromic_scope2',
+        grip = 'did_rrc3_achromic_afgrip',
+    },
+    WEAPON_WOLFRIFLE = { suppressor = 'wolfrifle_supp' },
+}
 local stockMagazines = { WEAPON_PUMPSHOTGUN = true, WEAPON_MARKSMANRIFLE = true }
 
 function WeaponAccessories.catalog(name)

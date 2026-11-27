@@ -378,6 +378,19 @@ files {
     'data/WEAPON_DBCARROT/weaponanimations.meta',
     'data/WEAPON_DBCARROT/weaponarchetypes.meta',
     'data/WEAPON_DBCARROT/weapons.meta',
+    'data/WEAPON_RRC3_ACHROMIC/names.json',
+    'data/WEAPON_RRC3_ACHROMIC/pedpersonality.meta',
+    'data/WEAPON_RRC3_ACHROMIC/weaponanimations.meta',
+    'data/WEAPON_RRC3_ACHROMIC/weaponarchetypes.meta',
+    'data/WEAPON_RRC3_ACHROMIC/weaponcomponents.meta',
+    'data/WEAPON_RRC3_ACHROMIC/weapons.meta',
+    'data/WEAPON_WOLFRIFLE/names.json',
+    'data/WEAPON_WOLFRIFLE/pedpersonality.meta',
+    'data/WEAPON_WOLFRIFLE/weaponanimations.meta',
+    'data/WEAPON_WOLFRIFLE/weaponarchetypes.meta',
+    'data/WEAPON_WOLFRIFLE/weaponcomponents.meta',
+    'data/WEAPON_WOLFRIFLE/weapons.meta',
+    'data/WEAPON_RRC3_ACHROMIC/components/GF_CLIP60/weaponcomponents.meta',
 }
 
 data_file 'WEAPONCOMPONENTSINFO_FILE' 'data/**/weaponcomponents.meta'
