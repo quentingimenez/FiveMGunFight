@@ -1,10 +1,17 @@
 # Configuration gitleaks du dépôt FiveMGunFight.
 #
 # Les règles par défaut de gitleaks restent actives : cette configuration ne
-# désactive aucun détecteur. L'unique allowlist ci-dessous couvre un faux
-# positif documentaire connu, la valeur d'exemple « change_moi », et reste
-# limitée aux fichiers qui la citent. Toute nouvelle exception doit être
-# justifiée de la même façon, pas élargie à tout le dépôt.
+# désactive aucun détecteur. Il y a désormais deux exceptions, chacune
+# justifiée et limitée aux fichiers concernés :
+#   1. la valeur d'exemple « change_moi » citée par la documentation et les
+#      tests ;
+#   2. les noms d'armes GTA (clés WEAPON_*) des fichiers .meta des armes, que
+#      generic-api-key prend pour des clés d'API alors qu'ils ne sont jamais des
+#      secrets.
+# Une exception qui combine des chemins et des motifs doit fixer
+# condition = "AND" : sans cela, gitleaks combine paths et regexes en OU et
+# ignorerait tout le contenu des fichiers visés. Toute nouvelle exception doit
+# rester justifiée et limitée de la même façon, jamais élargie à tout le dépôt.
 
 [extend]
 useDefault = true
@@ -13,3 +20,10 @@ useDefault = true
 description = "Valeur d'exemple change_moi (documentation et tests), jamais un secret réel"
 paths = ['''^(?:docs/.*|tests/.*|\.env\.example)$''']
 regexes = ['''change_moi''']
+
+[[allowlists]]
+description = "Noms d'armes GTA (clés WEAPON_*) dans les fichiers .meta des armes, pris pour des clés d'API par generic-api-key ; jamais un secret"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^server-data/resources/\[gunfight\]/gf_weapons/data/.*\.meta$''']
+regexes = ['''^WEAPON_[A-Z0-9_]+$''']
