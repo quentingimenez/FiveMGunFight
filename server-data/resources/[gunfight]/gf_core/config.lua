@@ -155,7 +155,7 @@ Config.Weapons = {
     vvsmpxqrose = { name = 'WEAPON_VVSMPXQROSE', label = 'MPXQUEEN ROSE', category = 'Fusil d\'assaut', ammo = 300 },
     vvsmpxqyellow = { name = 'WEAPON_VVSMPXQYELLOW', label = 'MPXQUEEN YELLOW', category = 'Fusil d\'assaut', ammo = 300 },
     scarh = { name = 'WEAPON_SCARH', label = 'SCAR-H', category = 'Fusil d\'assaut', ammo = 300, thumbVersion = '8469f6df31811840' },
-    dbcarrot = { name = 'WEAPON_DBCARROT', label = 'DB Carrot', category = 'Fusil à pompe', ammo = 60, thumbVersion = '2d104a3dd3727a37' },
+    dbcarrot = { name = 'WEAPON_DBCARROT', label = 'DB Carrot', category = 'Fusil à pompe', ammo = 60, thumbVersion = 'c94c79e5e57665c5' },
 }
 
 -- Armes que tout le monde possède dès le départ (identifiants de Config.Weapons)
