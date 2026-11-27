@@ -62,6 +62,13 @@ essai**.
   `native.py 00000000786d8bc3` aussi.
 - **`pcall` cache la vraie erreur** : afficher le message d'erreur du `pcall`,
   pas un texte générique (« image introuvable » a masqué un `invalid handle`).
+- **Un natif qui retourne BOOL rend le nombre `1` pour vrai et `false` pour
+  faux en Lua FiveM** : ne jamais comparer son résultat à `true` (une ressource
+  qui exigeait `admin == true` refusait le panneau F10 et masquait l'entrée
+  ADMIN du menu Échap).
+  Tester sa valeur de vérité ou le normaliser en booléen — par exemple
+  `core:IsAdmin` renvoie désormais un vrai booléen (`allowed == true or
+  allowed == 1`) depuis cette correction, y compris via l'export.
 - **`sender` des événements de jeu serveur est une chaîne** :
   `weaponDamageEvent`, `explosionEvent`, `ptFxEvent`… reçoivent l'identifiant
   du joueur en `"3"` et non en `3` (`std::to_string(client->GetNetId())` dans

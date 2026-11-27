@@ -81,6 +81,7 @@ end
 local function newHarness(admin)
     local h = {
         admin = admin and true or false,
+        aceValue = admin and true or false, -- valeur exacte rendue par IsPlayerAceAllowed
         commands = {},        -- [nom] = gestionnaire
         netHandlers = {},
         eventHandlers = {},
@@ -123,7 +124,9 @@ local function newHarness(admin)
         env.GetPlayerIdentifiers = function()
             return { 'license:abc', 'ip:1.2.3.4', 'fivem:42', 'discord:99' }
         end
-        env.IsPlayerAceAllowed = function() return h.admin end
+        -- On renvoie EXACTEMENT h.aceValue : pas de repli sur h.admin, sinon nil
+        -- retomberait sur le faux coreExport.IsAdmin et masquerait le bug des BOOL.
+        env.IsPlayerAceAllowed = function() return h.aceValue end
         env.GetPlayers = function() return {} end
         env.GetPlayerPed = function() return 0 end
         env.GetEntityCoords = function() return newVector(0, 0, 0) end
@@ -571,6 +574,75 @@ check('4g. SetNextMap refuse un id inconnu et un id non chaîne', function()
 
     expectList(h.noticesMessages(), { 'Zone : Grove Street' },
         'message de zone exact : la carte n a pas changé')
+end)
+
+-- ---------------------------------------------------------------------------
+--  Scénarios 5 : normalisation BOOL des natifs par le VRAI export IsAdmin.
+--  Un natif BOOL rend 1 pour vrai : h.aceValue force la valeur exacte rendue
+--  par IsPlayerAceAllowed, et on vérifie le booléen de l'export capté.
+-- ---------------------------------------------------------------------------
+
+local ACE_CAS = {
+    { nom = '5a', valeur = 1,     attendu = true,  label = '1 (natif BOOL)' },
+    { nom = '5b', valeur = true,  attendu = true,  label = 'true' },
+    { nom = '5c', valeur = false, attendu = false, label = 'false' },
+    { nom = '5d', valeur = 0,     attendu = false, label = '0' },
+    { nom = '5e', valeur = nil,   attendu = false, label = 'nil' },
+}
+
+for _, cas in ipairs(ACE_CAS) do
+    check(cas.nom .. '. export IsAdmin avec IsPlayerAceAllowed = ' .. cas.label
+        .. ' : booléen exact ' .. tostring(cas.attendu), function()
+        local h = newHarness(true)
+        h.aceValue = cas.valeur
+
+        local resultat = h.exportsByName.IsAdmin(5)
+        eq('boolean', type(resultat), 'IsAdmin renvoie un booléen Lua')
+        eq(cas.attendu, resultat, 'valeur exacte renvoyée par IsAdmin')
+    end)
+end
+
+check('5f. export IsAdmin : la console (src 0) reste admin même avec Ace false', function()
+    local h = newHarness(false)
+    h.aceValue = false
+
+    local resultat = h.exportsByName.IsAdmin(0)
+    eq('boolean', type(resultat), 'IsAdmin renvoie un booléen Lua')
+    eq(true, resultat, 'la console est admin')
+end)
+
+check('5g. setmode avec IsPlayerAceAllowed = 1 : aucun message ADMIN_REQUIS', function()
+    local h = newHarness(true)
+    h.aceValue = 1
+    h.resetRecords()
+    h.call('setmode', 5)
+
+    for _, msg in ipairs(h.noticesMessages()) do
+        if msg == ADMIN_REQUIS then error('ADMIN_REQUIS dans un Notify', 2) end
+    end
+    for _, msg in ipairs(h.notifyMessages(5)) do
+        if msg == ADMIN_REQUIS then error('ADMIN_REQUIS dans une notification client', 2) end
+    end
+    eq(false, hasMessage(h.noticesMessages(), 'Réservé aux administrateurs'),
+        'aucun refus dans les Notify')
+    eq(false, hasMessage(h.notifyMessages(5), 'Réservé aux administrateurs'),
+        'aucun refus dans les notifications client')
+end)
+
+check('5h. whoami avec IsPlayerAceAllowed = 1 : Administrateur oui, sans aide', function()
+    local h = newHarness(true)
+    h.aceValue = 1
+    h.resetRecords()
+    h.call('whoami', 5)
+
+    local messages = h.notifyMessages(5)
+    local trouve = false
+    for _, msg in ipairs(messages) do
+        if msg == 'Administrateur : oui' then trouve = true end
+        if msg == AIDE_ADMIN then error('AIDE_ADMIN envoyé à un admin', 2) end
+    end
+    eq(true, trouve, 'Administrateur : oui affiché')
+    eq(false, hasMessage(messages, 'Administrateur : non'), 'pas de refus dans whoami')
 end)
 
 print(('%d passed, %d failed'):format(passed, failed))
