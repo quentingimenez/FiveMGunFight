@@ -260,6 +260,18 @@ RegisterNUICallback('quit', function(data, cb)
     repondre(cb, { ok = true })
 end)
 
+-- Ouvre le panneau d'administration : simple événement client local, gf_admin
+-- revérifie les droits côté serveur.
+RegisterNUICallback('openAdmin', function(_, cb)
+    if not pagePret then
+        repondre(cb, { ok = false })
+        return
+    end
+    fermerMenu()
+    TriggerEvent('gf_admin:open')
+    repondre(cb, { ok = true })
+end)
+
 -- Le Casier et le catalogue admin partagent le focus du menu Échap.
 local function transmettreArmes(kind, data)
     if type(data) ~= 'table' then return end

@@ -198,6 +198,17 @@ check('buildState : état complet', function()
     equal(Config.Rules, state.rules, 'rules')
     equal(Config.DiscordUrl, state.discord.url, 'discord.url')
     equal(Config.Features, state.features, 'features')
+    equal(false, state.isAdmin, 'isAdmin absent du contexte complet')
+end)
+
+check('buildState : droits admin strictement booléens', function()
+    equal(true, GFMenuState.buildState({ isAdmin = true }).isAdmin, 'isAdmin true')
+    equal(false, GFMenuState.buildState({ isAdmin = false }).isAdmin, 'isAdmin false')
+    equal(false, GFMenuState.buildState({}).isAdmin, 'isAdmin absent')
+    for _, valeur in ipairs({ 1, 'true', {} }) do
+        equal(false, GFMenuState.buildState({ isAdmin = valeur }).isAdmin,
+            'isAdmin truthy non booléen : ' .. type(valeur))
+    end
 end)
 
 check('buildState : sans statistiques', function()

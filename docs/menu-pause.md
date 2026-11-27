@@ -15,7 +15,8 @@ La page `html/index.html` se décompose en quatre zones :
 
 - un rail de navigation à gauche, organisé en groupes **PARTIE** (REPRENDRE),
   **ÉQUIPEMENT** (CASIER, CROSSHAIR, BOUTIQUE, CAISSES, PASS DE COMBAT,
-  CONTRIBUTEUR — les sections autres que le Casier sont marquées « BIENTÔT ») et **SERVEUR** (RÉGLEMENT,
+  CONTRIBUTEUR — les sections autres que le Casier sont marquées « BIENTÔT »),
+  **ADMIN** (PANNEAU ADMIN, visible uniquement des admins) et **SERVEUR** (RÉGLEMENT,
   DISCORD, PARAMÈTRES DU JEU « BIENTÔT », QUITTER LE SERVEUR) ;
 - une carte de profil à droite : pseudo, ID, K/D, victoires, parties, durée de
   session, date d'adhésion (« membre depuis ») et libellé du mode ;
@@ -48,6 +49,7 @@ fournit pas de laser, de lampe ou d'autre composant ne l'affiche pas.
 | Touche | Action |
 |---|---|
 | **Échap** | ouvre le menu ; le referme quand il est déjà ouvert |
+| **F10** | ouvre le panneau d'administration `gf_admin` (admins uniquement, aussi depuis **ADMIN > PANNEAU ADMIN** dans le menu Échap) |
 | **↑ / ↓** | navigue dans le rail et les éléments de la section courante |
 | **Entrée** | valide l'élément sélectionné |
 | **Souris** | sélection et clic sur les éléments du rail et des panneaux |
@@ -68,19 +70,26 @@ Le client envoie trois types de messages à la page via `SendNUIMessage` :
 | `close` | néant | la page se masque et rend le focus |
 | `state` | état construit côté serveur | profile, statistiques, règlement, fonctionnalités |
 
-La page répond par trois callbacks enregistrés côté client :
+La page répond par les callbacks enregistrés côté client :
 
 | Callback | Effet |
 |---|---|
 | `ready` | signalement que la page est prête ; mémorise l'état reçu si le menu est déjà ouvert |
 | `close` | fermeture demandée depuis la page |
 | `quit` | demande de déconnexion transmise au serveur |
+| `openAdmin` | ouverture du panneau d'administration (entrée **ADMIN > PANNEAU ADMIN**) : répond `{ ok = false }` si la page n'est pas prête ; sinon ferme le menu, déclenche l'événement client local `gf_admin:open` et répond `{ ok = true }` |
 
 Chaque callback délivre **une seule réponse** à la page. Le transport est
 `fetch('https://gf_menu/<callback>')`. Si `ready` n'arrive jamais, un garde-fou
 `SetTimeout(Config.PageReadyTimeoutMs, ...)` referme le menu pour ne pas piéger
 le joueur dans une page vide. Les callbacks dont l'argument n'est pas une
 fonction usable sont ignorés sans lever d'erreur.
+
+L'entrée **ADMIN** et le bouton **PANNEAU ADMIN** ne sont visibles que si l'état
+serveur indique `isAdmin === true` : un état client bricolé n'ouvre rien. Le
+serveur de `gf_admin` revérifie les droits lors de l'ouverture et sur chaque
+commande ; le panneau n'est pas accessible aux non-admins. Voir
+[le panneau d'administration](panneau-admin.md).
 
 ## Données et sécurité
 
