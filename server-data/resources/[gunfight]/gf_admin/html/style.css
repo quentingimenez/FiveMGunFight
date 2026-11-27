@@ -346,7 +346,10 @@ button { color: inherit; cursor: pointer; }
 .action + .action { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .action .btn { width: 100%; }
 .action-desc { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.counter { margin-top: 5px; font-variant-numeric: tabular-nums; }
 .tools-grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+#announce-text { margin-bottom: 2px; }
+#btn-announce { margin-top: 10px; }
 
 /* Confirmation : couche au-dessus du panneau, les clics ne passent pas. */
 .modal-overlay {
@@ -372,6 +375,8 @@ button { color: inherit; cursor: pointer; }
 }
 .modal-title { margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; }
 .modal-message { margin: 0 0 22px; color: var(--text); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.modal-field { margin: -8px 0 20px; }
+.modal-field .input { user-select: text; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 @keyframes admin-in {

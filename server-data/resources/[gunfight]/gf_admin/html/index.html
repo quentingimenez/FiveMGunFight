@@ -72,6 +72,18 @@
                 </div>
 
                 <div class="detail-section">
+                  <p class="section-label">ACTIONS</p>
+                  <div id="player-actions" class="button-row" role="group" aria-label="Actions sur le joueur">
+                    <button id="btn-goto" class="btn" type="button">ALLER VERS</button>
+                    <button id="btn-bring" class="btn" type="button">AMENER</button>
+                    <button id="btn-heal" class="btn" type="button">SOIGNER</button>
+                    <button id="btn-freeze" class="btn" type="button">Geler / dégeler</button>
+                    <button id="btn-kick" class="btn btn-danger" type="button">EXPULSER</button>
+                  </div>
+                  <p class="action-desc">Téléportation possible seulement si les deux joueurs sont dans le même mode.</p>
+                </div>
+
+                <div class="detail-section">
                   <p class="section-label">PERSONNAGE</p>
                   <button id="btn-resetchar" class="btn btn-danger" type="button">RÉINITIALISER</button>
                 </div>
@@ -121,6 +133,17 @@
                 <p class="action-desc">Charge la carte suivante de la rotation.</p>
               </div>
             </div>
+
+            <div class="panel action-group">
+              <h2 class="group-title">ANNONCE</h2>
+              <div class="action">
+                <label class="field-label" for="announce-text">MESSAGE</label>
+                <input id="announce-text" class="input" type="text" maxlength="120" placeholder="Message à diffuser" autocomplete="off">
+                <p id="announce-count" class="action-desc counter" aria-live="polite">120 caractères restants</p>
+                <button id="btn-announce" class="btn btn-primary" type="button" disabled>ENVOYER À TOUS</button>
+                <p class="action-desc">Diffuse le message à tous les joueurs connectés.</p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -158,6 +181,10 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
       <h2 id="confirm-title" class="modal-title">CONFIRMATION</h2>
       <p id="confirm-message" class="modal-message"></p>
+      <div id="confirm-reason-field" class="modal-field hidden">
+        <label class="field-label" for="confirm-reason">RAISON (FACULTATIF)</label>
+        <input id="confirm-reason" class="input" type="text" maxlength="80" placeholder="Raison de l'expulsion" autocomplete="off">
+      </div>
       <div class="modal-actions">
         <button id="confirm-cancel" class="btn" type="button">ANNULER</button>
         <button id="confirm-ok" class="btn btn-danger" type="button">CONFIRMER</button>

@@ -158,6 +158,31 @@ RegisterNUICallback('run', function(data, cb)
     repondre(cb, { ok = true })
 end)
 
+-- --------------------------------------------------- Actions demandées au client
+
+-- Téléportation validée côté serveur : la table et ses coordonnées doivent être
+-- des nombres finis. Aucun effet si le ped n'existe pas (joueur en chargement).
+RegisterNetEvent('gf_admin:teleport', function(p)
+    if type(p) ~= 'table' then return end
+    local x, y, z = p.x, p.y, p.z
+    if type(x) ~= 'number' or type(y) ~= 'number' or type(z) ~= 'number' then return end
+    if x ~= x or y ~= y or z ~= z then return end -- NaN
+    if x == math.huge or x == -math.huge
+        or y == math.huge or y == -math.huge
+        or z == math.huge or z == -math.huge then return end
+
+    local ped = PlayerPedId()
+    if ped == 0 then return end
+    SetEntityCoords(ped, x, y, z, false, false, false, false)
+end)
+
+-- Soin accordé par un administrateur (le serveur a déjà tracé l'audit).
+RegisterNetEvent('gf_admin:heal', function()
+    local ped = PlayerPedId()
+    if ped == 0 or IsEntityDead(ped) then return end
+    SetEntityHealth(ped, GetEntityMaxHealth(ped))
+end)
+
 -- -------------------------------------------------------------- Fin de ressource
 
 AddEventHandler('onResourceStop', function(resourceName)

@@ -32,6 +32,7 @@ local prints = {}        -- lignes produites par le print de env
 local events = {}        -- { { name, target, data }, ... }
 local handlers = {}      -- RegisterNetEvent
 local eventHandlers = {} -- AddEventHandler
+local commands = {}      -- RegisterCommand : commands[nom] = handler
 
 local now = 0
 
@@ -62,6 +63,7 @@ local env = setmetatable({
     end,
     RegisterNetEvent = function(name, handler) handlers[name] = handler end,
     AddEventHandler = function(name, handler) eventHandlers[name] = handler end,
+    RegisterCommand = function(name, handler) commands[name] = handler end,
     print = function(...)
         local parts = {}
         for i = 1, select('#', ...) do parts[i] = tostring((select(i, ...))) end
@@ -78,6 +80,10 @@ local build = assert(env.GFAdminCommands and env.GFAdminCommands.build, 'GFAdmin
 local opensUi = assert(env.GFAdminCommands.opensUi, 'GFAdminCommands.opensUi absent')
 local requestData = assert(handlers['gf_admin:requestData'], 'event gf_admin:requestData absent')
 local onDrop = assert(eventHandlers.playerDropped, 'handler playerDropped absent')
+
+for _, nom in ipairs({ 'kick', 'goto', 'bring', 'heal', 'freeze', 'announce' }) do
+    check(type(commands[nom]) == 'function', ('RegisterCommand(%s) enregistré'):format(nom))
+end
 
 local function reinitialiser()
     notices = {}
@@ -137,6 +143,19 @@ ligne('maps', {}, 'maps')
 ligne('customveh', {}, 'customveh')
 
 -- ---------------------------------------------------------------------------
+-- A2. Nouvelles commandes : lignes exactes (liste blanche).
+-- ---------------------------------------------------------------------------
+ligne('kick', { '3' }, 'kick 3')
+ligne('kick', { '3', 'triche' }, 'kick 3 triche')
+ligne('goto', { '3' }, 'goto 3')
+ligne('bring', { '3' }, 'bring 3')
+ligne('heal', { '3' }, 'heal 3')
+ligne('freeze', { '3' }, 'freeze 3')
+ligne('announce', { 'Bonjour' }, 'announce Bonjour')
+ligne('announce', { 'Redémarrage dans 5 minutes' }, 'announce Redémarrage dans 5 minutes')
+ligne('announce', { string.rep('a', 120) }, 'announce ' .. string.rep('a', 120))
+
+-- ---------------------------------------------------------------------------
 -- B. Refus de la liste blanche.
 -- ---------------------------------------------------------------------------
 refuse('inconnue', {}, 'commande inconnue')
@@ -163,10 +182,73 @@ refuse('resetchar', { true }, 'id booléen')
 refuse('setmode', '3 attack', 'args non table')
 
 -- ---------------------------------------------------------------------------
+-- B2. Refus des nouvelles commandes.
+-- ---------------------------------------------------------------------------
+refuse('kick', {}, 'kick sans id')
+refuse('kick', { '0' }, 'kick id zéro')
+refuse('kick', { '-1' }, 'kick id négatif')
+refuse('kick', { '3a' }, 'kick id non numérique')
+refuse('kick', { '3', 'triche', 'en plus' }, 'kick trois arguments')
+refuse('kick', { '3', true }, 'kick raison non chaîne')
+refuse('kick', { 3, 'triche' }, 'kick id non chaîne')
+refuse('goto', {}, 'goto sans argument')
+refuse('goto', { '3', 'x' }, 'goto argument en trop')
+refuse('goto', { 3 }, 'goto id non chaîne')
+refuse('bring', {}, 'bring sans argument')
+refuse('bring', { '3', 'x' }, 'bring argument en trop')
+refuse('heal', {}, 'heal sans argument')
+refuse('heal', { '3', 'x' }, 'heal argument en trop')
+refuse('freeze', {}, 'freeze sans argument')
+refuse('freeze', { '3', 'x' }, 'freeze argument en trop')
+refuse('announce', {}, 'announce sans argument')
+refuse('announce', { string.rep('a', 121) }, 'announce 121 caractères')
+
+-- ---------------------------------------------------------------------------
 -- C. Normalisation de l'arme (mise en minuscules avant contrôle).
 -- ---------------------------------------------------------------------------
 ligne('give', { '3', 'CARBINE' }, 'give 3 carbine')
 ligne('give', { '3', 'Weapon_Carbine' }, 'give 3 weapon_carbine')
+
+-- ---------------------------------------------------------------------------
+-- C2. Nettoyage du texte libre : séparateurs, espaces, troncature à 80.
+-- ---------------------------------------------------------------------------
+ligne('kick', { '3', '   ' }, 'kick 3')
+ligne('kick', { '3', ' ; | \\ ` " ' }, 'kick 3')
+local ligneKickPropre = assert(build('kick', { '3', 'Triche ; | \\ ` " \n' }))
+ligne('kick', { '3', 'Triche ; | \\ ` " \n' }, 'kick 3 Triche')
+check(ligneKickPropre:find('[;|\\`"\r\n]') == nil,
+    'kick : la ligne ne contient ni séparateur ni saut de ligne')
+ligne('kick', { '3', string.rep('a', 100) }, 'kick 3 ' .. string.rep('a', 80))
+check(#(assert(build('kick', { '3', string.rep('a', 100) }))) == 7 + 80,
+    'kick : raison tronquée à exactement 80 caractères')
+ligne('announce', { 'Salut ; | \\ ` " monde' }, 'announce Salut monde')
+refuse('announce', { string.rep('a', 121) .. ' ' }, 'announce 121 caractères après normalisation')
+refuse('announce', { string.rep('a', 120) .. '\na' }, 'announce 121 caractères avec saut de ligne')
+
+-- ---------------------------------------------------------------------------
+-- C3. Injection : aucune ligne produite ne contient ';' ni saut de ligne.
+-- ---------------------------------------------------------------------------
+local casInjection = {
+    { 'kick', { '3', 'Triche;|\\`"\r\nnext' } },
+    { 'kick', { '3', 'a\nb\rc;d|e\\f`g"h' } },
+    { 'announce', { 'A;B|C\\D`E"F\r\nG' } },
+    { 'announce', { '\n ; \r' } },
+    { 'goto', { '3\n' } },
+    { 'setmode', { '3', 'attack\n' } },
+}
+local injectionPropre = true
+local lignesInspectees = 0
+for _, cas in ipairs(casInjection) do
+    local ligne = build(cas[1], cas[2])
+    if ligne ~= nil then
+        lignesInspectees = lignesInspectees + 1
+        if ligne:find(';', 1, true) or ligne:find('[\r\n]') then
+            injectionPropre = false
+        end
+    end
+end
+check(lignesInspectees > 0, 'injection : au moins une ligne produite à inspecter')
+check(injectionPropre, 'injection : aucune ligne ne contient ; \\r ou \\n')
 
 -- ---------------------------------------------------------------------------
 -- D. Commandes qui ouvrent une autre interface.
