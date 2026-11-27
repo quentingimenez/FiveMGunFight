@@ -167,7 +167,7 @@
     return null;
   }
 
-  function withFeedback(button, action) {
+  function withFeedback(button, action, after) {
     if (button) {
       button.disabled = true;
       button.classList.add('is-busy');
@@ -177,23 +177,29 @@
     } catch (error) {
       /* un evenement ne doit jamais casser le panneau */
     }
+    if (after) {
+      try { after(); } catch (error) { /* ignore */ }
+    }
     if (button) {
       window.setTimeout(function () {
         button.disabled = false;
         button.classList.remove('is-busy');
         if (button === refs.giveBtn) { updateGiveButton(); }
+        if (button === refs.announceBtn) { updateAnnounceButton(); }
       }, FEEDBACK_MS);
     }
   }
 
-  function execute(button, command, args) {
+  function execute(button, command, args, after) {
     withFeedback(button, function () {
       run(command, args);
-    });
+    }, after);
   }
 
   function hideConfirm() {
     pendingConfirm = null;
+    refs.confirmReason.value = '';
+    refs.confirmReasonField.classList.add('hidden');
     refs.confirmOverlay.classList.add('hidden');
     refs.admin.removeAttribute('aria-hidden');
     refs.admin.removeAttribute('inert');
@@ -207,13 +213,25 @@
     }
   }
 
-  function askConfirm(message, command, args, button) {
-    pendingConfirm = { command: command, args: args || [], button: button || null };
+  function askConfirm(message, command, args, button, useReason) {
+    pendingConfirm = {
+      command: command,
+      args: args || [],
+      button: button || null,
+      useReason: useReason === true
+    };
     refs.confirmMessage.textContent = message;
+    refs.confirmReason.value = '';
+    if (pendingConfirm.useReason) {
+      refs.confirmReasonField.classList.remove('hidden');
+    } else {
+      refs.confirmReasonField.classList.add('hidden');
+    }
     refs.confirmOverlay.classList.remove('hidden');
     refs.admin.setAttribute('aria-hidden', 'true');
     refs.admin.setAttribute('inert', '');
-    try { refs.confirmCancel.focus(); } catch (error) { /* ignore */ }
+    var focusTarget = pendingConfirm.useReason ? refs.confirmReason : refs.confirmCancel;
+    try { focusTarget.focus(); } catch (error) { /* ignore */ }
   }
 
   function openPanel() {
@@ -246,6 +264,15 @@
     if (!refs.giveBtn) { return; }
     if (refs.giveBtn.classList.contains('is-busy')) { return; }
     refs.giveBtn.disabled = !(state.hasSelection && state.hasWeaponSelection);
+  }
+
+  function updateAnnounceButton() {
+    if (!refs.announceBtn || !refs.announceText || !refs.announceCount) { return; }
+    var remaining = 120 - (refs.announceText.value || '').length;
+    if (remaining < 0) { remaining = 0; }
+    refs.announceCount.textContent = remaining + ' caractères restants';
+    refs.announceBtn.disabled = refs.announceBtn.classList.contains('is-busy') ||
+      (refs.announceText.value || '').trim().length === 0;
   }
 
   function updateChoiceGroup(nodes, attribute, current) {
@@ -552,11 +579,17 @@
     }
     if (key === 'Tab' && !refs.confirmOverlay.classList.contains('hidden')) {
       event.preventDefault();
-      if (document.activeElement === refs.confirmCancel) {
-        try { refs.confirmOk.focus(); } catch (error) { /* ignore */ }
+      var showReason = !refs.confirmReasonField.classList.contains('hidden');
+      var current = document.activeElement;
+      var next;
+      if (current === refs.confirmCancel) {
+        next = showReason ? refs.confirmReason : refs.confirmOk;
+      } else if (current === refs.confirmReason) {
+        next = refs.confirmOk;
       } else {
-        try { refs.confirmCancel.focus(); } catch (error) { /* ignore */ }
+        next = refs.confirmCancel;
       }
+      try { next.focus(); } catch (error) { /* ignore */ }
     }
   }
 
@@ -640,6 +673,42 @@
       askConfirm('Reinitialiser le personnage de ' + name + ' ?', 'resetchar', [player.id], refs.resetChar);
     });
 
+    var playerActionButtons = [
+      { node: refs.gotoBtn, command: 'goto' },
+      { node: refs.bringBtn, command: 'bring' },
+      { node: refs.healBtn, command: 'heal' },
+      { node: refs.freezeBtn, command: 'freeze' }
+    ];
+    for (var a = 0; a < playerActionButtons.length; a += 1) {
+      (function (action) {
+        action.node.addEventListener('click', function () {
+          var player = state.selectedPlayer;
+          if (!state.hasSelection || !player) { return; }
+          execute(action.node, action.command, [player.id]);
+        });
+      })(playerActionButtons[a]);
+    }
+
+    refs.kickBtn.addEventListener('click', function () {
+      var player = state.selectedPlayer;
+      if (!state.hasSelection || !player) { return; }
+      var name = player.name || ('ID ' + player.id);
+      askConfirm('Expulser ' + name + ' ?', 'kick', [player.id], refs.kickBtn, true);
+    });
+
+    refs.announceText.addEventListener('input', function () {
+      updateAnnounceButton();
+    });
+
+    refs.announceBtn.addEventListener('click', function () {
+      var text = (refs.announceText.value || '').trim();
+      if (text.length === 0) { updateAnnounceButton(); return; }
+      execute(refs.announceBtn, 'announce', [text], function () {
+        refs.announceText.value = '';
+        updateAnnounceButton();
+      });
+    });
+
     refs.giveBtn.addEventListener('click', function () {
       if (!state.hasSelection || !state.hasWeaponSelection || !state.selectedWeapon) { return; }
       var player = state.selectedPlayer;
@@ -665,9 +734,15 @@
     refs.confirmCancel.addEventListener('click', cancelConfirm);
     refs.confirmOk.addEventListener('click', function () {
       var action = pendingConfirm;
+      var args = action ? action.args.slice() : [];
+      if (action && action.useReason) {
+        var reason = (refs.confirmReason.value || '').trim();
+        if (reason.length > 80) { reason = reason.substring(0, 80); }
+        if (reason.length > 0) { args.push(reason); }
+      }
       hideConfirm();
       if (!action) { return; }
-      execute(action.button, action.command, action.args);
+      execute(action.button, action.command, args);
     });
     refs.confirmOverlay.addEventListener('click', function (event) {
       if (event.target === refs.confirmOverlay) { cancelConfirm(); }
@@ -698,6 +773,14 @@
       refs.modeButtons = byId('mode-buttons');
       refs.teamButtons = byId('team-buttons');
       refs.resetChar = byId('btn-resetchar');
+      refs.gotoBtn = byId('btn-goto');
+      refs.bringBtn = byId('btn-bring');
+      refs.healBtn = byId('btn-heal');
+      refs.freezeBtn = byId('btn-freeze');
+      refs.kickBtn = byId('btn-kick');
+      refs.announceText = byId('announce-text');
+      refs.announceCount = byId('announce-count');
+      refs.announceBtn = byId('btn-announce');
       refs.weaponSearch = byId('weapon-search');
       refs.weaponFilters = byId('weapon-filters');
       refs.weaponGrid = byId('weapon-grid');
@@ -705,6 +788,8 @@
       refs.giveBtn = byId('btn-give');
       refs.confirmOverlay = byId('confirm-overlay');
       refs.confirmMessage = byId('confirm-message');
+      refs.confirmReasonField = byId('confirm-reason-field');
+      refs.confirmReason = byId('confirm-reason');
       refs.confirmCancel = byId('confirm-cancel');
       refs.confirmOk = byId('confirm-ok');
 
@@ -714,6 +799,7 @@
       renderDetail();
       renderWeaponFilters();
       renderWeaponGrid();
+      updateAnnounceButton();
     } catch (error) {
       /* la page reste ouverte meme si une partie du panneau manque */
     }

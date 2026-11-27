@@ -35,7 +35,19 @@ et **ping**. Les actions disponibles sur un joueur sont :
 
 - donner une arme au **Casier** (commande `give`) ;
 - changer son **mode** (`setmode`) ou son **équipe** (`setteam`) ;
-- **réinitialiser le personnage** (`resetchar`).
+- **réinitialiser le personnage** (`resetchar`) ;
+- **expulser** le joueur (`kick <id> [raison...]`) : la raison est nettoyée, avec
+  « aucune raison » par défaut ; impossible de s'expulser soi-même ;
+- **téléporter l'admin près du joueur** (`goto <id>`) ou **amener le joueur près
+  de l'admin** (`bring <id>`) : +1,5 m sur l'axe x. Ces deux commandes sont
+  **en jeu seulement**, exigent d'être dans le **même mode** (routing bucket)
+  que la cible — sinon le serveur répond « … est dans un autre mode : utilise
+  d'abord setmode. » — et refusent de cibler l'admin lui-même. Dans le cas de
+  `bring`, la cible est notifiée ;
+- **soigner** le joueur (`heal <id>`) : santé maximale si la cible n'est pas
+  morte (le serveur émet `gf:healGranted` avant `gf_admin:heal`) ;
+- **geler / dégeler** le joueur (`freeze <id>`) : la commande bascule l'état et
+  la cible est notifiée ; le gel est oublié à la déconnexion.
 
 ### PARTIES
 
@@ -51,18 +63,28 @@ Commandes de partie :
 
 - `editor` : éditeur de maps en jeu ;
 - `maps` : liste des maps ;
-- `customveh` : personnalisation du véhicule de base.
+- `customveh` : personnalisation du véhicule de base ;
+- `announce <texte...>` : annonce à tous les joueurs (titre **ANNONCE**,
+  8 secondes). Le texte est nettoyé et doit faire entre 1 et 120 caractères ;
+  l'auteur et le texte sont journalisés côté serveur.
 
 Chaque bouton exécute côté client la commande serveur existante au moyen de
 `ExecuteCommand`. La source de la commande est l'administrateur : le serveur
-revérifie ses droits avant de l'appliquer. La liste des commandes et leurs effets
-sont décrits dans le [README](../README.md#4-commandes-en-jeu).
+revérifie ses droits avant de l'appliquer. Les actions ci-dessus sont enregistrées
+côté serveur avec `RegisterCommand` et réservées aux admins : même si le client
+affiche `isAdmin === true`, c'est bien le serveur qui décide de l'accès. La liste
+des commandes et leurs effets sont décrits dans le
+[README](../README.md#4-commandes-en-jeu).
 
 ## Sécurité
 
 - Les droits sont revérifiés côté serveur sur `gf_admin:requestData`
   (`core:IsAdmin(src)`) **et** sur chaque commande exécutée depuis le panneau,
-  même si le client affiche déjà `isAdmin === true`.
+  même si le client affiche déjà `isAdmin === true`. Les commandes d'action
+  (`kick`, `goto`, `bring`, `heal`, `freeze`, `announce`) sont enregistrées avec
+  `RegisterCommand` côté serveur : **aucun nouveau message client → serveur**
+  n'est ajouté pour elles, la surface réseau décrite dans
+  [les événements serveur](evenements-serveur.md) reste inchangée.
 - `gf_admin:requestData` ne prend **aucun argument** : le serveur utilise
   uniquement `source`, vérifie que le joueur est connecté et répond en lecture
   seule.
@@ -76,8 +98,7 @@ sont décrits dans le [README](../README.md#4-commandes-en-jeu).
 
 ## Limites connues
 
-Le panneau ne propose pas encore : expulsion, téléportation, soin, gel,
-annonce ou vue du joueur.
+Le panneau ne propose pas encore la vue du joueur.
 
 ## Comment tester
 

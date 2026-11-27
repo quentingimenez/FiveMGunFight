@@ -158,6 +158,12 @@ Le chat s'ouvre avec **T** ; les commandes s'y saisissent avec une barre oblique
 | `editor` ou `maps` | admin | éditeur et liste des maps (voir ci-dessous) |
 | `resetchar [id]` | admin | efface le personnage d'un joueur pour retester la création |
 | `give [id] [arme]` | admin | ajoute une arme du catalogue (ex. `carbine`) au Casier d'un joueur ; aussi depuis la console serveur |
+| `kick <id> [raison...]` | admin | expulse un joueur ; raison nettoyée (défaut « aucune raison »), pas de soi-même |
+| `goto <id>` | admin | en jeu seulement : téléporte l'admin à +1,5 m sur x de la cible ; même mode requis (sinon utilise d'abord `setmode`) ; pas de soi-même |
+| `bring <id>` | admin | en jeu seulement : amène la cible à +1,5 m sur x de l'admin ; même mode requis, cible notifiée ; pas de soi-même |
+| `heal <id>` | admin | soigne la cible (santé maximale si elle n'est pas morte) ; émet `gf:healGranted` avant `gf_admin:heal` |
+| `freeze <id>` | admin | bascule gel/dégel de la cible, notifiée ; le gel est oublié à la déconnexion |
+| `announce <texte...>` | admin | annonce à tous (titre ANNONCE, 8 s) ; texte nettoyé de 1 à 120 caractères, auteur et texte journalisés |
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
 
