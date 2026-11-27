@@ -78,9 +78,11 @@
                     <button id="btn-bring" class="btn" type="button">AMENER</button>
                     <button id="btn-heal" class="btn" type="button">SOIGNER</button>
                     <button id="btn-freeze" class="btn" type="button">Geler / dégeler</button>
+                    <button id="btn-spectate" class="btn" type="button">REGARDER</button>
                     <button id="btn-kick" class="btn btn-danger" type="button">EXPULSER</button>
                   </div>
                   <p class="action-desc">Téléportation possible seulement si les deux joueurs sont dans le même mode.</p>
+                  <p class="action-desc">La caméra suit le joueur ; il n'est pas prévenu.</p>
                 </div>
 
                 <div class="detail-section">
@@ -169,6 +171,13 @@
               <div class="action">
                 <button class="btn" type="button" data-run="customveh">VÉHICULE DE BASE</button>
                 <p class="action-desc">Ouvre le sélecteur du véhicule de base.</p>
+              </div>
+            </div>
+            <div class="panel action-group">
+              <h2 class="group-title">SPECTATE</h2>
+              <div class="action">
+                <button id="btn-stop-spectate" class="btn" type="button" data-run="spectate">ARRÊTER LA VUE</button>
+                <p class="action-desc">Quitte la vue du joueur et rend la caméra au jeu.</p>
               </div>
             </div>
           </div>

@@ -163,6 +163,7 @@ Le chat s'ouvre avec **T** ; les commandes s'y saisissent avec une barre oblique
 | `bring <id>` | admin | en jeu seulement : amène la cible à +1,5 m sur x de l'admin ; même mode requis, cible notifiée ; pas de soi-même |
 | `heal <id>` | admin | soigne la cible (santé maximale si elle n'est pas morte) ; émet `gf:healGranted` avant `gf_admin:heal` |
 | `freeze <id>` | admin | bascule gel/dégel de la cible, notifiée ; le gel est oublié à la déconnexion |
+| `spectate [id]` | admin | en jeu seulement : `spectate [id]` regarde le joueur, `spectate` seul arrête ; même monde, cible non prévenue, arrêt automatique si elle part |
 | `announce <texte...>` | admin | annonce à tous (titre ANNONCE, 8 s) ; texte nettoyé de 1 à 120 caractères, auteur et texte journalisés |
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |

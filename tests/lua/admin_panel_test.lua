@@ -81,7 +81,7 @@ local opensUi = assert(env.GFAdminCommands.opensUi, 'GFAdminCommands.opensUi abs
 local requestData = assert(handlers['gf_admin:requestData'], 'event gf_admin:requestData absent')
 local onDrop = assert(eventHandlers.playerDropped, 'handler playerDropped absent')
 
-for _, nom in ipairs({ 'kick', 'goto', 'bring', 'heal', 'freeze', 'announce' }) do
+for _, nom in ipairs({ 'kick', 'goto', 'bring', 'heal', 'freeze', 'announce', 'spectate' }) do
     check(type(commands[nom]) == 'function', ('RegisterCommand(%s) enregistré'):format(nom))
 end
 
@@ -154,6 +154,8 @@ ligne('freeze', { '3' }, 'freeze 3')
 ligne('announce', { 'Bonjour' }, 'announce Bonjour')
 ligne('announce', { 'Redémarrage dans 5 minutes' }, 'announce Redémarrage dans 5 minutes')
 ligne('announce', { string.rep('a', 120) }, 'announce ' .. string.rep('a', 120))
+ligne('spectate', {}, 'spectate')
+ligne('spectate', { '12' }, 'spectate 12')
 
 -- ---------------------------------------------------------------------------
 -- B. Refus de la liste blanche.
@@ -202,6 +204,16 @@ refuse('freeze', {}, 'freeze sans argument')
 refuse('freeze', { '3', 'x' }, 'freeze argument en trop')
 refuse('announce', {}, 'announce sans argument')
 refuse('announce', { string.rep('a', 121) }, 'announce 121 caractères')
+refuse('spectate', { '0' }, 'spectate id zéro')
+refuse('spectate', { '-1' }, 'spectate id négatif')
+refuse('spectate', { '3a' }, 'spectate id non numérique')
+refuse('spectate', { 3 }, 'spectate id non chaîne')
+refuse('spectate', { true }, 'spectate id booléen')
+refuse('spectate', { '3', 'x' }, 'spectate deux arguments')
+refuse('spectate', { [2] = '12' }, 'spectate table trouée (index 1 absent)')
+refuse('spectate', { [1] = '12', [3] = 'x' }, 'spectate table trouée (index 2 absent)')
+refuse('spectate', { id = '12' }, 'spectate table non positionnelle')
+refuse('spectate', '12', 'spectate args non table')
 
 -- ---------------------------------------------------------------------------
 -- C. Normalisation de l'arme (mise en minuscules avant contrôle).
@@ -256,6 +268,7 @@ check(injectionPropre, 'injection : aucune ligne ne contient ; \\r ou \\n')
 check(opensUi('editor') == true, 'opensUi(editor) vrai')
 check(opensUi('maps') == true, 'opensUi(maps) vrai')
 check(opensUi('customveh') == true, 'opensUi(customveh) vrai')
+check(opensUi('spectate') == true, 'opensUi(spectate) vrai')
 check(opensUi('setmode') == false, 'opensUi(setmode) faux')
 check(opensUi('give') == false, 'opensUi(give) faux')
 check(opensUi('startround') == false, 'opensUi(startround) faux')

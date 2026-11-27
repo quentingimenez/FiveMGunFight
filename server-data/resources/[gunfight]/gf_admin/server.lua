@@ -8,8 +8,10 @@
 local core = exports.gf_core
 local RESOURCE = 'gf_admin'
 local DERNIERE_DEMANDE = {}  -- [src] = GetGameTimer() de la dernière demande admise
+local DERNIERE_FIN_SPECTATE = {} -- [src] = GetGameTimer() du dernier arrêt local signalé
 local DELAI_MS = 500
 local Geles = {}             -- [src] = true tant que le joueur est gelé par un admin
+local Spectating = {}        -- [admin] = { target = id, bucket = monde d'origine }
 
 -- Texte libre : supprime contrôles et séparateurs, réduit les espaces, tronque.
 -- Aucun identifiant ne doit passer par là (license, IP, Discord, steam...).
@@ -294,8 +296,125 @@ RegisterCommand('announce', function(src, args)
     end
 end, false)
 
+-- spectate <id> : l'admin suit la cible sans la prévenir (jeu seulement).
+-- stop : restaure le monde d'origine et coupe la vue ; silencieux = vrai uniquement
+-- lors d'un changement de cible (aucun reply, mais spectateStop bien envoyé).
+local function stop(admin, message, silencieux)
+    local etat = Spectating[admin]
+    if not etat then return end
+    if admin ~= 0 then
+        SetPlayerRoutingBucket(admin, etat.bucket)
+    end
+    Spectating[admin] = nil
+    TriggerClientEvent('gf_admin:spectateStop', admin)
+    if not silencieux and GetPlayerName(admin) ~= nil then
+        reply(admin, message or 'Vue arrêtée.')
+    end
+end
+
+RegisterCommand('spectate', function(src, args)
+    if not estAdmin(src) then
+        core:Notify(src, 'Réservé aux administrateurs.')
+        return
+    end
+    if src == 0 then
+        reply(src, 'Commande à utiliser en jeu.')
+        return
+    end
+
+    -- Sans argument : arrêt si une vue est en cours, sinon l'usage.
+    if args[1] == nil then
+        if Spectating[src] then
+            stop(src)
+        else
+            reply(src, 'Usage : spectate <id> (ex. spectate 12) ; spectate seul pour arrêter.')
+        end
+        return
+    end
+
+    local cible, nom = cibleValide(args)
+    if not cible then
+        reply(src, ('Joueur %s introuvable.'):format(tostring(args[1])))
+        return
+    end
+    if cible == src then
+        reply(src, "Tu ne peux pas te regarder toi-même.")
+        return
+    end
+
+    -- Même cible : arrêt simple. Autre cible : arrêt muet puis nouvelle vue.
+    if Spectating[src] then
+        if Spectating[src].target == cible then
+            stop(src)
+            return
+        end
+        stop(src, nil, true)
+    end
+
+    local bucket = GetPlayerRoutingBucket(src)
+    if GetPlayerRoutingBucket(cible) ~= bucket then
+        SetPlayerRoutingBucket(src, GetPlayerRoutingBucket(cible))
+    end
+    local coords = GetEntityCoords(GetPlayerPed(cible))
+    Spectating[src] = { target = cible, bucket = bucket }
+    TriggerClientEvent('gf_admin:spectateStart', src, {
+        target = cible, name = nom, x = coords.x, y = coords.y, z = coords.z,
+    })
+    reply(src, ('Vue de %s. Tape spectate pour arrêter.'):format(nom))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'spectate', cible, nil) end)
+    end
+end, false)
+
+-- Suivi : une seule boucle, une passe complète avant chaque Wait (global).
+CreateThread(function()
+    while true do
+        -- Une passe complète sur Spectating.
+        for admin, etat in pairs(Spectating) do
+            if GetPlayerName(admin) == nil then
+                -- Admin parti : nettoyage muet, sans changer de monde ni d'événement.
+                Spectating[admin] = nil
+            elseif GetPlayerName(etat.target) == nil then
+                -- Cible partie : retour dans le monde d'origine de l'admin.
+                stop(admin, 'Le joueur a quitté le serveur : vue arrêtée.')
+            else
+                if GetPlayerRoutingBucket(etat.target) ~= GetPlayerRoutingBucket(admin) then
+                    SetPlayerRoutingBucket(admin, GetPlayerRoutingBucket(etat.target))
+                end
+                local coords = GetEntityCoords(GetPlayerPed(etat.target))
+                TriggerClientEvent('gf_admin:spectatePos', admin, {
+                    x = coords.x, y = coords.y, z = coords.z,
+                })
+            end
+        end
+        Wait(1000)
+    end
+end)
+
+-- Le client peut arrêter sa caméra seul (respawn de l'admin, cible introuvable
+-- après 5 s). On réconcilie cet arrêt local sans rien renvoyer au client.
+-- Aucun contrôle admin : cet événement ne retire que l'état propre à `src`
+-- (Spectating[src]), il ne peut donc pas toucher un autre joueur.
+RegisterNetEvent('gf_admin:spectateEnded', function(...)
+    local src = source
+    -- arguments ignorés : le contrat n'en transmet aucun
+    if select('#', ...) > 0 then return end
+    -- rate-limit 1 / 500 ms par joueur, AVANT le contrôle d'état
+    local maintenant = GetGameTimer()
+    if DERNIERE_FIN_SPECTATE[src] and maintenant - DERNIERE_FIN_SPECTATE[src] < 500 then return end
+    DERNIERE_FIN_SPECTATE[src] = maintenant
+    local etat = Spectating[src]
+    if not etat then return end
+    -- le client a déjà arrêté sa caméra : restauration silencieuse
+    if src ~= 0 then SetPlayerRoutingBucket(src, etat.bucket) end
+    Spectating[src] = nil
+end)
+
 AddEventHandler('playerDropped', function()
     local src = source
     DERNIERE_DEMANDE[src] = nil
+    DERNIERE_FIN_SPECTATE[src] = nil
     Geles[src] = nil
+    -- Admin parti : nettoyage muet, sans changer son monde ni envoyer d'événement.
+    if Spectating[src] then Spectating[src] = nil end
 end)
