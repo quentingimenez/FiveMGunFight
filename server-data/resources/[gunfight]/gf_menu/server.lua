@@ -77,8 +77,9 @@ local function lireStats(src, callback)
     end
 end
 
---- Construit et envoie l'état. Le mode est lu sous pcall : gf_core peut être
---- arrêté indépendamment de gf_menu.
+--- Construit et envoie l'état. Le mode et les droits admin sont lus sous pcall :
+--- gf_core peut être arrêté indépendamment de gf_menu. Les droits ne viennent
+--- jamais du client : seule la source serveur est consultée.
 local function envoyerEtat(src)
     local nom = GetPlayerName(src)
     if not nom then return end
@@ -90,6 +91,14 @@ local function envoyerEtat(src)
     if not okMode then
         print(('[gf_menu] gf_core:GetMode: %s'):format(tostring(mode)))
         mode = nil
+    end
+
+    local okAdmin, isAdmin = pcall(function()
+        return exports.gf_core:IsAdmin(src)
+    end)
+    if not okAdmin then
+        print(('[gf_menu] gf_core:IsAdmin: %s'):format(tostring(isAdmin)))
+        isAdmin = false
     end
 
     lireStats(src, function(stats)
@@ -106,6 +115,7 @@ local function envoyerEtat(src)
             stats = stats,
             now = GetGameTimer(),
             joinedAt = session.joinedAt,
+            isAdmin = isAdmin,
         }
         TriggerClientEvent('gf_menu:state', src, GFMenuState.buildState(ctx))
     end)

@@ -108,11 +108,16 @@ function GFMenuState.buildState(ctx)
         secondesDeSession = (maintenant - arrivee) / MS_PAR_SECONDE
     end
 
+    -- Droits admin : seul le booléen Lua `true` du serveur autorise l'entrée.
+    -- Toute autre valeur (absente, fausse, truthy non booléenne) reste false.
+    local isAdmin = contexte.isAdmin == true
+
     return {
         build = contexte.build or Config.BuildFallback,
         server = { name = Config.ServerName },
         online = contexte.online,
         maxPlayers = contexte.maxPlayers,
+        isAdmin = isAdmin,
         me = {
             id = contexte.id,
             name = contexte.name or TIRET,

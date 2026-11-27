@@ -27,6 +27,7 @@ globals = {
   "AttackRules",
   "AuditVie",
   "Base64",
+  "GFAdminCommands",
   "GFLobbyAppearance",
   "GFLobbyAppearanceSchema",
   "GFLobbyBackdrop",

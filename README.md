@@ -146,6 +146,7 @@ Le chat s'ouvre avec **T** ; les commandes s'y saisissent avec une barre oblique
 | touche **Z** (maintenue) | tous | classement |
 | touches **1** et **2** | tous | sortir l'arme choisie en 1re / 2e position (la roue des armes de GTA est désactivée) |
 | touche **Échap** | tous | ouvre le menu pause GUNFIGHT (profil, règlement, Discord, quitter) à la place du menu natif |
+| touche **F10** | admin | ouvre le panneau d'administration (aussi depuis le menu Échap) |
 | `startround` | admin | force le lancement : fait entrer l'admin et toute la file du lobby (escouades entières, sans seuil, dans la limite des places), puis lance la manche (possible en solo) |
 | `endmatch` | admin | arrête le match, scores à zéro |
 | `nextzone` | admin | zone d'attaque suivante (hors match) |
@@ -277,6 +278,7 @@ server-data/
     gf_stats    statistiques persistantes (MariaDB via oxmysql)
     gf_journal  journal JSON des événements de match (morts, tueurs, résultats)
     gf_menu     menu pause NUI (Échap) : profil, règlement, Discord, quitter
+    gf_admin    panneau d'administration (F10 ou menu Échap > ADMIN) : joueurs, parties, outils
 ```
 
 Chaque mode a son propre « monde » (routing bucket) : les joueurs du lobby, de

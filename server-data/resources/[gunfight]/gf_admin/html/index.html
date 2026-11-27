@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gf_admin — Administration</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div id="app" class="hidden">
+    <div id="veil" aria-hidden="true"></div>
+
+    <section id="admin" role="dialog" aria-modal="true" aria-labelledby="admin-title" aria-describedby="admin-hint">
+      <p id="admin-hint" class="sr-only">Panneau d'administration. Choisissez un onglet, sélectionnez un joueur, et appuyez sur Échap pour fermer.</p>
+
+      <header class="admin-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">GF</span>
+          <h1 id="admin-title" class="brand-name">ADMINISTRATION</h1>
+        </div>
+        <div class="header-actions">
+          <span id="player-count" class="online-chip">JOUEURS : 0</span>
+          <button id="btn-refresh" class="btn" type="button">ACTUALISER</button>
+          <button id="btn-close" class="btn" type="button">FERMER</button>
+        </div>
+      </header>
+
+      <nav id="tabs" class="tabs" role="tablist" aria-label="Sections d'administration">
+        <button id="tab-players" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-players" data-tab="players" tabindex="0">JOUEURS</button>
+        <button id="tab-matches" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-matches" data-tab="matches" tabindex="-1">PARTIES</button>
+        <button id="tab-tools" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-tools" data-tab="tools" tabindex="-1">OUTILS</button>
+      </nav>
+
+      <main class="admin-main">
+        <section id="panel-players" class="tabpanel" role="tabpanel" aria-labelledby="tab-players">
+          <div class="players-layout">
+            <div class="panel players-list-panel">
+              <label class="field-label" for="player-search">RECHERCHER UN JOUEUR</label>
+              <input id="player-search" class="input" type="search" placeholder="Nom ou identifiant" autocomplete="off">
+              <div id="player-list" class="player-list" role="listbox" aria-label="Liste des joueurs"></div>
+              <p id="players-empty" class="empty-state hidden">Aucun joueur trouvé.</p>
+            </div>
+
+            <div id="player-detail" class="panel detail-panel">
+              <p id="detail-empty" class="empty-state">Sélectionnez un joueur dans la liste pour afficher sa fiche.</p>
+
+              <div id="detail-body" class="hidden">
+                <div class="detail-head">
+                  <span id="detail-avatar" class="detail-avatar" aria-hidden="true"></span>
+                  <div class="detail-identity">
+                    <p id="detail-id" class="detail-id"></p>
+                    <p id="detail-name" class="detail-name"></p>
+                  </div>
+                </div>
+
+                <div class="detail-section">
+                  <p class="section-label">MODE</p>
+                  <div id="mode-buttons" class="button-row" role="group" aria-label="Choisir un mode">
+                    <button class="btn choice" type="button" data-mode="lobby" aria-pressed="false">LOBBY</button>
+                    <button class="btn choice" type="button" data-mode="attack" aria-pressed="false">ATTAQUE</button>
+                    <button class="btn choice" type="button" data-mode="redzone" aria-pressed="false">REDZONE</button>
+                  </div>
+                </div>
+
+                <div class="detail-section">
+                  <p class="section-label">ÉQUIPE</p>
+                  <div id="team-buttons" class="button-row" role="group" aria-label="Choisir une équipe">
+                    <button class="btn choice" type="button" data-team="A" aria-pressed="false">A</button>
+                    <button class="btn choice" type="button" data-team="B" aria-pressed="false">B</button>
+                  </div>
+                </div>
+
+                <div class="detail-section">
+                  <p class="section-label">PERSONNAGE</p>
+                  <button id="btn-resetchar" class="btn btn-danger" type="button">RÉINITIALISER</button>
+                </div>
+
+                <div class="detail-section">
+                  <p class="section-label">DONNER UNE ARME</p>
+                  <label class="sr-only" for="weapon-search">Rechercher une arme</label>
+                  <input id="weapon-search" class="input" type="search" placeholder="Rechercher une arme" autocomplete="off">
+                  <div id="weapon-filters" class="filter-row" role="group" aria-label="Filtrer les armes par catégorie"></div>
+                  <div id="weapon-grid" class="weapon-grid"></div>
+                  <p id="weapons-empty" class="empty-state hidden">Aucune arme disponible.</p>
+                  <div class="give-row">
+                    <button id="btn-give" class="btn btn-primary" type="button" disabled>DONNER</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-matches" class="tabpanel hidden" role="tabpanel" aria-labelledby="tab-matches">
+          <div class="group-grid">
+            <div class="panel action-group">
+              <h2 class="group-title">ATTAQUE DE ZONE</h2>
+              <div class="action">
+                <button class="btn btn-primary" type="button" data-run="startround">LANCER LA MANCHE</button>
+                <p class="action-desc">Démarre immédiatement une nouvelle manche d'attaque de zone.</p>
+              </div>
+              <div class="action">
+                <button class="btn btn-danger" type="button" data-run="endmatch" data-confirm="Arrêter le match en cours ?">ARRÊTER LE MATCH</button>
+                <p class="action-desc">Termine le match en cours et libère la zone.</p>
+              </div>
+              <div class="action">
+                <button class="btn" type="button" data-run="nextzone">ZONE SUIVANTE</button>
+                <p class="action-desc">Passe à la zone d'attaque suivante.</p>
+              </div>
+            </div>
+
+            <div class="panel action-group">
+              <h2 class="group-title">REDZONE</h2>
+              <div class="action">
+                <button class="btn btn-danger" type="button" data-run="endgame" data-confirm="Terminer la partie de Redzone ?">TERMINER LA PARTIE</button>
+                <p class="action-desc">Clôt la partie de Redzone et affiche les résultats.</p>
+              </div>
+              <div class="action">
+                <button class="btn" type="button" data-run="nextmap">MAP SUIVANTE</button>
+                <p class="action-desc">Charge la carte suivante de la rotation.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-tools" class="tabpanel hidden" role="tabpanel" aria-labelledby="tab-tools">
+          <p class="note">Ces outils ferment le panneau pour s'afficher à l'écran.</p>
+          <div class="group-grid tools-grid">
+            <div class="panel action-group">
+              <h2 class="group-title">ÉDITEUR</h2>
+              <div class="action">
+                <button class="btn btn-primary" type="button" data-run="editor">ÉDITEUR DE MAPS</button>
+                <p class="action-desc">Ouvre l'éditeur de maps pour composer la carte.</p>
+              </div>
+            </div>
+            <div class="panel action-group">
+              <h2 class="group-title">CARTOGRAPHIE</h2>
+              <div class="action">
+                <button class="btn" type="button" data-run="maps">LISTE DES MAPS</button>
+                <p class="action-desc">Affiche la liste des maps disponibles sur le serveur.</p>
+              </div>
+            </div>
+            <div class="panel action-group">
+              <h2 class="group-title">VÉHICULES</h2>
+              <div class="action">
+                <button class="btn" type="button" data-run="customveh">VÉHICULE DE BASE</button>
+                <p class="action-desc">Ouvre le sélecteur du véhicule de base.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </section>
+  </div>
+
+  <div id="confirm-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <h2 id="confirm-title" class="modal-title">CONFIRMATION</h2>
+      <p id="confirm-message" class="modal-message"></p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" class="btn" type="button">ANNULER</button>
+        <button id="confirm-ok" class="btn btn-danger" type="button">CONFIRMER</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

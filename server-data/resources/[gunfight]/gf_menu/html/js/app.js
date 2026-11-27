@@ -16,6 +16,7 @@
   };
 
   var items = [];
+  var navItems = [];
   var current = 0;
   var state = null;
   var visible = false;
@@ -366,27 +367,74 @@
     put('section-label', 'MENU');
   }
 
+  // Liste des boutons réellement navigables : on écarte tout bouton situé
+  // dans un groupe masqué (ex. le panneau ADMIN réservé aux admins).
+  function isNavigable(node) {
+    if (!node) return false;
+    // On s'arrête au rail : la visibilité globale du menu (#menu.hidden)
+    // ne doit pas vider la liste de navigation quand l'état arrive menu fermé.
+    var rail = $('rail');
+    var parent = node;
+    while (parent && parent !== rail && parent !== document.body) {
+      if (parent.classList && parent.classList.contains('hidden')) return false;
+      parent = parent.parentElement;
+    }
+    return true;
+  }
+
+  function rebuildNavItems() {
+    var selected = navItems[current] || null;
+    navItems = items.filter(isNavigable);
+    // Conserve la sélection courante si elle est toujours visible, sinon
+    // retombe sur un index valide (le premier élément, ou 0 si la liste est vide).
+    var index = selected ? navItems.indexOf(selected) : -1;
+    current = index >= 0 ? index : 0;
+    setFocus(current);
+  }
+
+  function applyAdminVisibility() {
+    var group = $('rail-group-admin');
+    if (!group) return;
+    var admin = !!(state && state.isAdmin === true);
+    group.classList.toggle('hidden', !admin);
+    rebuildNavItems();
+  }
+
   function setFocus(index, moveFocus) {
-    if (!items.length) return;
-    current = ((index % items.length) + items.length) % items.length;
-    for (var i = 0; i < items.length; i += 1) {
+    if (!navItems.length) {
+      current = 0;
+      for (var j = 0; j < items.length; j += 1) {
+        items[j].classList.remove('is-current');
+        items[j].removeAttribute('aria-current');
+      }
+      return;
+    }
+    current = ((index % navItems.length) + navItems.length) % navItems.length;
+    for (var i = 0; i < navItems.length; i += 1) {
       var on = i === current;
-      items[i].classList.toggle('is-current', on);
+      navItems[i].classList.toggle('is-current', on);
       if (on) {
-        items[i].setAttribute('aria-current', 'true');
+        navItems[i].setAttribute('aria-current', 'true');
       } else {
-        items[i].removeAttribute('aria-current');
+        navItems[i].removeAttribute('aria-current');
       }
     }
-    if (moveFocus && items[current] && document.activeElement !== items[current]) focusCurrent();
+    // Un élément devenu masqué ne doit jamais conserver is-current/aria-current.
+    for (var k = 0; k < items.length; k += 1) {
+      if (navItems.indexOf(items[k]) === -1) {
+        items[k].classList.remove('is-current');
+        items[k].removeAttribute('aria-current');
+      }
+    }
+    if (moveFocus && navItems[current] && document.activeElement !== navItems[current]) focusCurrent();
   }
 
   function focusCurrent() {
-    if (!items[current]) return;
+    if (!navItems[current]) return;
     try {
-      items[current].focus({ preventScroll: true });
+      navItems[current].focus({ preventScroll: true });
     } catch (err) {
-      items[current].focus();
+      navItems[current].focus();
     }
   }
 
@@ -398,6 +446,13 @@
     var key = node.getAttribute('data-key');
     var child = node.querySelector('.rail-item-label');
     var label = child ? child.textContent : '';
+    if (key === 'admin') {
+      // Le callback client ferme le menu et ouvre gf_admin : on ne construit
+      // aucun panneau local et on n'envoie surtout pas 'close'.
+      send('openAdmin', {});
+      hide();
+      return;
+    }
     if (key === 'resume') {
       send('close', {});
       hide();
@@ -468,7 +523,7 @@
     if (key === 'ArrowDown' || key === 'ArrowUp') {
       event.preventDefault();
       var delta = key === 'ArrowDown' ? 1 : -1;
-      var next = window.GFMenuNav.nextIndex(items.length, current, delta);
+      var next = window.GFMenuNav.nextIndex(navItems.length, current, delta);
       if (next >= 0) setFocus(next, true);
       return;
     }
@@ -481,7 +536,7 @@
     if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
       if (stage && event.target && stage.contains(event.target)) return;
       event.preventDefault();
-      if (items[current]) activate(items[current]);
+      if (navItems[current]) activate(navItems[current]);
     }
   }
 
@@ -510,6 +565,9 @@
     }
     if (message.type === 'state') {
       state = data;
+      // Appliqué à chaque état, même menu fermé, pour que la prochaine
+      // ouverture affiche/masque correctement le groupe ADMIN.
+      applyAdminVisibility();
       if (visible) {
         renderProfile();
         renderStatus();
@@ -530,19 +588,24 @@
   function boot() {
     items = Array.prototype.slice.call(document.querySelectorAll('#rail .rail-item'));
     for (var i = 0; i < items.length; i += 1) {
-      (function (index, node) {
+      (function (node) {
         node.addEventListener('mouseenter', function () {
-          setFocus(index);
+          var index = navItems.indexOf(node);
+          if (index >= 0) setFocus(index);
         });
         node.addEventListener('focus', function () {
-          setFocus(index);
+          var index = navItems.indexOf(node);
+          if (index >= 0) setFocus(index);
         });
         node.addEventListener('click', function () {
+          var index = navItems.indexOf(node);
+          if (index < 0) return;
           setFocus(index);
           activate(node);
         });
-      })(i, items[i]);
+      })(items[i]);
     }
+    applyAdminVisibility();
     renderProfile();
     renderStatus();
     weaponScreen = null;
