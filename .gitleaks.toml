@@ -25,5 +25,5 @@ regexes = ['''change_moi''']
 description = "Noms d'armes GTA (clés WEAPON_*) dans les fichiers .meta des armes, pris pour des clés d'API par generic-api-key ; jamais un secret"
 condition = "AND"
 regexTarget = "secret"
-paths = ['''^server-data/resources/\[gunfight\]/gf_weapons/data/.*\.meta$''']
+paths = ['''(?:^|/)server-data/resources/\[gunfight\]/gf_weapons/data/.*\.meta$''']
 regexes = ['''^WEAPON_[A-Z0-9_]+$''']
