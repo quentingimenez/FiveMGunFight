@@ -28,8 +28,8 @@ faire · ✅ fait · ❓ hypothèse à vérifier avant tout correctif.
 |---|---|---|---|---|---|
 | C1 | Validation des tirs | haute | 🟡 | — | S4, S9 |
 | C2 | Journal brut des matchs | haute | ✅ | — | D2, S9, P3 |
-| C3 | Vie et soins contrôlés par le serveur | haute | 🧪 | C2 | S1 |
-| C4 | State bags lus comme vérité | haute | 🧪 | — | S3 |
+| C3 | Vie et soins contrôlés par le serveur | haute | 🟡 | C2 | S1 |
+| C4 | State bags lus comme vérité | haute | ✅ | — | S3 |
 | C5 | Verrous FXServer et véhicules créés par le serveur | haute | ⬜ | — | S5, S8 |
 | C6 | Équilibrage tiré des fichiers du jeu | moyenne | 🟡 | C2 | A3, V8 |
 | C7 | Manche d'Attaque en machine à états testée | moyenne | 🧪 | — | A1, V5 |
@@ -53,8 +53,8 @@ de développement.
 |---|---|---|---|
 | C1 | #55 | Module `ShotValidation` : arme hors loadout, plafond de dégât, cadence ; refus journalisés | Les plafonds ne peuvent pas encore être remplis sans risque : une touche mortelle annonce 484, 572, 605 ou 730 de dégât, sans rapport stable avec l'arme, et `willKill` vient du client du tireur, donc exempter les touches mortelles ouvrirait une faille ; il faut d'abord la mesure de C6 en jeu |
 | C2 | #59 | Ressource `gf_journal` (table `gf_match_events`), `scripts/recalculer_match.py`, `scripts/exporter_journal.sh` | — |
-| C3 | #62 | Ressource `gf_audit` : anomalies `soin-sans-objet` et `touche-mortelle-sans-mort`, sans sanction | Une anomalie quand une ressource de test force un soin ; mesurer le taux de fausses alertes sur plus de parties avant toute sanction |
-| C4 | #61 | Le serveur décide depuis ses tables (`Proteges`, `Equipes`, `Modes`) ; un garde rétablit les state bags réécrits par un client et journalise l'anomalie | En jeu, un client : `LocalPlayer.state:set('gf_protected', true, true)` doit produire une ligne `anomalie` et la valeur revenir à `false` |
+| C3 | #62 | Ressource `gf_audit` : anomalies `soin-sans-objet` et `touche-mortelle-sans-mort`, sans sanction | Mesurer le taux de fausses alertes sur de vraies parties avant toute sanction |
+| C4 | #61 | Le serveur décide depuis ses tables (`Proteges`, `Equipes`, `Modes`) ; un garde rétablit les state bags réécrits par un client et journalise l'anomalie ; preuve en local avec un vrai client, voir ci-dessous | — |
 | C5 | — | Rien | Tout, avec une partie de test : le véhicule de mode devient créé par le serveur |
 | C6 | #64 | Tableau des tirs et du temps pour tuer : [`equilibrage-armes.md`](equilibrage-armes.md) (build 1.0.3889.0) | Compter les tirs pour tuer en jeu, à 10, 25 et 50 m, et comparer au tableau ; puis la part des kills de chaque arme (C2) avant tout réglage |
 | C7 | #58, #90, #97 | Module `AttackRules` (machine à états, 26 tests, 500 suites aléatoires) ; #90 vu en jeu : la manche se termine au passage en live quand un départ en sélection ou en placement a vidé une équipe ; #97 : un match commencé avec deux équipes peuplées se termine par forfait dès qu'une équipe n'a plus de joueur, à toute phase y compris la pause entre deux manches, manches de test en solo inchangées, 43 tests | Voir le forfait de #97 en jeu à deux clients |
@@ -91,10 +91,15 @@ mortelles ouvrirait une faille. Les plafonds ne peuvent donc pas encore
 ### Preuves du 27 novembre 2026
 
 Le 27 novembre 2026, #90 a été vu en jeu ; les autres preuves viennent de
-tests, de piles jetables locales et du code de la CI.
+tests, de piles jetables locales et du code de la CI. C3 et C4 ont été
+vérifiés sur un banc de test : un serveur jetable construit depuis `main`
+(sans base, `TXADMIN=false`), un vrai client FiveM connecté et une ressource
+de test locale, hors dépôt, qui agit côté client.
 
 | # | Résultat | Preuve |
 |---|---|---|
+| C3 | Anomalie `soin-sans-objet` prouvée en local | En Redzone sans protection, la vie du joueur est baissée à 150 puis, une fois stable et la grâce de 3 s passée, remise de force à 200 côté client, sans objet ni soin accordé ; `gf_audit` émet `gf:anomalie` de type `soin-sans-objet` (`[gf_audit] anomalie soin-sans-objet joueur 1`) ; la remontée de vie de la réapparition, pendant la grâce, n'a déclenché aucune fausse alerte. Reste à mesurer le taux de fausses alertes sur de vraies parties avant toute sanction |
+| C4 | Anomalie `state-bag` prouvée en local avec un vrai client | Dans le lobby, le serveur considère le joueur protégé (`gf_protected = true`) ; le client écrit `LocalPlayer.state:set('gf_protected', false, true)` ; le serveur journalise `gf:anomalie` de type `state-bag` (`cle=gf_protected recu=false serveur=true`) et la ligne `[gf_core] anomalie state-bag`, garde `IsProtected = true`, et 2 s plus tard le client relit `gf_protected = true` : la valeur a été rétablie |
 | C7 | #90 vu en jeu, #97 prouvé par 43 tests | En jeu, l'adversaire a quitté et l'utilisateur a gagné la manche aussitôt : un départ en sélection ou en placement vidant une équipe termine la manche au passage en live. Les 43 tests de #97 prouvent le forfait d'un match commencé avec deux équipes peuplées dès qu'une équipe n'a plus de joueur, à toute phase y compris la pause entre deux manches, sans changer les manches de test en solo. Reste à voir ce forfait en jeu à deux clients |
 | C11 | #100, durcissement du lecteur RPF7 | Traversée de chemin démontrée (une entrée `../x` écrivait hors du dossier de sortie), lectures hors bornes, cycles de répertoires, profondeur des `.rpf` imbriqués limitée à 8, bombe de décompression (512 Mo par fichier, 4 Go au total) ; 14 tests, dont un fuzz déterministe de 2 000 mutations (bibliothèque standard) ; 8 vrais packs extraits à l'identique de l'ancien code |
 | C12 | #95, preuve complète en local sur piles jetables | Une base en version 2 (migrations 1 et 2) a migré au démarrage jusqu'à la version 4 ; `scripts/sauvegarder.sh` (code 0), `scripts/restaurer.sh --verifier`, puis extraction et import dans la pile `gunfight-restore` du runbook. Le test a trouvé un défaut du runbook : le serveur restauré s'arrêtait aussitôt (« Ctrl-C pressed in server console », pas d'entrée standard) ; corrigé dans #95 (`init`, `stdin_open`, `tty`). Après correction : serveur restauré en marche, 15 ressources démarrées, `gf_db` « schéma à jour (version 4) » sans migration rejouée |
@@ -102,6 +107,11 @@ tests, de piles jetables locales et du code de la CI.
 
 Avec la preuve en production du 26/11, C12 passe à ✅ ; la variante « en CI »
 de la preuve n'est pas automatisée.
+
+En local, la vie vue par le serveur suit celle du client avec plusieurs
+secondes de retard : client 200 et serveur 150, puis client 150 et serveur
+200. C'est cohérent avec le refus « mort refusé … : vivant » vu en production
+le 26/11 : la mort est vérifiée sur une vie serveur pas encore à jour.
 
 ## C1 — Validation des tirs
 
