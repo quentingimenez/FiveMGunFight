@@ -134,7 +134,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
 ## 4. Commandes en jeu
 
-Le chat est retiré : les commandes se tapent dans la console F8, sans barre oblique.
+Le chat s'ouvre avec **T** ; les commandes s'y saisissent avec une barre oblique, ou dans la console F8 sans barre oblique.
 
 | Commande | Qui | Effet |
 |---|---|---|
