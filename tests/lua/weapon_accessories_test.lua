@@ -47,6 +47,15 @@ local oldScarClip = env.WeaponAccessories.validate(scar, { clip = 'SCARH_BETAMAG
 assert(oldScarClip and oldScarClip.clip == 'GF_SCARH_CLIP_60', 'ancien chargeur SCAR-H adapté')
 local angel = env.WeaponAccessories.catalog('WEAPON_ANGEL9VVSPINK')
 assert(env.WeaponAccessories.validate(angel, { clip = 'GF_ANGEL9VVSPINK_CLIP_60' }), 'chargeur 60 Angel Pink')
+local rrc3 = env.WeaponAccessories.catalog('WEAPON_RRC3_ACHROMIC')
+assert(env.WeaponAccessories.validate(rrc3, { clip = 'GF_RRC3_ACHROMIC_CLIP_60' }), 'chargeur 60 RRC3')
+assert(rrc3.suppressor.applyDefault and rrc3.sight.applyDefault and rrc3.grip.applyDefault,
+    'accessoires RRC3 installés par défaut et amovibles')
+assert(env.WeaponAccessories.validate(rrc3, { suppressor = '', sight = '', grip = '' }), 'RRC3 sans accessoires')
+local wolf = env.WeaponAccessories.catalog('WEAPON_WOLFRIFLE')
+assert(not wolf.clip, 'Wolf Rifle garde son chargeur fixe de 100 balles')
+assert(wolf.suppressor.applyDefault and env.WeaponAccessories.validate(wolf, { suppressor = '' }),
+    'silencieux Wolf installé par défaut et amovible')
 local ak = env.WeaponAccessories.catalog('WEAPON_AKFEMVVSBLUE')
 assert(not ak.clip, 'arme de 100 balles : ne pas proposer de chargeur 60')
 local queen = env.WeaponAccessories.catalog('WEAPON_QUEENBEE16YELLOW')
