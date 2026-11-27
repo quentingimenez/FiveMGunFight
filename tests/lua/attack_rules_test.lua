@@ -206,12 +206,12 @@ local function verifierInvariants(ctx, etat, effets, avant)
             etat.score.A + etat.score.B, ctx.manches))
     end
 
-    -- 2) Aucun score ne dépasse WinRounds ; matchOver exactement à WinRounds.
+    -- 2) Aucun score ne dépasse WinRounds ; matchOver à WinRounds OU forfait.
     local max = etat.config.WinRounds
     if etat.score.A > max or etat.score.B > max or etat.score.A < 0 or etat.score.B < 0 then
         echec(ctx, '2', ('scores %s/%s hors bornes'):format(tostring(etat.score.A), tostring(etat.score.B)))
     end
-    local attendu = (etat.score.A == max or etat.score.B == max)
+    local attendu = (etat.score.A == max or etat.score.B == max) or etat.forfait == true
     if etat.matchOver ~= attendu then
         echec(ctx, '2', ('matchOver=%s attendu=%s'):format(tostring(etat.matchOver), tostring(attendu)))
     end
@@ -338,6 +338,8 @@ verifier('API : état initial, requêtes et capacité d’accueil', function()
     egal('A', etat.attaquants, 'attaquants')
     egal(false, etat.solo, 'solo')
     egal(false, etat.matchOver, 'matchOver')
+    egal(false, etat.matchADeux, 'matchADeux')
+    egal(false, etat.forfait, 'forfait')
     egal(false, etat.echangeDeCamp, 'echangeDeCamp')
     egal(0, etat.score.A, 'score A')
     egal(0, etat.score.B, 'score B')
@@ -426,6 +428,7 @@ verifier('manche gagnée par élimination des défenseurs', function()
     egal(1, etat.score.A, 'score A')
     egal(0, etat.score.B, 'score B')
     egal(false, fin.matchOver, 'matchOver')
+    egal(false, etat.forfait, 'pas de forfait : mort, pas départ')
     egal(true, aEffet(effets, 'recompenseKevlar'), 'kevlar au tueur')
     egal(true, aEffet(effets, 'vivant'), 'effet vivant')
     egal(true, aEffet(effets, 'spectateurDiffere'), 'spectateur différé')
@@ -442,6 +445,7 @@ verifier('manche gagnée par élimination des attaquants', function()
     vrai(fin ~= nil, 'effet finManche')
     egal('B', fin.gagnant, 'gagnant = défense')
     egal('Tous les attaquants ont été éliminés', fin.raison, 'raison')
+    egal(false, etat.forfait, 'pas de forfait : mort, pas départ')
 end)
 
 verifier('fin au chrono : la défense a tenu la zone', function()
@@ -509,6 +513,7 @@ verifier('match gagné à 2 manches puis retour en waiting', function()
     egal(2, match.score.A, 'score du match')
     egal(2, etat.score.A, 'score final')
     egal(true, etat.matchOver, 'matchOver dans l’état')
+    egal(false, etat.forfait, 'pas de forfait')
     egal(2, #match.participants, 'participants')
 
     t = t + 2000
@@ -533,15 +538,20 @@ verifier('changement de camp : annonce debutManche après manche non décisive',
     egal('attack', AttackRules.roleDe(etat, 2), 'B attaque maintenant')
 end)
 
-verifier('départ du dernier défenseur en live termine la manche', function()
+verifier('départ du dernier défenseur en live termine le match par forfait', function()
     local ctx = nouveauContexte(110, 0, 'depart live')
     local etat = matchDeDeux(22)
     local t = avancerJusquALive(etat, 0)
     local effets = appliquer(ctx, etat, AttackRules.depart, 2, t + 100)
     local fin = trouverEffet(effets, 'finManche')
     vrai(fin ~= nil, 'finManche')
+    -- Le départ vide une équipe d'un match à deux : forfait, pas une élimination.
     egal('A', fin.gagnant, 'gagnant')
-    egal('Tous les défenseurs ont été éliminés', fin.raison, 'raison')
+    egal('L’équipe adverse a quitté la partie', fin.raison, 'raison forfait')
+    egal(true, fin.matchOver, 'matchOver immédiat')
+    vrai(trouverEffet(effets, 'finMatch') ~= nil, 'finMatch')
+    egal(true, etat.matchOver, 'matchOver dans l’état')
+    egal(true, etat.forfait, 'forfait dans l’état')
     egal(true, aEffet(effets, 'objets'), 'objets clear')
     egal('clear', trouverEffet(effets, 'objets').action, 'action clear')
     egal(true, aEffet(effets, 'nettoyerJoueur'), 'nettoyerJoueur')
@@ -673,6 +683,8 @@ verifier('/endmatch : remise à zéro et effet matchArrete', function()
     egal(0, etat.score.B, 'score B remis')
     egal(0, etat.manche, 'manche remise')
     egal(false, etat.matchOver, 'matchOver remis')
+    egal(false, etat.matchADeux, 'matchADeux remis')
+    egal(false, etat.forfait, 'forfait remis')
     egal('A', etat.attaquants, 'attaquants remis')
     egal(0, etat.echeance, 'échéance remise')
     -- Une seule annonce côté serveur : l'effet matchArrete remplace l'annonce.
@@ -713,6 +725,8 @@ verifier('allerEnAttente et reinitialiser : silencieux et sans score', function(
     egal(0, etat.score.A, 'score effacé')
     egal(0, etat.manche, 'manche effacée')
     egal(0, AttackRules.nombreJoueurs(etat), 'équipes vidées')
+    egal(false, etat.matchADeux, 'matchADeux effacé')
+    egal(false, etat.forfait, 'forfait effacé')
     egal(0, etat.chronoMisAJourA, 'chronoMisAJourA remis')
 end)
 
@@ -1110,7 +1124,7 @@ end)
 --  Départ pendant select/place : la victoire est constatée au passage en live.
 -- ===========================================================================
 
-verifier('départ en select qui vide une équipe : victoire au passage en live', function()
+verifier('départ en select qui vide une équipe : forfait au passage en live', function()
     local ctx = nouveauContexte(130, 0, 'depart select vide équipe')
     local etat = etatDeTest(37)
     appliquer(ctx, etat, AttackRules.arrivee, 1)
@@ -1135,14 +1149,15 @@ verifier('départ en select qui vide une équipe : victoire au passage en live',
     local fin = trouverEffet(effets, 'finManche')
     vrai(fin ~= nil, 'finManche au passage en live')
     egal(gagnant, fin.gagnant, 'gagnant')
-    if campParti == etat.attaquants then
-        egal('Tous les attaquants ont été éliminés', fin.raison, 'raison attaquants')
-    else
-        egal('Tous les défenseurs ont été éliminés', fin.raison, 'raison défenseurs')
-    end
+    -- Forfait : la raison n'est plus une élimination et le match se termine.
+    egal('L’équipe adverse a quitté la partie', fin.raison, 'raison forfait')
+    egal(true, fin.matchOver, 'matchOver')
+    vrai(trouverEffet(effets, 'finMatch') ~= nil, 'finMatch')
+    egal(true, etat.matchOver, 'matchOver dans l’état')
+    egal(true, etat.forfait, 'forfait dans l’état')
 end)
 
-verifier('départ en place qui vide une équipe : victoire au passage en live', function()
+verifier('départ en place qui vide une équipe : forfait au passage en live', function()
     local ctx = nouveauContexte(131, 0, 'depart place vide équipe')
     local etat = etatDeTest(38)
     appliquer(ctx, etat, AttackRules.arrivee, 1)
@@ -1166,11 +1181,252 @@ verifier('départ en place qui vide une équipe : victoire au passage en live', 
     local fin = trouverEffet(effets, 'finManche')
     vrai(fin ~= nil, 'finManche au passage en live')
     egal(gagnant, fin.gagnant, 'gagnant')
-    if campParti == etat.attaquants then
-        egal('Tous les attaquants ont été éliminés', fin.raison, 'raison attaquants')
-    else
-        egal('Tous les défenseurs ont été éliminés', fin.raison, 'raison défenseurs')
+    -- Forfait : la raison n'est plus une élimination et le match se termine.
+    egal('L’équipe adverse a quitté la partie', fin.raison, 'raison forfait')
+    egal(true, fin.matchOver, 'matchOver')
+    vrai(trouverEffet(effets, 'finMatch') ~= nil, 'finMatch')
+    egal(true, etat.matchOver, 'matchOver dans l’état')
+    egal(true, etat.forfait, 'forfait dans l’état')
+end)
+
+-- ===========================================================================
+--  Forfait : un match commencé à deux se termine dès qu'une équipe est vide.
+--  Les camps sont toujours lus dans etat.equipes (tirage aléatoire).
+-- ===========================================================================
+
+-- Match à deux avec tirage aléatoire des camps : on lit toujours les camps
+-- dans etat.equipes, sans supposer A ou B.
+local function matchDeDeuxTire(graine, ctx)
+    local etat = etatDeTest(graine)
+    appliquer(ctx, etat, AttackRules.arrivee, 1)
+    appliquer(ctx, etat, AttackRules.arrivee, 2)
+    vrai(etat.equipes[1] ~= etat.equipes[2], 'camps distincts')
+    return etat
+end
+
+local function verifierFinForfait(etat, gagnant, effets)
+    local fin = trouverEffet(effets, 'finManche')
+    vrai(fin ~= nil, 'finManche')
+    egal(gagnant, fin.gagnant, 'gagnant du forfait')
+    egal('L’équipe adverse a quitté la partie', fin.raison, 'raison forfait')
+    egal(true, fin.matchOver, 'matchOver dans finManche')
+    local match = trouverEffet(effets, 'finMatch')
+    vrai(match ~= nil, 'finMatch')
+    egal(gagnant, match.gagnant, 'gagnant finMatch')
+    egal(1, etat.score[gagnant], 'score du camp restant')
+    egal(true, etat.matchOver, 'matchOver')
+    egal(true, etat.forfait, 'forfait')
+    return match
+end
+
+local function verifierRetourLobbyApresForfait(effets, etat, nbJoueurs)
+    egal(nbJoueurs, compterEffets(effets, 'retourLobby'), 'retourLobby')
+    egal('suivante', trouverEffet(effets, 'chargerCarte').mode, 'carte suivante')
+    egal('waiting', etat.phase, 'phase waiting')
+    egal(0, etat.score.A, 'score A remis')
+    egal(0, etat.score.B, 'score B remis')
+    egal(0, etat.manche, 'manche remise')
+    egal(false, etat.matchOver, 'matchOver remis')
+    egal(false, etat.forfait, 'forfait remis')
+    egal(false, etat.matchADeux, 'matchADeux remis')
+end
+
+verifier('forfait : départ en select, finManche puis finMatch au passage en live', function()
+    local ctx = nouveauContexte(140, 0, 'forfait select')
+    local etat = matchDeDeuxTire(60, ctx)
+    appliquer(ctx, etat, AttackRules.tic, 0, false)
+    egal('select', etat.phase, 'select')
+    egal(true, etat.matchADeux, 'match à deux')
+
+    -- Camp tiré au hasard : celui qui reste gagne, quel que soit A ou B.
+    local campQuiPart, gagnant = etat.equipes[2], etat.equipes[1]
+    appliquer(ctx, etat, AttackRules.depart, 2, 1500)
+    egal('select', etat.phase, 'toujours select')
+    appliquer(ctx, etat, AttackRules.tic, 2000, false)
+    egal('place', etat.phase, 'place')
+
+    local effets = appliquer(ctx, etat, AttackRules.tic, 3000, false)
+    egal('ended', etat.phase, 'ended au passage en live')
+    local match = verifierFinForfait(etat, gagnant, effets)
+    egal(1, #match.participants, 'participant restant')
+    egal(gagnant, match.participants[1].equipe, 'camp du participant')
+    egal(1, #match.partis, 'joueur parti')
+    egal(campQuiPart, match.partis[1].equipe, 'camp du joueur parti')
+
+    local fin = appliquer(ctx, etat, AttackRules.tic, 4000, false)
+    verifierRetourLobbyApresForfait(fin, etat, 1)
+end)
+
+verifier('forfait : départ en place, finManche puis finMatch au passage en live', function()
+    local ctx = nouveauContexte(141, 0, 'forfait place')
+    local etat = matchDeDeuxTire(61, ctx)
+    appliquer(ctx, etat, AttackRules.tic, 0, false)
+    appliquer(ctx, etat, AttackRules.tic, 1000, false)
+    egal('place', etat.phase, 'place')
+
+    local gagnant = etat.equipes[1]
+    appliquer(ctx, etat, AttackRules.depart, 2, 1500)
+    egal('place', etat.phase, 'toujours place')
+
+    local effets = appliquer(ctx, etat, AttackRules.tic, 2000, false)
+    egal('ended', etat.phase, 'ended au passage en live')
+    verifierFinForfait(etat, gagnant, effets)
+
+    local fin = appliquer(ctx, etat, AttackRules.tic, 3000, false)
+    verifierRetourLobbyApresForfait(fin, etat, 1)
+end)
+
+verifier('forfait : départ en live, fin immédiate puis retour lobby', function()
+    local ctx = nouveauContexte(142, 0, 'forfait live')
+    local etat = matchDeDeuxTire(62, ctx)
+    appliquer(ctx, etat, AttackRules.tic, 0, false)
+    appliquer(ctx, etat, AttackRules.tic, 1000, false)
+    appliquer(ctx, etat, AttackRules.tic, 2000, false)
+    egal('live', etat.phase, 'live')
+
+    local gagnant = etat.equipes[1]
+    local effets = appliquer(ctx, etat, AttackRules.depart, 2, 2100)
+    egal('ended', etat.phase, 'ended immédiatement')
+    verifierFinForfait(etat, gagnant, effets)
+
+    local fin = appliquer(ctx, etat, AttackRules.tic, 3100, false)
+    verifierRetourLobbyApresForfait(fin, etat, 1)
+end)
+
+verifier('forfait : départ pendant la pause, finMatch sans finManche ni annonce', function()
+    local ctx = nouveauContexte(143, 0, 'forfait pause')
+    local etat = matchDeDeuxTire(63, ctx)
+    appliquer(ctx, etat, AttackRules.tic, 0, false)
+    appliquer(ctx, etat, AttackRules.tic, 1000, false)
+    appliquer(ctx, etat, AttackRules.tic, 2000, false)
+    egal('live', etat.phase, 'live')
+
+    -- Manche 1 terminée normalement au chrono : aucun départ, donc pas de
+    -- forfait. Le gagnant est le camp défenseur, tiré au hasard.
+    local tFin = 2000 + CONFIG.RoundTimeMs + 1000
+    local effetsManche = appliquer(ctx, etat, AttackRules.tic, tFin, false)
+    local manche = trouverEffet(effetsManche, 'finManche')
+    vrai(manche ~= nil, 'finManche manche 1')
+    local campGagnant = manche.gagnant
+    local campPerdant = autreCamp(campGagnant)
+    egal('ended', etat.phase, 'ended après la manche 1')
+    egal(false, etat.forfait, 'pas de forfait sur la manche')
+    egal(false, etat.matchOver, 'match pas fini')
+    local scoreAvant = copieScore(etat.score)
+    egal(1, scoreAvant[campGagnant], 'un point au camp gagnant')
+    egal(0, scoreAvant[campPerdant], 'zéro point au camp perdant')
+
+    -- Départ du joueur du camp GAGNANT pendant la pause : le camp restant
+    -- (0 point) doit être forcé gagnant au tic de fin de pause.
+    local srcParti = etat.equipes[1] == campGagnant and 1 or 2
+    appliquer(ctx, etat, AttackRules.depart, srcParti, tFin + 500)
+    egal('ended', etat.phase, 'toujours ended après le départ')
+
+    local tPause = tFin + CONFIG.EndDelayMs + 1000
+    local effets = appliquer(ctx, etat, AttackRules.tic, tPause, false)
+    egal(false, aEffet(effets, 'finManche'), 'aucun finManche')
+    egal(false, aEffet(effets, 'annonce'), 'aucune annonce')
+    local match = trouverEffet(effets, 'finMatch')
+    vrai(match ~= nil, 'finMatch seul')
+    egal(campPerdant, match.gagnant, 'gagnant forcé = camp restant à 0 point')
+    egal(scoreAvant.A, match.score.A, 'score A inchangé')
+    egal(scoreAvant.B, match.score.B, 'score B inchangé')
+    egal(1, #match.partis, 'joueur parti')
+    egal(campGagnant, match.partis[1].equipe, 'camp du joueur parti')
+    egal(1, #match.participants, 'participant restant')
+    egal(campPerdant, match.participants[1].equipe, 'camp du participant')
+    egal('ended', etat.phase, 'phase ended conservée')
+    egal(tPause + CONFIG.MatchEndDelayMs, etat.echeance, 'échéance repoussée de MatchEndDelayMs')
+    egal(true, etat.matchOver, 'matchOver')
+    egal(true, etat.forfait, 'forfait')
+
+    local fin = appliquer(ctx, etat, AttackRules.tic, tPause + CONFIG.MatchEndDelayMs, false)
+    verifierRetourLobbyApresForfait(fin, etat, 1)
+end)
+
+verifier('non-régression : match solo poursuit ses manches de test sans forfait', function()
+    local ctx = nouveauContexte(144, 0, 'solo manche 2')
+    local etat = etatDeTest(64)
+    appliquer(ctx, etat, AttackRules.arrivee, 1)
+    local effets = appliquer(ctx, etat, AttackRules.debutTest, 1000)
+    egal(true, etat.solo, 'solo')
+    egal(false, etat.matchADeux, 'pas un match à deux')
+    vrai(trouverEffet(effets, 'annonce', 'debutMancheTest') ~= nil, 'annonce test manche 1')
+
+    appliquer(ctx, etat, AttackRules.tic, 2000, false)  -- place
+    appliquer(ctx, etat, AttackRules.tic, 3000, false)  -- live
+    local finManche = appliquer(ctx, etat, AttackRules.tic, 3000 + CONFIG.RoundTimeMs + 1000, false)
+    vrai(trouverEffet(finManche, 'finManche') ~= nil, 'fin de manche de test')
+    egal(false, etat.forfait, 'aucun forfait')
+    egal(false, etat.matchOver, 'match pas fini')
+
+    local suite = appliquer(ctx, etat, AttackRules.tic, 3000 + CONFIG.RoundTimeMs + 1000 + 2000, false)
+    egal('select', etat.phase, 'manche 2 en select')
+    egal(2, etat.manche, 'manche 2')
+    egal(true, etat.solo, 'toujours solo')
+    egal(false, etat.matchADeux, 'matchADeux toujours faux')
+    egal(false, etat.forfait, 'forfait toujours faux')
+    egal(false, aEffet(suite, 'finMatch'), 'aucun finMatch')
+    local annonce = trouverEffet(suite, 'annonce', 'debutMancheTest')
+    vrai(annonce ~= nil, 'annonce debutMancheTest manche 2')
+    egal(2, annonce.manche, 'manche annoncée 2')
+end)
+
+verifier('non-régression : match à deux sans départ finit à WinRounds sans forfait', function()
+    local ctx = nouveauContexte(145, 0, 'match normal')
+    local etat = matchDeDeuxTire(65, ctx)
+    local t = 0
+    appliquer(ctx, etat, AttackRules.tic, t, false)  -- select
+    t = t + CONFIG.SelectTimeMs
+    appliquer(ctx, etat, AttackRules.tic, t, false)  -- place
+    t = t + CONFIG.PlacementTimeMs
+    appliquer(ctx, etat, AttackRules.tic, t, false)  -- live
+    egal(true, etat.matchADeux, 'match à deux')
+    egal(false, etat.forfait, 'pas de forfait')
+
+    -- Le défenseur gagne chaque manche au chrono ; avec l'échange des camps,
+    -- les victoires alternent : il faut 2*WinRounds-1 manches pour atteindre
+    -- WinRounds. On joue jusqu'à matchOver, sans jamais quitter appliquer().
+    local gagnantFinal, matchFinal
+    for manche = 1, 2 * CONFIG.WinRounds - 1 do
+        t = t + CONFIG.RoundTimeMs + 1000
+        local effets = appliquer(ctx, etat, AttackRules.tic, t, false)
+        local fin = trouverEffet(effets, 'finManche')
+        vrai(fin ~= nil, ('finManche manche %d'):format(manche))
+        egal(false, etat.forfait, ('pas de forfait manche %d'):format(manche))
+        if etat.matchOver then
+            egal(true, fin.matchOver, 'matchOver à WinRounds')
+            local match = trouverEffet(effets, 'finMatch')
+            vrai(match ~= nil, 'finMatch')
+            egal(fin.gagnant, match.gagnant, 'gagnant du match')
+            egal(CONFIG.WinRounds, etat.score[fin.gagnant], 'score final')
+            egal(true, etat.matchOver, 'matchOver dans l’état')
+            egal(false, etat.forfait, 'forfait faux')
+            egal(true, etat.matchADeux, 'matchADeux vrai')
+            gagnantFinal, matchFinal = fin.gagnant, match
+            break
+        end
+        egal(false, fin.matchOver, 'match pas encore fini')
+        egal(false, aEffet(effets, 'finMatch'), 'pas de finMatch prématuré')
+        t = t + CONFIG.EndDelayMs + 1000
+        appliquer(ctx, etat, AttackRules.tic, t, false)  -- select
+        t = t + CONFIG.SelectTimeMs
+        appliquer(ctx, etat, AttackRules.tic, t, false)  -- place
+        t = t + CONFIG.PlacementTimeMs
+        appliquer(ctx, etat, AttackRules.tic, t, false)  -- live
     end
+    vrai(gagnantFinal ~= nil and matchFinal ~= nil, 'match terminé à WinRounds')
+
+    t = t + CONFIG.MatchEndDelayMs + 1000
+    local finEffets = appliquer(ctx, etat, AttackRules.tic, t, false)
+    egal(2, compterEffets(finEffets, 'retourLobby'), 'retourLobby x2')
+    egal('suivante', trouverEffet(finEffets, 'chargerCarte').mode, 'carte suivante')
+    egal('waiting', etat.phase, 'retour waiting')
+    egal(0, etat.score.A, 'score A remis')
+    egal(0, etat.score.B, 'score B remis')
+    egal(false, etat.matchOver, 'matchOver remis')
+    egal(false, etat.forfait, 'forfait remis')
+    egal(false, etat.matchADeux, 'matchADeux remis')
 end)
 
 verifier('manche solo : passage en live sans finManche', function()

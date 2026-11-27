@@ -42,6 +42,39 @@ local function copieScore(score)
     return { A = score.A, B = score.B }
 end
 
+-- Forfait : ne rend un camp que si exactement une équipe est vide. Le camp
+-- rendu est celui qui reste, quel que soit le camp gagnant initialement prévu.
+local function campRestant(etat)
+    local a = AttackRules.compter(etat, 'A')
+    local b = AttackRules.compter(etat, 'B')
+    if a == 0 and b > 0 then return 'B' end
+    if b == 0 and a > 0 then return 'A' end
+    return nil
+end
+
+-- Participants encore présents + joueurs partis + score : construit une seule
+-- fois l'effet `finMatch`, qu'il vienne d'une manche ou d'un forfait en pause.
+local function effetFinMatch(etat, gagnant)
+    local participants = {}
+    for _, src in ipairs(listeJoueurs(etat)) do
+        local st = etat.stats[src] or { kills = 0, deaths = 0 }
+        participants[#participants + 1] = {
+            src = src, equipe = etat.equipes[src], kills = st.kills, deaths = st.deaths,
+        }
+    end
+    local partis = {}
+    for i, entree in ipairs(etat.partis) do
+        partis[i] = {
+            src = entree.src, equipe = entree.equipe,
+            kills = entree.kills, deaths = entree.deaths,
+        }
+    end
+    return {
+        type = 'finMatch', gagnant = gagnant, score = copieScore(etat.score),
+        participants = participants, partis = partis,
+    }
+end
+
 -- Un src valide est un numéro entier strictement positif.
 local function estSrcValide(src)
     return type(src) == 'number' and math.floor(src) == src and src > 0
@@ -179,6 +212,9 @@ local function demarrerSelection(etat, liste, maintenantMs)
     etat.phase = 'select'
     etat.echeance = maintenantMs + etat.config.SelectTimeMs
     etat.solo = AttackRules.compter(etat, 'A') == 0 or AttackRules.compter(etat, 'B') == 0
+    -- Forfait : un match commencé à deux reste un match à deux, même si une
+    -- équipe se vide ensuite. Calculé après équilibrage, sur la manche 1.
+    if etat.manche == 1 then etat.matchADeux = not etat.solo end
 
     local dureeAnnonce = etat.echangeDeCamp and 4500 or 4000
     for _, src in ipairs(listeJoueurs(etat)) do
@@ -245,6 +281,15 @@ end
 local function terminerManche(etat, liste, gagnant, raison, maintenantMs)
     if etat.phase ~= 'live' then return end
 
+    -- Forfait : si un match à deux perd une équipe, le camp restant gagne
+    -- quelle que soit la victoire de manche calculée par l'appelant.
+    local restant = etat.matchADeux and campRestant(etat) or nil
+    if restant then
+        gagnant = restant
+        raison = 'L’équipe adverse a quitté la partie'
+        etat.forfait = true
+    end
+
     etat.phase = 'ended'
     etat.score[gagnant] = etat.score[gagnant] + 1
     etat.echeance = maintenantMs + etat.config.EndDelayMs
@@ -253,7 +298,7 @@ local function terminerManche(etat, liste, gagnant, raison, maintenantMs)
         ajouter(liste, { type = 'protection', src = src, protege = true })
     end
 
-    local matchOver = etat.score[gagnant] >= etat.config.WinRounds
+    local matchOver = etat.score[gagnant] >= etat.config.WinRounds or etat.forfait
     if matchOver then
         etat.matchOver = true
         etat.echeance = maintenantMs + etat.config.MatchEndDelayMs
@@ -266,24 +311,7 @@ local function terminerManche(etat, liste, gagnant, raison, maintenantMs)
     })
 
     if matchOver then
-        local participants = {}
-        for _, src in ipairs(listeJoueurs(etat)) do
-            local st = etat.stats[src] or { kills = 0, deaths = 0 }
-            participants[#participants + 1] = {
-                src = src, equipe = etat.equipes[src], kills = st.kills, deaths = st.deaths,
-            }
-        end
-        local partis = {}
-        for i, entree in ipairs(etat.partis) do
-            partis[i] = {
-                src = entree.src, equipe = entree.equipe,
-                kills = entree.kills, deaths = entree.deaths,
-            }
-        end
-        ajouter(liste, {
-            type = 'finMatch', gagnant = gagnant, score = score,
-            participants = participants, partis = partis,
-        })
+        ajouter(liste, effetFinMatch(etat, gagnant))
     end
 
     ajouter(liste, { type = 'phase', phase = 'ended' })
@@ -313,6 +341,18 @@ local function mancheSuivante(etat, liste, maintenantMs)
         end
         AttackRules.reinitialiser(etat)
         ajouter(liste, { type = 'chargerCarte', mode = 'suivante' })
+        return
+    end
+
+    -- Forfait pendant la pause : le match se termine sans nouvelle manche,
+    -- sans finManche et sans annonce (aucun modèle serveur dédié). Le score
+    -- reste inchangé, les résultats sont envoyés avec les joueurs/partis.
+    local restant = etat.matchADeux and campRestant(etat) or nil
+    if restant then
+        etat.matchOver = true
+        etat.forfait = true
+        etat.echeance = maintenantMs + etat.config.MatchEndDelayMs
+        ajouter(liste, effetFinMatch(etat, restant))
         return
     end
 
@@ -386,6 +426,8 @@ function AttackRules.nouveau(config, aleatoire)
         chronoMisAJourA = 0,   -- millisecondes du dernier tic pendant 'live'
         solo = false,
         matchOver = false,
+        matchADeux = false,
+        forfait = false,
         echangeDeCamp = false,
     }
 end
@@ -406,6 +448,8 @@ function AttackRules.reinitialiser(etat)
     etat.chronoMisAJourA = 0
     etat.solo = false
     etat.matchOver = false
+    etat.matchADeux = false
+    etat.forfait = false
     etat.echangeDeCamp = false
 end
 
@@ -610,6 +654,8 @@ function AttackRules.finMatch(etat)
     end
     etat.manche = 0
     etat.matchOver = false
+    etat.matchADeux = false
+    etat.forfait = false
     etat.attaquants = 'A'
     etat.echeance = 0
     etat.phase = 'waiting'
