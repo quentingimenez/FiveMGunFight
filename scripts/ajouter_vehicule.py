@@ -47,23 +47,97 @@ TAILLE_LOURDE = 16 * 1024 * 1024
 
 
 # ---------------------------------------------------------------- Archive RPF7
-def extraire_rpf(fichier: Path, sortie: Path) -> None:
-    """Extrait une archive GTA RPF7 non chiffrée (« OPEN »), .rpf imbriqués compris."""
+# Limites de sécurité de l'extracteur RPF7 (consultées par extraire_rpf, et
+# remplaçables par les tests avec unittest.mock.patch).
+LIMITE_FICHIER = 512 * 1024 * 1024       # 512 Mo par fichier décompressé
+LIMITE_TOTALE = 4 * 1024 * 1024 * 1024   # 4 Go écrits au total
+PROFONDEUR_MAX = 8                       # profondeur maximale des .rpf imbriqués
 
-    def lire(buf: bytes, prefixe: Path) -> None:
+# Composants de nom interdits (traversée, caractères Windows et noms réservés).
+_NOMS_RESERVES = {
+    "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5",
+    "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4",
+    "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+}
+_CARACTERES_INTERDITS = set('/\\:<>"|?*')
+
+
+def extraire_rpf(fichier: Path, sortie: Path) -> None:
+    """Extrait une archive GTA RPF7 non chiffrée (« OPEN »), .rpf imbriqués compris.
+
+    Toute archive malformée ou piégée lève une ValueError en français : aucun
+    autre type d'exception ne doit s'échapper, et aucune écriture ne sort de
+    ``sortie``.
+    """
+    try:
+        racine = sortie.resolve()
+    except OSError as erreur:
+        raise ValueError(f"dossier de sortie illisible : {erreur}") from None
+    total: list[int] = [0]
+
+    def verifier_nom(nom: str, prefixe: Path) -> None:
+        if not isinstance(nom, str) or not nom:
+            raise ValueError(f"{prefixe} : nom d'entrée vide")
+        if nom in (".", "..") or any(c in nom for c in _CARACTERES_INTERDITS):
+            raise ValueError(f"{prefixe} : nom d'entrée invalide « {nom} »")
+        if any(ord(c) < 32 or ord(c) == 127 for c in nom):
+            raise ValueError(f"{prefixe} : nom d'entrée contrôlé « {nom!r} »")
+        if nom.rstrip(" .") == "" or nom.split(".")[0].lower() in _NOMS_RESERVES:
+            raise ValueError(f"{prefixe} : nom d'entrée réservé « {nom} »")
+
+    def ecrire(cible: Path, donnees: bytes, prefixe: Path) -> None:
+        """Vérifie le périmètre et les limites avant chaque écriture."""
+        try:
+            cible_resolue = cible.resolve()
+        except OSError as erreur:
+            raise ValueError(f"{prefixe} : chemin de sortie illisible : {erreur}") from None
+        try:
+            cible_resolue.relative_to(racine)
+        except ValueError:
+            raise ValueError(f"{prefixe} : écriture hors du dossier de sortie") from None
+        if cible_resolue == racine:
+            raise ValueError(f"{prefixe} : écriture hors du dossier de sortie")
+        if len(donnees) > LIMITE_FICHIER:
+            raise ValueError(f"{prefixe} : fichier trop volumineux (limite {LIMITE_FICHIER} octets)")
+        total[0] += len(donnees)
+        if total[0] > LIMITE_TOTALE:
+            raise ValueError(f"{prefixe} : total écrit trop volumineux (limite {LIMITE_TOTALE} octets)")
+        try:
+            cible.parent.mkdir(parents=True, exist_ok=True)
+            cible.write_bytes(donnees)
+        except OSError as erreur:
+            raise ValueError(f"{prefixe} : écriture impossible : {erreur}") from None
+
+    def lire(buf: bytes, prefixe: Path, profondeur: int) -> None:
+        if len(buf) < 16:
+            raise ValueError(f"{prefixe} : en-tête RPF7 tronqué")
         if buf[:4] != b"7FPR":
             raise ValueError(f"{prefixe} n'est pas une archive RPF7")
         nombre = int.from_bytes(buf[4:8], "little")
         chiffrement = int.from_bytes(buf[12:16], "little")
         if chiffrement not in (0, 0x4E45504F):
             raise ValueError(f"{prefixe} est chiffrée : extrais-la avec OpenIV ou CodeWalker")
-        noms = 16 + nombre * 16
+        table_fin = 16 + nombre * 16
+        if table_fin > len(buf):
+            raise ValueError(f"{prefixe} : table des entrées hors de l'archive")
+        longueur_noms = int.from_bytes(buf[8:12], "little")
+        noms = table_fin
+        fin_noms = noms + longueur_noms
+        if fin_noms > len(buf):
+            raise ValueError(f"{prefixe} : table des noms hors de l'archive")
+        if longueur_noms == 0:
+            raise ValueError(f"{prefixe} : table des noms vide")
 
         def nom(decalage: int) -> str:
-            fin = buf.index(b"\0", noms + decalage)
-            return buf[noms + decalage:fin].decode("latin-1")
+            if decalage >= longueur_noms:
+                raise ValueError(f"{prefixe} : décalage de nom hors de la table")
+            debut = noms + decalage
+            fin = buf.find(b"\0", debut, fin_noms)
+            if fin < 0:
+                raise ValueError(f"{prefixe} : nom non terminé dans la table")
+            return buf[debut:fin].decode("latin-1")
 
-        entrees = []
+        entrees: list[tuple] = []
         for i in range(nombre):
             p = 16 + i * 16
             if int.from_bytes(buf[p + 4:p + 8], "little") == 0x7FFFFF00:
@@ -79,35 +153,116 @@ def extraire_rpf(fichier: Path, sortie: Path) -> None:
                                 taille, decalage & 0x7FFFFF,
                                 int.from_bytes(buf[p + 8:p + 12], "little")))
 
-        def parcourir(index: int, relatif: Path) -> None:
-            _, _, debut, n = entrees[index]
-            for k in range(debut, debut + n):
-                e = entrees[k]
-                chemin = relatif / e[1]
-                if e[0] == "dir":
-                    parcourir(k, chemin)
-                    continue
-                genre, _, taille, bloc, brut = e
-                pos = bloc * 512
-                if genre == "res":
-                    if taille == 0xFFFFFF:
-                        h = buf[pos:pos + 16]
-                        taille = h[7] | (h[14] << 8) | (h[5] << 16) | (h[2] << 24)
+        if not entrees or entrees[0][0] != "dir":
+            raise ValueError(f"{prefixe} : l'entrée 0 n'est pas un répertoire")
+
+        # Parcours itératif : (index d'entrée, chemin relatif, index enfant).
+        # Un seul ensemble d'index visités évite les cycles (directs ou
+        # indirects) et les explositions exponentielles sur les DAG partagés.
+        visites: set[int] = set()
+        pile: list[tuple[int, Path, int]] = []
+        if entrees[0][2] > nombre or entrees[0][3] > nombre - entrees[0][2]:
+            raise ValueError(f"{prefixe} : intervalles d'enfants hors de la table")
+        visites.add(0)
+        pile.append((0, Path(), entrees[0][2]))
+        while pile:
+            index, relatif, enfant = pile[-1]
+            debut, n = entrees[index][2], entrees[index][3]
+            if enfant >= debut + n:
+                pile.pop()
+                continue
+            pile[-1] = (index, relatif, enfant + 1)
+            k = enfant
+            if k < 0 or k >= len(entrees):
+                raise ValueError(f"{prefixe} : index d'entrée hors de la table")
+            e = entrees[k]
+            verifier_nom(e[1], prefixe / relatif)
+            chemin = relatif / e[1]
+            try:
+                cible = (sortie / prefixe / chemin).resolve()
+            except OSError as erreur:
+                raise ValueError(f"{prefixe} : chemin d'entrée illisible : {erreur}") from None
+            try:
+                cible.relative_to(racine)
+            except ValueError:
+                raise ValueError(f"{prefixe} : entrée hors du dossier de sortie") from None
+
+            if e[0] == "dir":
+                debut_enfant, nombre_enfants = e[2], e[3]
+                if debut_enfant > nombre or nombre_enfants > nombre - debut_enfant:
+                    raise ValueError(f"{prefixe} : intervalles d'enfants hors de la table")
+                if k in visites:
+                    raise ValueError(f"{prefixe} : cycle ou répertoire déjà visité « {chemin} »")
+                visites.add(k)
+                pile.append((k, chemin, debut_enfant))
+                continue
+
+            genre, _, taille, bloc, brut = e
+            pos = bloc * 512
+            if pos > len(buf):
+                raise ValueError(f"{prefixe} : bloc de données hors de l'archive")
+            disponible = len(buf) - pos
+            if genre == "res":
+                if taille == 0xFFFFFF:
+                    if disponible < 16:
+                        raise ValueError(f"{prefixe} : en-tête de ressource tronqué")
+                    h = buf[pos:pos + 16]
+                    taille = h[7] | (h[14] << 8) | (h[5] << 16) | (h[2] << 24)
+                    if taille > disponible:
+                        raise ValueError(f"{prefixe} : ressource hors de l'archive")
                     donnees = buf[pos:pos + taille]
-                elif taille == 0:
-                    donnees = buf[pos:pos + brut]
+                elif taille > disponible:
+                    raise ValueError(f"{prefixe} : ressource hors de l'archive")
                 else:
-                    donnees = zlib.decompress(buf[pos:pos + taille], -15)
-                if e[1].lower().endswith(".rpf"):
-                    lire(bytes(donnees), prefixe / chemin)
-                    continue
-                cible = sortie / prefixe / chemin
-                cible.parent.mkdir(parents=True, exist_ok=True)
-                cible.write_bytes(donnees)
+                    donnees = buf[pos:pos + taille]
+            elif taille == 0:
+                if brut > disponible:
+                    # Certains packs réels surestiment la taille d'un .rpf
+                    # imbriqué : la lecture récursive vérifie déjà ses bornes.
+                    if e[1].lower().endswith(".rpf"):
+                        donnees = buf[pos:]
+                    else:
+                        raise ValueError(f"{prefixe} : données hors de l'archive")
+                else:
+                    donnees = buf[pos:pos + brut]
+            else:
+                if taille > disponible:
+                    raise ValueError(f"{prefixe} : données compressées hors de l'archive")
+                if taille > LIMITE_FICHIER:
+                    raise ValueError(f"{prefixe} : fichier trop volumineux (limite {LIMITE_FICHIER} octets)")
+                try:
+                    obj = zlib.decompressobj(-15)
+                    morceaux: list[bytes] = []
+                    produit = 0
+                    reste = buf[pos:pos + taille]
+                    while True:
+                        morceau = obj.decompress(reste, max(1, LIMITE_FICHIER - produit + 1))
+                        produit += len(morceau)
+                        if produit > LIMITE_FICHIER:
+                            raise ValueError(f"{prefixe} : bombes de décompression (limite {LIMITE_FICHIER} octets)")
+                        if morceau:
+                            morceaux.append(morceau)
+                        reste = obj.unconsumed_tail
+                        if not reste:
+                            break
+                    if obj.flush():
+                        raise ValueError(f"{prefixe} : bombes de décompression (limite {LIMITE_FICHIER} octets)")
+                    if not obj.eof:
+                        raise ValueError(f"{prefixe} : flux zlib tronqué")
+                    donnees = b"".join(morceaux)
+                except zlib.error:
+                    raise ValueError(f"{prefixe} : données zlib invalides ou tronquées") from None
 
-        parcourir(0, Path())
+            if e[1].lower().endswith(".rpf"):
+                if profondeur >= PROFONDEUR_MAX:
+                    raise ValueError(f"{prefixe} : profondeur maximale des .rpf imbriqués atteinte")
+                if len(donnees) > LIMITE_FICHIER:
+                    raise ValueError(f"{prefixe} : fichier trop volumineux (limite {LIMITE_FICHIER} octets)")
+                lire(donnees, prefixe / chemin, profondeur + 1)
+                continue
+            ecrire(sortie / prefixe / chemin, donnees, prefixe / relatif)
 
-    lire(fichier.read_bytes(), Path(fichier.stem))
+    lire(fichier.read_bytes(), Path(fichier.stem), 0)
 
 
 # ---------------------------------------------------------------- Réglages
@@ -247,7 +402,11 @@ def main() -> int:
                 print("Donne un dossier extrait ou un fichier .rpf (les .zip/.rar sont à extraire d'abord).", file=sys.stderr)
                 return 1
             dossier = Path(tmp)
-            extraire_rpf(source, dossier)
+            try:
+                extraire_rpf(source, dossier)
+            except ValueError as erreur:
+                print(f"Erreur : {erreur}", file=sys.stderr)
+                return 1
 
         fichiers = [f for f in dossier.rglob("*") if f.is_file()]
         metas = {}
