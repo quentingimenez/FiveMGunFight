@@ -142,11 +142,11 @@
       <HudCapacity value="0" />
       <HudAccuracy value="5" />
       <HudRange value="0" />
-      <CameraHash>SNIPER_AIM_CAMERA</CameraHash>
+      <CameraHash />
       <RecoilShakeAmplitude value="0.000000" />
       <ExtraZoomFactorForAccurateMode value="1.400000" />
       <Reticule value="0" />
-      <ReticuleHash>SNIPER_MAX</ReticuleHash>
+      <ReticuleHash />
     </Item>
 
   </Infos>
