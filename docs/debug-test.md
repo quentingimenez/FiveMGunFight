@@ -26,7 +26,7 @@ procédures de production.
 | Fichiers montés | `server-data/` | `docker-compose.dev.yml` | les modifications Lua/NUI sont prises en compte sans reconstruire l'image |
 | Personnages | `server-data/resources/[gunfight]/gf_lobby/data/characters.json` | `gf_lobby/config.lua` | ignoré par Git ; `resetchar` dans la console F8 pour repartir de zéro |
 | Maps | `server-data/resources/[gunfight]/gf_maps/data/maps.json` | `gf_maps/server.lua` | suivi par Git ; sauvegarde-le après une création volontaire |
-| Console de jeu | **F8** (client) | client FiveM | `connect`, `quit`, `reconnect` ; commandes sans barre oblique (`lobbyui`, `attack`, `redzone`, `lobby`). Le chat s'ouvre avec **T** et accepte les commandes avec une barre oblique. |
+| Console de jeu | **F8** (client) | client FiveM | `connect`, `quit`, `reconnect` ; commandes sans barre oblique (`lobbyui`, `attack`, `redzone`, `lobby`) ; la touche **T** n'ouvre plus rien (chat retiré) |
 | Éditeur de maps | `editor` (admin, console F8) | `gf_maps` | voir section 5 du README |
 | Tests locaux | `bash scripts/verifier-docker.sh` | `scripts/`, `tests/`, `docker/verifier/` | même commande qu'en CI, dans l'image ; Docker Desktop doit tourner |
 
