@@ -63,6 +63,11 @@ services:
       retries: 20
       start_period: 30s
   fxserver:
+    # FXServer quitte sans console (« Ctrl-C pressed in server console »),
+    # comme dans docker-compose.yml.
+    init: true
+    stdin_open: true
+    tty: true
     image: ${RESTORE_IMAGE_REF:?}
     environment:
       TXADMIN: "false"
@@ -155,6 +160,10 @@ txAdmin, passe `TXADMIN: "true"` et ajoute temporairement
 - `maps.json` est présent dans `/data-maps/` et contient les maps attendues ;
 - `txData/` contient la configuration et les comptes txAdmin ;
 - le serveur jetable démarre ses ressources sans erreur ;
+- le conteneur `fxserver` jetable reste en marche
+  (`docker compose -p gunfight-restore -f restore-compose.yml ps`) et ses
+  journaux montrent `[gf_db] schéma à jour (version N)` sans ligne
+  `migration … appliquée` : la base restaurée est déjà au schéma de l'image ;
 - aucun volume `gunfight-prod-*` n'a été modifié (`docker volume ls`).
 
 Détruis ensuite la pile jetable **et ses volumes uniquement** :
