@@ -84,6 +84,24 @@ local function adminData(src)
     return list
 end
 
+local function grantWeapon(target, weaponId)
+    if type(weaponId) ~= 'string' or #weaponId < 1 or #weaponId > 48 then return false, 'unknown' end
+    local chosen
+    for _, weapon in ipairs(core:GetWeaponCatalog()) do
+        if weapon.id == weaponId then chosen = weapon break end
+    end
+    if not chosen then return false, 'unknown' end
+    if not GetPlayerName(target) then return false, 'offline' end
+    local entry = load(target)
+    if not entry then return false, 'unavailable' end
+    if core:OwnsWeapon(target, weaponId) then return true, 'already', chosen end
+    MySQL.prepare.await('INSERT IGNORE INTO gf_player_weapons (identifier, weapon_id, origin) VALUES (?, ?, ?)',
+        { entry.id, weaponId, 'admin' })
+    if not GetPlayerName(target) or identifierOf(target) ~= entry.id then return false, 'offline' end
+    entry.obtained[weaponId] = true
+    return true, 'granted', chosen
+end
+
 exports('GetObtained', function(src)
     local entry = cache[src]
     local ids = {}
@@ -198,20 +216,64 @@ end, false)
 RegisterNetEvent('gf_inventory:adminGive', function(weaponId)
     local src = source
     if type(weaponId) ~= 'string' or #weaponId > 48 or not core:IsAdmin(src) then return end
-    withInventory(src, function(entry)
+    withInventory(src, function()
         if not core:IsAdmin(src) then return end
-        local chosen
-        for _, weapon in ipairs(core:GetWeaponCatalog()) do
-            if weapon.id == weaponId then chosen = weapon break end
-        end
-        if not chosen then return end
-        if not core:OwnsWeapon(src, weaponId) then
-            MySQL.prepare.await('INSERT IGNORE INTO gf_player_weapons (identifier, weapon_id, origin) VALUES (?, ?, ?)',
-                { entry.id, weaponId, 'admin' })
-            if not GetPlayerName(src) or identifierOf(src) ~= entry.id then return end
-            entry.obtained[weaponId] = true
-        end
+        local ok, status, chosen = grantWeapon(src, weaponId)
+        if not ok or (status ~= 'granted' and status ~= 'already') then return end
         core:Notify(src, ('%s ajoutée à ton Casier.'):format(chosen.label))
         TriggerClientEvent('gf_inventory:adminData', src, adminData(src))
     end)
 end)
+
+-- Pas de contrôle admin ici : cet export serveur est appelé par des ressources de confiance.
+exports('GiveWeaponToLocker', function(target, weaponId)
+    local ok, result, status = pcall(grantWeapon, target, weaponId)
+    if not ok then
+        print(('[gf_inventory] %s'):format(tostring(result)))
+        return false, 'error'
+    end
+    return result, status
+end)
+
+RegisterCommand('give', function(src, args)
+    local function reply(msg)
+        if src == 0 then print('[gf_inventory] ' .. msg) else core:Notify(src, msg) end
+    end
+    if src ~= 0 and not core:IsAdmin(src) then
+        reply('Réservé aux administrateurs.')
+        return
+    end
+    local target = tonumber(args[1])
+    local weaponId = args[2] and args[2]:lower()
+    if not target or not weaponId then
+        reply('Usage : give <id joueur> <arme> (ex. give 12 carbine).')
+        return
+    end
+    local ok, result, status, chosen = pcall(grantWeapon, target, weaponId)
+    if not ok then
+        print(('[gf_inventory] %s'):format(tostring(result)))
+        reply('Inventaire indisponible. Réessaie dans un instant.')
+        return
+    end
+    if status == 'unknown' then
+        reply(('Arme inconnue : %s (identifiant du catalogue, ex. carbine).'):format(weaponId))
+        return
+    end
+    if status == 'offline' then
+        reply(('Joueur %s introuvable.'):format(args[1]))
+        return
+    end
+    if status == 'unavailable' then
+        reply('Inventaire indisponible. Réessaie dans un instant.')
+        return
+    end
+    local nom = GetPlayerName(target)
+    if status == 'already' then
+        reply(('%s possède déjà %s.'):format(nom, chosen.label))
+        return
+    end
+    reply(('%s ajoutée au Casier de %s.'):format(chosen.label, nom))
+    core:Notify(target, ('%s ajoutée à ton Casier par un administrateur.'):format(chosen.label))
+    local auteur = src == 0 and 'console' or GetPlayerName(src)
+    print(('[gf_inventory] %s a donné %s à %s'):format(auteur, weaponId, nom))
+end, false)
