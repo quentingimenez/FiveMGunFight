@@ -225,15 +225,55 @@ nameInput.addEventListener('blur', () => post('typing', { on: false }));
 nameInput.addEventListener('input', () => { nameInput.dataset.touched = '1'; });
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btn-save').click(); });
 
+// Angle de vue : boutons du panneau
+document.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => post('camera', { action: b.dataset.cam })));
+
+// Angle de vue : molette maintenue + glisser. Les déplacements sont cumulés
+// et envoyés au plus une fois par image (~16 ms), en pixels.
+let orbit = null;
+let orbitTimer = null;
+function flushOrbit() {
+    clearTimeout(orbitTimer);
+    orbitTimer = null;
+    if (!orbit || (orbit.dx === 0 && orbit.dy === 0)) return;
+    post('camera', { dx: orbit.dx, dy: orbit.dy });
+    orbit.dx = 0;
+    orbit.dy = 0;
+}
+function stopOrbit() {
+    if (!orbit) return;
+    flushOrbit();
+    orbit = null;
+    canvas.classList.remove('orbiting');
+}
+
 // Souris sur la carte
 const canvas = $('#canvas');
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('auxclick', (e) => e.preventDefault());
 canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 1) {
+        e.preventDefault(); // pas de défilement automatique du navigateur
+        orbit = { x: e.clientX, y: e.clientY, dx: 0, dy: 0 };
+        canvas.classList.add('orbiting');
+        return;
+    }
     if (e.button !== 0 && e.button !== 2) return;
     post('click', { x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight, button: e.button });
 });
+window.addEventListener('mousemove', (e) => {
+    if (!orbit) return;
+    orbit.dx += e.clientX - orbit.x;
+    orbit.dy += e.clientY - orbit.y;
+    orbit.x = e.clientX;
+    orbit.y = e.clientY;
+    if (!orbitTimer) orbitTimer = setTimeout(flushOrbit, 16);
+});
+window.addEventListener('mouseup', (e) => { if (e.button === 1) stopOrbit(); });
+window.addEventListener('blur', stopOrbit);
 let lastHover = 0;
 canvas.addEventListener('mousemove', (e) => {
+    if (orbit) return;
     const now = performance.now();
     if (now - lastHover < 50) return;
     lastHover = now;
@@ -254,7 +294,7 @@ window.addEventListener('message', (event) => {
         const wasEditing = state.editing;
         state = msg.state;
         maps = msg.maps || maps;
-        if (!state.editing && wasEditing) { nameInput.dataset.touched = ''; nameInput.blur(); }
+        if (!state.editing && wasEditing) { nameInput.dataset.touched = ''; nameInput.blur(); stopOrbit(); }
         render();
     } else if (msg.type === 'toast') {
         toast(msg.text, msg.error);

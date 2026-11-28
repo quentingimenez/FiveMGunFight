@@ -59,9 +59,21 @@
                 </div>
                 <button id="btn-cancel" class="ghost wide">Annuler les modifications</button>
 
+                <div class="cam-box">
+                    <div class="cam-title">Angle de vue</div>
+                    <div class="cam-buttons">
+                        <button class="secondary" data-cam="left" title="Tourner la vue à gauche">↺ Gauche</button>
+                        <button class="secondary" data-cam="right" title="Tourner la vue à droite">Droite ↻</button>
+                        <button class="secondary" data-cam="tilt" title="Incliner la caméra vers l'horizon">Incliner</button>
+                        <button class="secondary" data-cam="flat" title="Redresser la caméra vers le sol">Redresser</button>
+                        <button class="secondary" data-cam="top" title="Revenir à la vue du dessus, orientée nord">Vue du dessus</button>
+                    </div>
+                </div>
+
                 <div class="controls">
                     <div><kbd>Z Q S D</kbd> / <kbd>W A S D</kbd> déplacer la caméra · <kbd>Maj</kbd> plus vite</div>
-                    <div><kbd>Molette</kbd> zoom · <kbd>Clic gauche</kbd> placer · <kbd>Clic droit</kbd> retirer</div>
+                    <div><kbd>Molette</kbd> zoom · <kbd>Molette maintenue</kbd> + glisser : tourner et incliner la vue</div>
+                    <div><kbd>Clic gauche</kbd> placer · <kbd>Clic droit</kbd> retirer</div>
                 </div>
             </section>
         </aside>
