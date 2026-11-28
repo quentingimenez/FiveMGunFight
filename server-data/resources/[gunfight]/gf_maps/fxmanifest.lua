@@ -15,7 +15,11 @@ files {
 }
 
 server_script 'server.lua'
-client_script 'client.lua'
+client_scripts {
+    'config.lua',
+    'camera.lua',
+    'client.lua',
+}
 
 dependencies {
     'gf_core',

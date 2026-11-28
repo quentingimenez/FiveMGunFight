@@ -31,6 +31,7 @@ globals = {
   "GFLobbyAppearance",
   "GFLobbyAppearanceSchema",
   "GFLobbyBackdrop",
+  "GFMapsCamera",
   "GFMenuState",
   "GardeEtat",
   -- Globale fournie par le runtime FiveM (W112 sur les champs mutés).

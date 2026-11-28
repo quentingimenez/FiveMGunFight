@@ -4,6 +4,8 @@
 --  /editor (admin) ouvre la liste des maps. En création/modification :
 --   - caméra vue de dessus, déplacement avec les touches de marche (ZQSD/WASD),
 --     Maj = plus vite, molette = zoom
+--   - molette maintenue + glisser = tourner et incliner la vue (camera.lua),
+--     boutons du panneau pour les mêmes réglages et le retour à la vue du dessus
 --   - clic gauche = placer, clic droit = retirer le dernier point
 -- =============================================================================
 
@@ -16,8 +18,10 @@ local E = {
     map = nil,         -- map en cours d'édition
     cam = nil,
     pos = vector2(0.0, 0.0),
-    refZ = 0.0,        -- hauteur du sol sous la caméra
-    height = 180.0,    -- altitude de la caméra au-dessus du sol
+    refZ = 0.0,        -- hauteur du sol au point visé
+    height = 180.0,    -- distance de la caméra au point visé (altitude en vue du dessus)
+    view = nil,        -- angle de vue { pitch, yaw } (GFMapsCamera)
+    camGround = nil,   -- hauteur du sol sous la caméra elle-même
     hover = nil,       -- point du sol sous la souris
     closed = false,    -- polygone fermé (attaque)
 }
@@ -90,16 +94,31 @@ local function groundAt(x, y)
     return nil
 end
 
+local function camView()
+    if not E.view then E.view = GFMapsCamera.new(Config.EditorCamera) end
+    return E.view
+end
+
+local function camPosition()
+    local view = camView()
+    local p = GFMapsCamera.position({ x = E.pos.x, y = E.pos.y, z = E.refZ }, E.height, view)
+    p.z = GFMapsCamera.aboveGround(p.z, E.camGround, Config.EditorCamera.groundClearanceM)
+    return p, view
+end
+
 local function updateCam()
     if not E.cam then return end
-    SetCamCoord(E.cam, E.pos.x, E.pos.y, E.refZ + E.height)
-    SetCamRot(E.cam, -89.9, 0.0, 0.0, 2)
+    local p, view = camPosition()
+    SetCamCoord(E.cam, p.x, p.y, p.z)
+    SetCamRot(E.cam, view.pitch, 0.0, view.yaw, 2)
     SetFocusPosAndVel(E.pos.x, E.pos.y, E.refZ, 0.0, 0.0, 0.0)
 end
 
 local function camStart(x, y, z)
     E.pos = vector2(x, y)
     E.refZ = z or 0.0
+    E.view = GFMapsCamera.new(Config.EditorCamera)
+    E.camGround = nil
     if not E.cam then
         E.cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
         SetCamFov(E.cam, 60.0)
@@ -355,6 +374,20 @@ RegisterNUICallback('wheel', function(d, cb)
     ok(cb)
 end)
 
+-- Angle de vue : { dx, dy } en pixels (molette maintenue + glisser) ou
+-- { action = 'left' | 'right' | 'tilt' | 'flat' | 'top' } (boutons du panneau).
+RegisterNUICallback('camera', function(d, cb)
+    if E.editing and E.cam and type(d) == 'table' then
+        if d.action ~= nil then
+            GFMapsCamera.step(camView(), d.action, Config.EditorCamera)
+        else
+            GFMapsCamera.drag(camView(), tonumber(d.dx), tonumber(d.dy), Config.EditorCamera)
+        end
+        updateCam()
+    end
+    ok(cb)
+end)
+
 RegisterNUICallback('radius', function(d, cb)
     if E.map and E.kind == 'redzone' then
         E.map.radius = math.max(15.0, math.min(500.0, tonumber(d.value) or 80.0))
@@ -527,12 +560,15 @@ CreateThread(function()
                 local ud = GetDisabledControlNormal(0, 31)  -- avant / arrière
                 local speed = E.height * 1.1 * dt
                 if IsDisabledControlPressed(0, 21) then speed = speed * 2.5 end
-                E.pos = vector2(E.pos.x + lr * speed, E.pos.y - ud * speed)
+                local dx, dy = GFMapsCamera.move(lr, ud, speed, camView().yaw)
+                E.pos = vector2(E.pos.x + dx, E.pos.y + dy)
 
                 if GetGameTimer() > nextGround then
                     nextGround = GetGameTimer() + 500
                     local g = groundAt(E.pos.x, E.pos.y)
                     if g then E.refZ = E.refZ + (g - E.refZ) * 0.5 end
+                    local p = camPosition()
+                    E.camGround = groundAt(p.x, p.y)
                 end
 
                 updateCam()

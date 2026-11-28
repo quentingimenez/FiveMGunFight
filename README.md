@@ -183,8 +183,13 @@ Tape `/editor` (admin). Tu passes au lobby et un panneau s'ouvre à gauche avec 
 **Redzone** et **Attaque de zone**. Choisis « + Nouvelle… » ou « Modifier » sur une map existante.
 
 La caméra passe en **vue du ciel** :
-- **Z Q S D** (ou W A S D) : déplacer la caméra, **Maj** pour aller plus vite
+- **Z Q S D** (ou W A S D) : déplacer la caméra, **Maj** pour aller plus vite ; le déplacement suit
+  l'orientation de la vue
 - **Molette** : zoomer / dézoomer
+- **Molette maintenue + glisser** : tourner la vue (gauche / droite) et l'incliner (haut / bas),
+  de la vue du dessus jusqu'à une vue oblique
+- Panneau **Angle de vue** : **↺ Gauche** / **Droite ↻** (45°), **Incliner** / **Redresser** (15°),
+  **Vue du dessus** pour revenir à la vue verticale orientée nord ; chaque nouvelle édition repart de la vue du dessus
 - **Clic gauche** : placer · **Clic droit** : retirer le dernier élément
 
 **Redzone** (4 étapes)
