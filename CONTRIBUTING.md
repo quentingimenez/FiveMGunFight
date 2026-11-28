@@ -13,7 +13,15 @@ qu'une erreur soit détectée **avant** la fusion, pas pendant un match.
 
 ## 2. Avant de commencer
 
-Lis au minimum :
+Commence par la [méthode de développement](docs/methode/README.md) : elle dit
+dans quel ordre travailler (cadrer, situer avec la
+[fiche d'impact](docs/methode/fiche-impact.md), écrire les tests d'abord,
+vérifier, capitaliser) et quels tests chaque type de changement exige
+([stratégie de test](docs/methode/strategie-de-test.md)). Un changement se
+situe dans le projet avant d'être codé : on cherche ce qu'il touche dans les
+autres ressources, pas seulement dans le fichier modifié.
+
+Lis aussi au minimum :
 
 - [`docs/architecture.md`](docs/architecture.md) — comment le serveur est
   construit et ce que fait chaque ressource ;

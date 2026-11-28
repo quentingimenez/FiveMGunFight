@@ -1,6 +1,6 @@
 # ADR 0002 — FXServer épinglé par URL et SHA256
 
-- **Statut** : accepté pour la cible ; application encore partielle
+- **Statut** : accepté et appliqué (voir « Mise en œuvre »)
 - **Date** : 2026-11-25
 - **Décideurs** : `@WardenPro`, `@Zhics`
 

@@ -203,6 +203,8 @@ Variables utiles :
 ## Ajouter un test
 
 Règle : **un test doit échouer sur un vrai défaut et passer sur `main`**.
+Quels niveaux de test un type de changement exige (T0 à T6) :
+[stratégie de test](methode/strategie-de-test.md).
 
 - Défaut statique (syntaxe, format, outil) → ajouter une étape à
   `scripts/verifier.sh`, avec un message d'échec qui dit quoi corriger. Une

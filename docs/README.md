@@ -4,13 +4,29 @@ Index des documents du dépôt. Le `README.md` à la racine reste le guide
 utilisateur (installation, commandes en jeu, dépannage) ; les documents ici
 décrivent le fonctionnement interne et l'exploitation.
 
+## Méthode de développement
+
+À lire **avant** toute modification, par un agent comme par un humain.
+
+| Document | À lire si… |
+|---|---|
+| [`methode/README.md`](methode/README.md) | tu commences une tâche : les huit phases, les trois portes, les niveaux S/M/L, ce qu'on capitalise |
+| [`methode/fiche-impact.md`](methode/fiche-impact.md) | tu dois situer ton changement avant de coder : le modèle de fiche et comment trouver ce qu'il touche |
+| [`methode/strategie-de-test.md`](methode/strategie-de-test.md) | tu dois savoir quels tests et quelle preuve ton type de changement exige (niveaux T0 à T6) |
+| [`methode/architecture-cible.md`](methode/architecture-cible.md) | tu ajoutes un lien entre ressources, un export, un événement, un calque NUI ou une ressource |
+| [`methode/orchestration-agents.md`](methode/orchestration-agents.md) | tu délègues du travail à un autre agent, ou tu vérifies le sien |
+
 ## Architecture et développement
 
 | Document | À lire si… |
 |---|---|
 | [`architecture.md`](architecture.md) | tu veux comprendre comment le serveur est assemblé (Docker, ressources, données) |
+| [`evenements-serveur.md`](evenements-serveur.md) | tu ajoutes ou modifies un événement réseau (validation, limite de débit, droits) |
 | [`lobby.md`](lobby.md) | tu travailles sur le lobby, l'escouade ou la création de personnage |
 | [`menu-pause.md`](menu-pause.md) | tu travailles sur le menu pause (Échap), sa page NUI ou son protocole |
+| [`panneau-admin.md`](panneau-admin.md) | tu travailles sur le panneau admin (F10) ou ses actions |
+| [`killcam.md`](killcam.md) | tu travailles sur la killcam |
+| [`equilibrage-armes.md`](equilibrage-armes.md) | tu touches aux dégâts ou à l'équilibre des armes |
 | [`must-have.md`](must-have.md) | tu veux connaître les fonctionnalités prévues et l'ordre dans lequel les construire |
 | [`regles-de-code.md`](regles-de-code.md) | tu écris ou relis du code : les règles à respecter (autorité du serveur, performance, données, tests et preuve) |
 | [`chantiers-techniques.md`](chantiers-techniques.md) | tu cherches ce qui doit être revu, corrigé ou ajouté pour que le code existant respecte ces règles |
@@ -39,10 +55,14 @@ Outils associés : `scripts/verifier-sante.sh` (santé), `scripts/deployer.sh`
 
 ## Décisions
 
+Quand écrire un ADR, et son modèle : [`adr/README.md`](adr/README.md).
+
 | Document | Sujet |
 |---|---|
-| [`adr/0001-protection-branche.md`](adr/0001-protection-branche.md) | protection de `main`, option GitHub Pro vs dépôt public |
+| [`adr/0001-protection-branche.md`](adr/0001-protection-branche.md) | protection de `main` : dépôt public et ruleset |
 | [`adr/0002-fxserver-epingle.md`](adr/0002-fxserver-epingle.md) | FXServer épinglé par URL et SHA256 |
+| [`adr/0003-methode-de-developpement.md`](adr/0003-methode-de-developpement.md) | méthode de développement en phases et portes |
+| [`adr/0004-architecture-cible.md`](adr/0004-architecture-cible.md) | couches, propriétaires et frontières entre ressources |
 
 ## Règles en une ligne
 

@@ -426,9 +426,14 @@ partie du serveur et n'ajoute aucune dépendance au projet.
 
 ## 8. Checklist de test avant une PR
 
+Les niveaux de test exigés selon le type de changement sont dans la
+[stratégie de test](methode/strategie-de-test.md) ; cette liste est le
+minimum commun pour toute PR qui touche le serveur.
+
 - [ ] `bash scripts/verifier-docker.sh` passe (mêmes étapes qu'en CI, tests
       compris).
-- [ ] Le serveur démarre et les six ressources `gf_*` sont lancées.
+- [ ] Le serveur démarre et chaque ressource `ensure gf_*` de `server.cfg`
+      est lancée, sans `SCRIPT ERROR` dans le journal.
 - [ ] `http://127.0.0.1:30120/info.json` répond en 200.
 - [ ] Le lobby s'affiche, le personnage est visible, **JOUER** lance le mode.
 - [ ] Le scénario touché est reproduit : Redzone, Attaque `startround` (console F8),
@@ -436,4 +441,4 @@ partie du serveur et n'ajoute aucune dépendance au projet.
 - [ ] Aucun secret dans le diff : `git diff --cached` ne contient ni `.env`, ni
       `secrets.cfg`, ni clé de licence.
 - [ ] La PR décrit **ce qui a été exécuté** et **comment le refaire** (section
-      « Comment tester » du modèle de PR).
+      « Tests et preuve » du modèle de PR).
