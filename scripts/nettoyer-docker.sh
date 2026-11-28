@@ -8,7 +8,8 @@
 #    - supprime les images « <none> » laissées par chaque reconstruction ;
 #    - ramène le cache de construction sous GF_CACHE_MAX (défaut 4GB), en
 #      jetant d'abord les couches les plus anciennes : les reconstructions
-#      suivantes restent rapides.
+#      suivantes restent rapides. Selon la version de buildx, le bornage utilise
+#      --max-used-space (récent) ou --keep-storage (ancien, alias déprécié).
 #  --tout (fin de session, ou disque plein) :
 #    - vide tout le cache de construction inutilisé ;
 #    - supprime aussi les images qu'aucun conteneur n'utilise (images de
@@ -28,7 +29,7 @@ mode="borne"
 case "${1:-}" in
   "") ;;
   --tout) mode="tout" ;;
-  -h|--help) sed -n '3,23p' "$0" | sed 's/^#  \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '3,24p' "$0" | sed 's/^#  \{0,1\}//'; exit 0 ;;
   *) echo "Option inconnue : $1 (attendu : --tout)" >&2; exit 2 ;;
 esac
 
@@ -47,7 +48,16 @@ if [ "$mode" = "tout" ]; then
   docker builder prune --all --force >/dev/null
   docker image prune --all --force >/dev/null
 else
-  docker builder prune --all --force --max-used-space "$cache_max" >/dev/null
+  aide_builder="$(docker builder prune --help 2>&1 || true)"
+  if printf '%s\n' "$aide_builder" | grep -q -- '--max-used-space'; then
+    option_borne="--max-used-space"
+  elif printf '%s\n' "$aide_builder" | grep -q -- '--keep-storage'; then
+    option_borne="--keep-storage"
+  else
+    echo "buildx ne permet pas de borner le cache : lance bash scripts/nettoyer-docker.sh --tout" >&2
+    exit 1
+  fi
+  docker builder prune --all --force "$option_borne" "$cache_max" >/dev/null
 fi
 
 echo "== Espace Docker après nettoyage ($mode)"
