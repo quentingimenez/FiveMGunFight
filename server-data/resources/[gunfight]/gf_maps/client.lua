@@ -232,6 +232,12 @@ local function closeEditor()
     exports.gf_ui:PopLayer(GetCurrentResourceName())
 end
 
+-- Passerelle de test NUI : fermeture demandée par la console serveur.
+RegisterNetEvent('gf_testbridge:fermer', function(page)
+    if page ~= GetCurrentResourceName() then return end
+    if E.open then closeEditor() end
+end)
+
 local function startEdit(kind, id)
     E.kind = kind
     E.step = 1

@@ -32,6 +32,11 @@ exports('PopLayer', function(nom)
     return changed
 end)
 
+-- Lecture seule de la pile, pour la passerelle de test NUI (T5).
+exports('GetLayers', function()
+    return { count = layers:count(), top = layers:top() }
+end)
+
 AddEventHandler('onClientResourceStop', function(resource)
     if layers:pop(resource) then
         TriggerEvent('gf_ui:layersChanged', layers:count(), layers:top())

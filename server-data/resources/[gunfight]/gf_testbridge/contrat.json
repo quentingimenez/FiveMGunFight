@@ -1,0 +1,27 @@
+{
+  "ressource": "gf_testbridge",
+  "exports": [],
+  "consomme": [
+    "gf_ui:GetLayers"
+  ],
+  "emet": [
+    "gf_testbridge:clientPret",
+    "gf_testbridge:demande",
+    "gf_testbridge:fermer",
+    "gf_testbridge:rapport"
+  ],
+  "ecoute": [
+    "gf_testbridge:demande"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_ui"
+    ],
+    "optionnelles": []
+  },
+  "dette": []
+}

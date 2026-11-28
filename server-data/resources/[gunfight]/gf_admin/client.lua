@@ -44,6 +44,12 @@ local function fermer()
     exports.gf_ui:PopLayer(GetCurrentResourceName())
 end
 
+-- Passerelle de test NUI : fermeture demandée par la console serveur.
+RegisterNetEvent('gf_testbridge:fermer', function(page)
+    if page ~= GetCurrentResourceName() then return end
+    if ouvert then fermer() end
+end)
+
 -- ---------------------------------------------------------------------- État
 
 RegisterNetEvent('gf_core:modeChanged', function(mode)

@@ -418,6 +418,54 @@ partie du serveur et n'ajoute aucune dépendance au projet.
   qu'aucune donnée personnelle n'est visible. Les captures de jeu seules
   suffisent pour un rapport.
 
+### Passerelle de test NUI (T5 automatique)
+
+Depuis la PR #130, le T5 « client unique » ne se fait plus à la main. La
+ressource `gf_testbridge` expose la commande console `gf_bridge` ; elle est
+**développement uniquement** : l'entrypoint ne l'active que si
+`GF_DEV_TESTBRIDGE=true` (surcouche dev), elle n'est **jamais** `ensure` dans
+`server.cfg`, et elle s'arrête d'elle-même si le convar `gf_dev_testbridge`
+ne vaut pas `"true"`.
+
+Le pilote lance tout le cycle :
+
+```powershell
+python scripts/verifier_nui.py
+```
+
+- Il démarre la passerelle (`stop` puis `ensure gf_testbridge` par rcon) et
+  attend `[gf_testbridge] prêt (développement)`.
+- Il lance le client FiveM s'il ne tourne pas déjà
+  (`FiveM.exe +connect 127.0.0.1:30120`), attend
+  `[gf_testbridge] client prêt id=…`, puis, pour chaque page (`gf_admin`,
+  `gf_maps`, `gf_vehicles`, `gf_menu`) : `gf_bridge open <page>`, attente de la
+  ligne `etat=ouvert`, capture, `gf_bridge close <page>`, attente de
+  `etat=ferme calques=0`, capture.
+- La similarité entre la capture ouverte et la capture fermée doit être
+  **inférieure** au seuil (0,98 par défaut) : une page qui ne change pas le
+  rendu est un échec. Les captures vont dans
+  `%TEMP%\gf-nui\<horodatage>\` ; le dossier est refusé s'il est dans le dépôt.
+- Il lit le journal client (`scripts/journal_client.py`) et les nouvelles
+  lignes du serveur : toute erreur `SCRIPT ERROR` est un échec.
+- Il referme le client en fin de course **s'il l'a lancé** (`--garder-client`
+  pour le laisser ouvert, `--sans-client` pour exiger un client déjà connecté,
+  `--pages` pour restreindre la liste, `--seuil` pour le rendu).
+- Codes de sortie : `0` tout passe, `1` contrôle en échec, `2` prérequis
+  manquant (passerelle désactivée, client absent, timeout, sortie dans le
+  dépôt).
+
+Au poste de développement, les quatre pages sont réservées aux admins. Avec le
+client connecté, `gf_bridge whoami` imprime dans la console
+`[gf_testbridge] identifiants : license:…` ; pose le principal par rcon avec
+`add_principal identifier.license:… group.admin`, ou renseigne
+`ADMIN_IDENTIFIERS` dans `.env` puis recrée le serveur. Ne modifie jamais le
+contrôle admin du jeu pour faire passer le test.
+
+Ce que la passerelle ne couvre pas — une page qui n'apparaît qu'en match, un
+clic précis dans la page, une action à deux joueurs — reste **T6** : écris le
+scénario et demande-le à l'utilisateur avant la porte G3. Ne demande jamais un
+test que `verifier_nui.py` sait faire.
+
 ## 7. Sécurité et données sensibles
 
 - Ne commite **jamais** `.env`, `server-data/secrets.cfg`,

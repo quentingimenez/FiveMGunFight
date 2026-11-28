@@ -1,6 +1,7 @@
 {
   "ressource": "gf_ui",
   "exports": [
+    "GetLayers",
     "PopLayer",
     "PushLayer"
   ],

@@ -309,6 +309,57 @@ class RconDansLeConteneur(unittest.TestCase):
                 self.assertNotIn("GF_DEV_RCON", (RACINE / fichier).read_text(encoding="utf-8"))
 
 
+class TestbridgeDansLeConteneur(unittest.TestCase):
+    """La passerelle de test NUI est activée uniquement par la surcouche dev."""
+
+    def executer_bloc_testbridge(self, valeur: str | None) -> Path:
+        """Exécute le vrai bloc testbridge de l'entrypoint dans un dossier temporaire."""
+        bash = bash_utilisable()
+        exiger(self, "bash", bash)
+        texte = (RACINE / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
+        bloc = re.search(
+            r'if \[ "\$\{GF_DEV_TESTBRIDGE:-\}" = "true" \]; then(.*?)\nfi', texte, re.DOTALL
+        )
+        self.assertIsNotNone(bloc, "bloc testbridge introuvable dans l'entrypoint")
+        dossier = Path(tempfile.mkdtemp(prefix="gf-testbridge-"))
+        (dossier / "secrets.cfg").write_text("sv_maxclients 48\n", encoding="utf-8")
+        variable = "" if valeur is None else f"GF_DEV_TESTBRIDGE={valeur}\n"
+        script = f"set -e\nDATA=.\n{variable}" + bloc.group(0)
+        resultat = subprocess.run(
+            [bash, "-s"], input=script.replace("\r", ""), cwd=dossier,
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+        return dossier
+
+    def test_bloc_testbridge_ecrit_la_convar_pour_true(self) -> None:
+        dossier = self.executer_bloc_testbridge("true")
+        self.assertIn(
+            'set gf_dev_testbridge "true"',
+            (dossier / "secrets.cfg").read_text(encoding="utf-8"),
+        )
+
+    def test_bloc_testbridge_ferme_pour_false_et_absent(self) -> None:
+        for valeur in ("false", "", None):
+            with self.subTest(GF_DEV_TESTBRIDGE=valeur):
+                dossier = self.executer_bloc_testbridge(valeur)
+                self.assertNotIn(
+                    "gf_dev_testbridge",
+                    (dossier / "secrets.cfg").read_text(encoding="utf-8"),
+                )
+
+    def test_seule_la_surcouche_dev_active_testbridge(self) -> None:
+        self.assertIn(
+            'GF_DEV_TESTBRIDGE: "true"',
+            (RACINE / "docker-compose.dev.yml").read_text(encoding="utf-8"),
+        )
+        for fichier in ("docker-compose.yml", "docker-compose.prod.yml", "docker-compose.staging.yml"):
+            with self.subTest(fichier=fichier):
+                self.assertNotIn(
+                    "GF_DEV_TESTBRIDGE", (RACINE / fichier).read_text(encoding="utf-8")
+                )
+
+
 JOURNAL = """\
 [     37937] [b3889_GTAProce]             MainThrd/ Creating script environments for gf_lobby
 [     38000] [b3889_GTAProce]             MainThrd/ script error in native 00000000786d8bc3: invalid handle

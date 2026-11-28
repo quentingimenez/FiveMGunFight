@@ -186,6 +186,7 @@ modifiées, démarrées avant nos ressources.
 | `gf_menu` | menu pause NUI (Échap) remplaçant le frontend natif : profil, règlement, Discord, déconnexion | `html/` (page `ui_page`), `config.lua`, `menu_state.lua`, `server.lua`, `client.lua` ; dépend de `gf_core` et `gf_stats` |
 | `gf_admin` | panneau d'administration : joueurs, parties, outils ; ouverture par F10 ou depuis le menu Échap, données via `gf_admin:requestData`, actions réussies journalisées dans `gf_admin_log` | `html/` (page `ui_page`), `commands.lua` (liste blanche des commandes, partagé), `@oxmysql/lib/MySQL.lua`, `audit.lua` (`LogAction`), `server.lua`, `client.lua` ; dépend de `gf_core`, `gf_db` et `oxmysql` |
 | `gf_screen` | écran en direct des joueurs pour les admins (`screen <id>`) : images JPEG transmises à l'admin qui regarde, cible non prévenue | `config.lua` (partagé), `server.lua`, `client.lua`, `html/` (page `ui_page`) ; dépend de `gf_core` et `gf_admin` |
+| `gf_testbridge` | passerelle de test NUI, **développement uniquement** : la commande console `gf_bridge` ouvre ou ferme une page par la commande de production et rapporte son calque ; refus de démarrer sans `gf_dev_testbridge="true"` ; jamais `ensure` dans `server.cfg` | `guard.lua` (garde du convar), `protocol.lua` (pages, commandes, ligne de rapport), `server.lua`, `client.lua` ; dépend de `gf_ui` |
 
 Chaque ressource déclare ses scripts dans `fxmanifest.lua`
 (`fx_version 'cerulean'`, `game 'gta5'`, `lua54 'yes'`). Les tests vérifient que

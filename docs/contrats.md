@@ -18,6 +18,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 - Événements écoutés
   - gf_core:modeChanged
   - gf_core:spawned
+  - gf_testbridge:fermer
 - State bags écrits
   - Aucun.
 - State bags lus
@@ -341,7 +342,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 - Événements émis
   - Aucun.
 - Événements écoutés
-  - Aucun.
+  - gf_testbridge:fermer
 - State bags écrits
   - Aucun.
 - State bags lus
@@ -379,6 +380,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
   - gf_inventory:locker
   - gf_inventory:openAdmin
   - gf_lobby:state
+  - gf_testbridge:fermer
 - State bags écrits
   - Aucun.
 - State bags lus
@@ -505,6 +507,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 ## gf_ui
 
 - Exports fournis
+  - GetLayers
   - PopLayer
   - PushLayer
 - Exports consommés
@@ -537,7 +540,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 - Événements émis
   - Aucun.
 - Événements écoutés
-  - Aucun.
+  - gf_testbridge:fermer
 - State bags écrits
   - gf_vehicle_base
   - gf_vehicle_customs

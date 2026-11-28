@@ -23,7 +23,8 @@
     "gf_inventory:adminData",
     "gf_inventory:locker",
     "gf_inventory:openAdmin",
-    "gf_lobby:state"
+    "gf_lobby:state",
+    "gf_testbridge:fermer"
   ],
   "state_bags": {
     "ecrit": [],

@@ -11,7 +11,9 @@
     "gf_ui:PushLayer"
   ],
   "emet": [],
-  "ecoute": [],
+  "ecoute": [
+    "gf_testbridge:fermer"
+  ],
   "state_bags": {
     "ecrit": [
       "gf_vehicle_base",

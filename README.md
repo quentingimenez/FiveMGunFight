@@ -297,6 +297,7 @@ server-data/
     gf_menu     menu pause NUI (Échap) : profil, règlement, Discord, quitter
     gf_admin    panneau d'administration (F10 ou menu Échap > ADMIN) : joueurs, parties, outils
     gf_screen   écran en direct des joueurs pour les admins (2 à 5 images/s)
+    gf_testbridge passerelle de test NUI (développement uniquement, jamais démarrée en production)
 ```
 
 La page NUI de `gf_screen` embarque `html/vendor/three.min.js` : une copie

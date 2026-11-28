@@ -16,7 +16,8 @@
   ],
   "ecoute": [
     "gf_core:modeChanged",
-    "gf_core:spawned"
+    "gf_core:spawned",
+    "gf_testbridge:fermer"
   ],
   "state_bags": {
     "ecrit": [],

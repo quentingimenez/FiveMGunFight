@@ -191,7 +191,12 @@ le composant concerné et observer le résultat :
   « txAdmin : désactivé » et « joueurs max : 48 », attendre « Started resource
   gf_… », puis reproduire le scénario en jeu ou par commande. Détail et
   commandes : [`docs/debug-test.md`](docs/debug-test.md) § 2, « Prérequis » ;
-- interface NUI : ouvrir l'écran concerné, vérifier le rendu et les actions ;
+- interface NUI : lancer `python scripts/verifier_nui.py` (passerelle
+  `gf_testbridge`, client unique). Il ouvre et ferme chaque page par rcon,
+  capture avant/après, compare le rendu et lit le journal client. Ne demande
+  jamais à l'utilisateur un test que ce script sait faire ; ce qu'il ne couvre
+  pas (page visible seulement en match, clic précis, deux joueurs) reste T6 et
+  se demande sous forme de scénario écrit ;
 - rendu, caméra, ped ou natif jamais appelé : lire d'abord
   [`docs/pieges-fivem.md`](docs/pieges-fivem.md). Signature d'un natif :
   `python scripts/native.py <nom ou hash>` (docs.fivem.net n'est pas lisible

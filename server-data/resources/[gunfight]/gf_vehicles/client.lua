@@ -157,6 +157,12 @@ local function closeMenu()
     exports.gf_ui:PopLayer(GetCurrentResourceName())
 end
 
+-- Passerelle de test NUI : fermeture demandée par la console serveur.
+RegisterNetEvent('gf_testbridge:fermer', function(page)
+    if page ~= GetCurrentResourceName() then return end
+    if menu then closeMenu() end
+end)
+
 -- Véhicule local (non réseau) : seul l'admin le voit
 local function spawnPreview()
     preview = CreateVehicle(previewHash, previewPos.x, previewPos.y, previewPos.z, heading, false, false)
