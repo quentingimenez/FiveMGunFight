@@ -33,7 +33,16 @@ hook `.githooks/pre-push` et la revue humaine.
 
 ## Décision
 
-**Aucune décision n'est prise à ce jour.** L'option recommandée est GitHub Pro :
+**Décision du 26/11/2026 : option 2, dépôt public.** Le ruleset « Protection
+de main » est actif : PR obligatoire, fusion en squash, conversations
+résolues, les quatre checks de la CI requis, force-push et suppression
+interdits, aucune approbation exigée. L'état réel est décrit dans
+[`protection-branche.md`](../protection-branche.md) ;
+`.github/branch-protection.json` est un ancien modèle qui ne fait pas foi.
+
+Texte d'origine (25/11/2026), conservé pour l'historique :
+
+« Aucune décision n'est prise à ce jour. » L'option recommandée était GitHub Pro :
 elle conserve le dépôt privé et active les règles déjà écrites, sans changer le
 code. Le passage en public n'est pas recommandé pour un serveur de jeu dont la
 configuration et les cartes ont de la valeur.
@@ -44,8 +53,8 @@ modifie pas le JSON et n'exécute jamais `--apply` tout seul.
 
 ## Conséquences
 
-- Tant que la décision n'est pas prise, la protection reste **absente** : ne pas
-  l'affirmer dans la documentation.
+- Depuis le 26/11/2026, la protection est **active** côté GitHub ; avant
+  cette date, elle était absente.
 - Le hook `pre-push` est un filet local, pas une garantie serveur : il peut être
   contourné (`GF_ALLOW_MAIN=1`, `--no-verify`).
 - Après activation, vérifier que les trois contextes CI portent exactement les

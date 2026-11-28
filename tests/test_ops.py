@@ -47,6 +47,8 @@ RUNBOOKS = (
 ADR = (
     "0001-protection-branche",
     "0002-fxserver-epingle",
+    "0003-methode-de-developpement",
+    "0004-architecture-cible",
 )
 
 MOTIFS_SECRETS_CONNUS = (

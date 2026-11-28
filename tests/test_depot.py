@@ -653,6 +653,12 @@ class Documentation(unittest.TestCase):
         "docs/protection-branche.md",
         "docs/regles-de-code.md",
         "docs/chantiers-techniques.md",
+        "docs/methode/README.md",
+        "docs/methode/fiche-impact.md",
+        "docs/methode/strategie-de-test.md",
+        "docs/methode/architecture-cible.md",
+        "docs/methode/orchestration-agents.md",
+        "docs/adr/README.md",
         ".github/pull_request_template.md",
         ".github/CODEOWNERS",
     )
@@ -746,6 +752,97 @@ class Documentation(unittest.TestCase):
             with self.subTest(workflow=workflow.name):
                 self.assertRegex(texte, r"(?m)^on:")
                 self.assertRegex(texte, r"(?m)^jobs:")
+
+
+class Methode(unittest.TestCase):
+    """La méthode de développement reste indexée et imposée à tous les agents."""
+
+    def test_documents_de_methode_indexes(self) -> None:
+        dossier = RACINE / "docs" / "methode"
+        fichiers = sorted(dossier.glob("*.md"))
+        self.assertTrue(fichiers, "aucun document de méthode trouvé")
+        index = lire(RACINE / "docs" / "README.md")
+        for fichier in fichiers:
+            with self.subTest(fichier=fichier.name):
+                self.assertIn(
+                    f"](methode/{fichier.name})",
+                    index,
+                    "document de méthode absent de l'index docs/README.md",
+                )
+
+    def test_index_des_adr_complet_et_sans_trou(self) -> None:
+        dossier = RACINE / "docs" / "adr"
+        fichiers = sorted(
+            fichier for fichier in dossier.glob("*.md")
+            if re.fullmatch(r"[0-9]{4}-.+[.]md", fichier.name)
+        )
+        self.assertTrue(fichiers, "aucun ADR numéroté trouvé")
+        index = lire(dossier / "README.md")
+        numeros: list[int] = []
+        for fichier in fichiers:
+            with self.subTest(fichier=fichier.name):
+                self.assertIn(
+                    f"]({fichier.name})", index, "ADR absent de l'index docs/adr/README.md"
+                )
+                numeros.append(int(fichier.name[:4]))
+        self.assertEqual(
+            sorted(numeros),
+            list(range(1, len(numeros) + 1)),
+            "les ADR doivent être numérotés 0001, 0002… sans trou",
+        )
+
+    def test_agents_md_impose_la_methode(self) -> None:
+        texte = lire(RACINE / "AGENTS.md")
+        for attendu in (
+            "### 4.0 Cadrer et situer",
+            "docs/methode/fiche-impact.md",
+            "docs/methode/strategie-de-test.md",
+            "docs/methode/README.md",
+        ):
+            with self.subTest(attendu=attendu):
+                self.assertIn(attendu, texte, "méthode absente de AGENTS.md")
+
+    def test_modele_de_pr_suit_la_methode(self) -> None:
+        texte = lire(RACINE / ".github" / "pull_request_template.md")
+        for titre in (
+            "## Fiche d'impact",
+            "## Tests et preuve",
+            "## Risques et retour arrière",
+            "## Cause racine",
+        ):
+            with self.subTest(titre=titre):
+                self.assertIn(titre, texte, "section absente du modèle de pull request")
+
+    def test_categories_de_cause_racine_definies(self) -> None:
+        modele = lire(RACINE / ".github" / "pull_request_template.md")
+        methode = lire(RACINE / "docs" / "methode" / "README.md")
+        for categorie in (
+            "exigence",
+            "effet-de-bord",
+            "contrat",
+            "plateforme",
+            "etat",
+            "calques-nui",
+            "asset",
+        ):
+            with self.subTest(categorie=categorie):
+                self.assertIn(categorie, modele, "catégorie absente du modèle de pull request")
+                self.assertIn(
+                    chr(96) + categorie + chr(96),
+                    methode,
+                    "catégorie non définie dans docs/methode/README.md",
+                )
+
+    def test_niveaux_de_test_distincts_des_regles(self) -> None:
+        regles = lire(RACINE / "docs" / "regles-de-code.md")
+        self.assertIsNone(
+            re.search(r"[*][*]T[0-9]+ — ", regles),
+            "un niveau de test est défini comme règle de code",
+        )
+        strategie = lire(RACINE / "docs" / "methode" / "strategie-de-test.md")
+        for niveau in ("**T0 statique**", "**T6 humain**"):
+            with self.subTest(niveau=niveau):
+                self.assertIn(niveau, strategie, "niveau de test absent de la stratégie")
 
 
 class ChaineCI(unittest.TestCase):

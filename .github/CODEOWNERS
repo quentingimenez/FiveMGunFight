@@ -1,9 +1,9 @@
-# Fichiers dont la revue est obligatoire avant fusion.
-# La règle n'est appliquée par GitHub que si la protection de branche est active
-# (voir docs/protection-branche.md) : sans elle, ce fichier reste informatif.
+# Propriétaires des fichiers : GitHub demande leur revue sur chaque PR.
+# Le ruleset « Protection de main » n'exige aucune approbation (voir
+# docs/protection-branche.md) : la revue est bienvenue, surtout sur les fichiers
+# à impact fort ci-dessous, mais elle ne bloque pas la fusion.
 #
 # Propriétaires : WardenPro (propriétaire) et Zhics (collaborateur).
-# Une approbation de l'un des deux suffit (required_approving_review_count = 1).
 
 *                       @WardenPro @Zhics
 
@@ -14,3 +14,6 @@
 /.github/               @WardenPro @Zhics
 /server-data/server.cfg @WardenPro @Zhics
 /server-data/resources/ @WardenPro @Zhics
+/AGENTS.md              @WardenPro @Zhics
+/docs/methode/          @WardenPro @Zhics
+/docs/adr/              @WardenPro @Zhics

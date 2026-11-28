@@ -11,25 +11,45 @@ reste la référence pour le fond (style de commit, critères de revue, sécurit
 en cas de divergence, `CONTRIBUTING.md` gagne sur le contenu et ce fichier gagne
 sur le déroulé.
 
-## Règle d'or — DeepSeek orchestre, Hy4 Flash exécute
+## Règle d'or — on situe avant de coder, on vérifie avant d'intégrer
 
-Le modèle DeepSeek qui pilote la session est **uniquement orchestrateur** : il
-ne produit pas lui-même le travail d'exécution (diagnostic, code, tests,
-documentation). Il découpe la demande, lance des sous-agents
-`opencode-go/hy4-flash-free` (Hy4 Flash Free) pour chaque lot de travail, puis
-**vérifie chaque production** avant de l'intégrer.
+Toute demande suit la [méthode de développement](docs/methode/README.md) :
+cadrer, **situer** (fiche d'impact), concevoir, **tester d'abord**, produire,
+**vérifier**, livrer, capitaliser. Un changement n'est jamais traité comme
+une fonctionnalité isolée : on cherche ce qu'il touche ailleurs avant d'écrire
+la première ligne (§ 4.0).
 
-- Un sous-agent ne décide jamais seul d'un commit, d'un push, d'une PR ou d'une
+Le travail se répartit en rôles, quel que soit l'outil
+([orchestration des agents](docs/methode/orchestration-agents.md)) :
+
+- l'**orchestrateur-vérificateur** parle à l'utilisateur, cadre, remplit la
+  fiche d'impact, découpe, écrit les briefs, **vérifie chaque production** et
+  décide de l'intégration ;
+- le **producteur** exécute un brief complet (tests d'abord, puis code) sans
+  sortir de son périmètre de fichiers ;
+- au niveau L, un **vérificateur indépendant** relit le diff sans le
+  raisonnement du producteur.
+
+Règles communes :
+
+- Un producteur ne décide jamais d'un commit, d'un push, d'une PR ou d'une
   fusion : ces décisions restent celles de l'orchestrateur, avec l'accord de
   l'utilisateur (§ 4.5).
-- « Vérifier » veut dire : relire le diff produit, lancer soi-même les contrôles
-  (§ 4.2), exécuter le comportement en local (§ 4.3) et comparer le résultat à
-  la demande. Une production non vérifiée n'est jamais intégrée.
-- Si Hy4 Flash Free est indisponible ou échoue de façon répétée, l'orchestrateur
-  le signale à l'utilisateur et attend sa décision ; il ne bascule pas
-  silencieusement sur un autre modèle.
-- Cette règle s'applique à **toute demande de correction**, y compris quand
+- « Vérifier » veut dire : relire le diff produit en entier, lancer soi-même
+  les contrôles (§ 4.2), exécuter le comportement en local au niveau exigé
+  (§ 4.3) et comparer le résultat aux critères d'acceptation. Une production
+  non vérifiée n'est jamais intégrée.
+- Si le producteur prévu est indisponible ou échoue de façon répétée,
+  l'orchestrateur le signale à l'utilisateur et attend sa décision ; il ne
+  bascule pas silencieusement sur un autre modèle.
+- Ces règles s'appliquent à **toute demande de correction**, y compris quand
   l'utilisateur décrit lui-même le correctif à appliquer.
+
+Configurations utilisées sur ce dépôt (exemples, pas des obligations) :
+DeepSeek Harness, où DeepSeek orchestre et des sous-agents
+`opencode-go/hy4-flash-free` produisent ; Claude Code qui orchestre et délègue
+la production à DeepSeek Harness. Un agent seul tient les deux rôles en
+séparant les temps : brief, production, puis vérification de son propre diff.
 
 ## 1. Règle cardinale
 
@@ -46,7 +66,9 @@ l'utilisateur** (§ 4.3 et § 4.5). Sans accord, rien n'est poussé.
 
 Une session qui a modifié le dépôt n'est terminée que lorsque, dans cet ordre :
 
-1. la modification a été **exécutée et vérifiée en local** (§ 4.3) ;
+1. la modification, située par sa fiche d'impact (§ 4.0), a été **exécutée et
+   vérifiée en local** au niveau exigé par la matrice de test (§ 4.3), et ce
+   qui doit être capitalisé l'a été (§ 4.4) ;
 2. l'utilisateur a donné son **accord explicite** sur l'avant/après (§ 4.5) ;
 3. la branche a été poussée et la pull request est **mergée** sur `main` (squash)
    avec `scripts/fusionner-pr.sh` (§ 4.8) ;
@@ -92,6 +114,31 @@ git config core.hooksPath .githooks   # filet local : refuse tout push direct su
 
 ## 4. Boucle obligatoire
 
+### 4.0 Cadrer et situer (avant le code)
+
+Porte **G1** de la [méthode](docs/methode/README.md) : aucune ligne de code
+avant ces trois livrables.
+
+1. **Cadrer** : reformuler la demande et écrire des **critères d'acceptation**
+   observables. Une demande ambiguë, ou qui implique une **décision produit**
+   (retirer ou remplacer une fonctionnalité, changer une règle de jeu, une
+   touche, un équilibre), se clarifie avec l'utilisateur **avant** de coder ;
+   la décision prise donne un [ADR](docs/adr/README.md). Une décision produit
+   ne se prend jamais « au passage » d'une autre tâche.
+2. **Situer** : remplir la [fiche d'impact](docs/methode/fiche-impact.md) :
+   ressources et **contrats touchés** (exports, événements `gf:*` et
+   `gf_<ressource>:*`, state bags, calques NUI, tables, fichiers de données,
+   textes vus par le joueur), appelants et écouteurs **trouvés par
+   recherche**, risques, niveau S/M/L, plan de test. Chaque appelant trouvé
+   est adapté dans la PR ou justifié comme non concerné.
+3. **Prévoir les tests** : les niveaux exigés par la
+   [matrice](docs/methode/strategie-de-test.md) ; ils s'écrivent et se voient
+   rouges **avant** le code (règle V2).
+
+Niveau S (documentation, réglage isolé sans contrat touché) : trois lignes
+de fiche suffisent. Niveau L (plusieurs ressources, contrat, état partagé,
+base, calques NUI) : un vérificateur indépendant relit avant la porte G2.
+
 ### 4.1 Branche
 
 ```bash
@@ -100,10 +147,13 @@ git switch -c type/sujet-en-kebab-case
 
 Types : `feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `perf`, `test`.
 Une branche = un sujet. Deux sujets indépendants = deux branches, deux pull
-requests, dans l'ordre.
+requests, dans l'ordre. À l'inverse, les changements d'un **même sujet**
+(code, tests, documentation, registre) vont dans la **même** PR : chaque PR
+coûte deux runs complets de CI (PR, puis `main`), on n'en multiplie pas pour
+de petits lots.
 
 Avant de toucher au code, annoncer l'intention en une phrase : ce qui va être
-modifié et pourquoi.
+modifié et pourquoi, avec le niveau S/M/L de la fiche.
 
 ### 4.2 Contrôles locaux avant le commit
 
@@ -125,7 +175,11 @@ bash scripts/verifier-docker.sh
 
 ### 4.3 Exécution locale et preuve
 
-Toute modification doit être **lancée en local** avant d'être proposée. Lancer
+Toute modification doit être **lancée en local** avant d'être proposée, au
+niveau exigé par la [matrice de test](docs/methode/strategie-de-test.md)
+(niveaux T0 à T6 selon le type de changement). Ce que l'agent ne peut pas
+faire lui-même (tir, conduite, deux joueurs : niveau T6) se demande à
+l'utilisateur sous forme de scénario écrit **avant** la porte d'accord. Lancer
 le composant concerné et observer le résultat :
 
 - ressource Lua / serveur : **avant chaque lancement**, fixer `TXADMIN=false`
@@ -156,9 +210,24 @@ le composant concerné et observer le résultat :
   `bash scripts/verifier-docker.sh`.
 
 Consigner la commande lancée et le résultat observable (sortie, capture, log) :
-c'est la preuve qui accompagne l'avant/après.
+c'est la preuve qui accompagne l'avant/après. Puis cocher un par un les
+critères d'acceptation du § 4.0 (porte **G2**).
 
-### 4.4 Commit
+### 4.4 Capitaliser, puis commit
+
+Avant le commit, répondre aux cinq questions de l'étape « Capitaliser » de la
+[méthode](docs/methode/README.md#p7--capitaliser) ; chaque « oui » entre dans
+**la même PR** :
+
+- correctif : un test de régression vu rouge sur le code d'avant, et la
+  cause racine catégorisée dans la description de la PR ;
+- comportement surprenant de la plateforme : une entrée dans
+  [`docs/pieges-fivem.md`](docs/pieges-fivem.md) ;
+- décision qui engage la suite : un [ADR](docs/adr/README.md) ;
+- contrat modifié : registre et documents des contrats à jour ;
+- dette vue et non traitée : une entrée dans
+  [`docs/chantiers-techniques.md`](docs/chantiers-techniques.md), jamais un
+  correctif hors sujet glissé dans la PR.
 
 ```bash
 git add <fichiers du sujet>
@@ -205,8 +274,10 @@ La documentation du dépôt et la description de la PR sont rédigées **en
 français** ; seul le titre de la PR reste en anglais (§ 4.4).
 
 Le corps de la PR reprend [`.github/pull_request_template.md`](.github/pull_request_template.md) :
-**Résumé**, **Pourquoi**, **Comment tester**, **Checklist** avec les cases
-cochées. Décrire ce qui a réellement été exécuté.
+**Résumé**, **Pourquoi**, **Fiche d'impact** (§ 4.0), **Tests et preuve**,
+**Risques et retour arrière**, **Cause racine** pour un correctif, et la
+**Checklist** avec les cases cochées. Décrire ce qui a réellement été
+exécuté.
 
 ### 4.7 Suivi obligatoire de la CI
 

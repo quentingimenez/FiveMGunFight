@@ -270,7 +270,8 @@ scripts/capturer-jeu.ps1  capture de la fenêtre du jeu (une à la fois)
 tests/                  tests automatiques du dépôt (unittest)
 docs/                   architecture, lobby, qualité, exploitation, décisions
 docs/runbooks/          incident, restauration, mise à jour, rotation des secrets, déploiement Unraid
-docs/adr/               décisions d'architecture (protection, FXServer épinglé)
+docs/adr/               décisions d'architecture (protection, FXServer, méthode, architecture)
+docs/methode/           méthode de développement : phases, fiche d'impact, tests, rôles des agents
 .githooks/pre-push      refuse un envoi direct sur main
 CONTRIBUTING.md         branches, commits, pull requests, revue
 SECURITY.md             signalement de faille, gestion des secrets
@@ -468,6 +469,10 @@ bienvenue, mais GitHub ne la demande pas. Voir
 Le dépôt n'accepte plus de modifications directes sur `main` : tout passe par une
 **branche** et une **pull request** avec une CI verte.
 
+0. Lis la [méthode de développement](docs/methode/README.md) : avant de
+   coder, remplis la [fiche d'impact](docs/methode/fiche-impact.md) (ce que
+   ton changement touche ailleurs) et écris les tests exigés par la
+   [stratégie de test](docs/methode/strategie-de-test.md).
 1. Crée ta branche depuis `main` : `git switch -c feat/ma-fonctionnalite`.
 2. Fais tes modifications, puis lance les contrôles en local (Docker Desktop
    démarré) :
@@ -475,7 +480,10 @@ Le dépôt n'accepte plus de modifications directes sur `main` : tout passe par 
    bash scripts/verifier-docker.sh
    ```
 3. Commit avec un message conventionnel (`feat: …`, `fix: …`, `docs: …`).
-4. Envoie la branche et ouvre la pull request : `gh pr create --fill`.
+4. Envoie la branche et ouvre la pull request en remplissant le modèle
+   (fiche d'impact, tests, preuve locale) : `gh pr create`. Un agent attend
+   l'accord explicite de l'utilisateur avant cet envoi
+   ([AGENTS.md](AGENTS.md) § 4.5).
 5. La CI doit être verte, puis la PR est fusionnée en *squash* et la branche
    supprimée ; une revue reste bienvenue, sans être exigée.
 
@@ -485,7 +493,8 @@ Un hook fourni refuse un envoi direct sur `main` :
 git config core.hooksPath .githooks
 ```
 
-Pour contourner volontairement ce hook en cas d'urgence : `GF_ALLOW_MAIN=1 git push`.
+Il ne se contourne pas, même en urgence : un correctif urgent suit la même
+boucle, en priorité ([AGENTS.md](AGENTS.md) § 7).
 
 Détails complets : [CONTRIBUTING.md](CONTRIBUTING.md) et [docs/](docs/README.md).
 
@@ -680,11 +689,13 @@ production   docker-compose.yml + docker-compose.prod.yml, digest GHCR
 préprod      docker-compose.staging.yml, projet gunfight-staging, ports 30121/40121
 sauvegardes  backups/ (14 quotidiennes + 4 hebdomadaires, chiffrement age optionnel)
 restauration restauration/ (extraction locale, pile jetable gunfight-restore)
-décisions    docs/adr/ (protection de branche, FXServer épinglé)
+décisions    docs/adr/ (protection de branche, FXServer épinglé, méthode, architecture cible)
 ```
 
-Décisions consignées : [ADR 0001 — protection de branche](docs/adr/0001-protection-branche.md)
-et [ADR 0002 — FXServer épinglé](docs/adr/0002-fxserver-epingle.md).
+Décisions consignées : [ADR 0001 — protection de branche](docs/adr/0001-protection-branche.md),
+[ADR 0002 — FXServer épinglé](docs/adr/0002-fxserver-epingle.md),
+[ADR 0003 — méthode de développement](docs/adr/0003-methode-de-developpement.md)
+et [ADR 0004 — architecture cible](docs/adr/0004-architecture-cible.md).
 
 État réel à ne pas surinterpréter :
 

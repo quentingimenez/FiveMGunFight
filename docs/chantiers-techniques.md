@@ -41,7 +41,20 @@ faire · ✅ fait · ❓ hypothèse à vérifier avant tout correctif.
 | C13 | Suivi d'oxmysql | basse | ✅ | — | E3 |
 | C14 | Rendu du lobby comparé à une référence | basse | ⬜ | — | V6 |
 | C15 | Documentation contradictoire | basse | ✅ | — | — |
-| C16 | Délais, boucles par image et taille des fichiers | basse | 🟡 | C7 | A4, A6, P1 |
+| C16 | Délais, boucles par image et taille des fichiers | basse | 🟡 | C7, C17 | A4, A6, P1 |
+| C17 | Registre des contrats entre ressources | haute | ⬜ | — | A2, S3 |
+| C18 | Harnais Lua partagé | haute | ⬜ | — | V2, V3 |
+| C19 | Démarrage sans erreur de script et scénarios console | haute | ⬜ | — | V6, A7 |
+| C20 | Documentation tenue par les tests | moyenne | ⬜ | — | A6, V1 |
+| C21 | Mesure du flux de correctifs | moyenne | ⬜ | — | V8 |
+| C22 | Calques NUI possédés par gf_ui | moyenne | ⬜ | C17, C18 | A2, N2 |
+| C23 | gf_core sans connaissance des modes | moyenne | ⬜ | C17, C18, C19 | A1, A2 |
+| C24 | Utilitaires communs et données d'armes exposées | basse | ⬜ | C17 | A2, A3 |
+
+Les chantiers C17 à C24 viennent de la [méthode de développement](methode/README.md)
+(ADR [0003](adr/0003-methode-de-developpement.md) et
+[0004](adr/0004-architecture-cible.md)) : C17 à C21 forment le filet de
+vérification, livré avant les refactors C22 à C24 et C16.
 
 ## Avancement (27 novembre 2026)
 
@@ -368,3 +381,148 @@ le 26/11 : la mort est vérifiée sur une vie serveur pas encore à jour.
   `Wait(0)` avec `resmon` et allonger l'attente hors des moments qui en ont
   besoin ; découper ces fichiers quand on y travaille, dans une PR `refactor`.
 - **Preuve** : `resmon` au repos, avant et après.
+
+## C17 — Registre des contrats entre ressources
+
+- **Constat** : environ la moitié des appels entre ressources ne sont pas
+  dans les `fxmanifest.lua` (16 fichiers passent par `GetResourceState` et
+  `pcall`) ; le bus `gf:*` compte environ 17 événements, dont 3 décrits dans
+  [`evenements-serveur.md`](evenements-serveur.md), et plusieurs ont deux
+  émetteurs ; les state bags et le protocole `gf_lobby:menuOverlay` ne sont
+  écrits nulle part. `tests/test_evenements.py` ne couvre que les
+  événements client → serveur.
+- **Faire** : un `contrat.json` par ressource `gf_*` (exports fournis et
+  consommés, événements émis et écoutés, state bags écrits et lus, calques
+  NUI, tables possédées, dépendances dures et optionnelles, dette connue) ;
+  `scripts/contrats.py` qui extrait ces faits du code et génère
+  `docs/contrats.md` ; `tests/test_contrats.py` : le code et le registre
+  concordent dans les deux sens, toute consommation a un fournisseur, toute
+  dépendance dure est dans le manifeste, la documentation générée est à
+  jour.
+- **Matière brute** : le code des ressources, `server.cfg`, les manifestes.
+- **Outils** : expressions régulières dans l'esprit de
+  `tests/test_evenements.py`, bibliothèque standard Python.
+- **Preuve** : sabotage — un export non déclaré, un appel à un export
+  inexistant et un nouvel événement `gf:*` non déclaré font chacun échouer
+  le test avec un message clair.
+
+## C18 — Harnais Lua partagé
+
+- **Constat** : les 33 fichiers de `tests/lua/` (environ 9 800 lignes)
+  recopient chacun leurs assertions, leurs compteurs et leur faux FiveM
+  (événements, exports, horloge, threads, NUI), avec des différences d'un
+  fichier à l'autre ; les noms ne suivent pas une convention
+  (`*_test.lua` ou non) ; les suites Lua tournent deux fois (étape 5b de
+  `scripts/verifier.sh` et `tests/test_lobby_nui.py`).
+- **Faire** : `tests/lua/lib/assert.lua` et `tests/lua/lib/fivem.lua` (bac à
+  sable qui charge un vrai fichier de ressource : bus d'événements, exports,
+  horloge pilotable, threads pas à pas, state bags, NUI, fichiers de
+  ressource) ; découverte limitée aux fichiers de premier niveau ; trois
+  tests représentatifs migrés ; règle « un test touché est migré » ; un seul
+  lancement des suites Lua.
+- **Matière brute** : les faux FiveM existants, à unifier sans perdre
+  d'assertion.
+- **Outils** : `lua5.4` de l'image de vérification.
+- **Preuve** : les tests migrés passent ; un sabotage du code produit (pas du
+  harnais) les fait échouer.
+
+## C19 — Démarrage sans erreur de script et scénarios console
+
+- **Constat** : le job `smoke` vérifie que chaque ressource atteint
+  « Started resource », mais ne cherche pas `SCRIPT ERROR` ni
+  `Error loading script` dans le journal : une ressource peut démarrer et
+  planter à la première exécution. Aucun scénario console n'est rejoué
+  automatiquement.
+- **Faire** : `scripts/verifier-journal-serveur.sh <journal>` (code 1 et
+  lignes fautives sur erreur de script, code 2 sur journal absent ou vide),
+  testé sur des journaux de fixture et appelé par le job `smoke` ;
+  `scripts/scenario.py` qui rejoue un scénario JSON (commandes rcon par
+  `scripts/fivem_rcon.py`, lignes de journal attendues, délais) ; deux
+  scénarios de référence (lancement d'une manche, redémarrage de
+  `gf_attack` sans erreur).
+- **Matière brute** : journaux du serveur de développement et de la CI.
+- **Outils** : `scripts/fivem_rcon.py`, Docker Compose de développement.
+- **Preuve** : le script sort en code 1 sur la fixture fautive et 0 sur la
+  propre ; un scénario dont l'attente est fausse échoue.
+
+## C20 — Documentation tenue par les tests
+
+- **Constat** : trois jours après le début du projet, la table des
+  ressources de [`architecture.md`](architecture.md) en oublie sept, l'ordre
+  de démarrage quatre, [`debug-test.md`](debug-test.md) parle de « six
+  ressources », [`docs/README.md`](README.md) n'indexe pas tous les
+  documents, et la liste `RESSOURCES_GUNFIGHT` de `tests/test_depot.py`
+  oublie cinq ressources ; aucune garde n'empêche un fichier de dépasser
+  600 lignes (A6).
+- **Faire** : dériver la liste des ressources de `server.cfg` dans les
+  tests ; vérifier la table et l'ordre de démarrage de `architecture.md` et
+  l'index de `docs/README.md` ; un cliquet de taille (fichiers tolérés avec
+  leur taille maximale, qui ne peut que baisser) ; corriger les documents
+  périmés que ces tests trouvent.
+- **Matière brute** : `server-data/server.cfg`, l'arborescence `docs/`.
+- **Outils** : `unittest`.
+- **Preuve** : ajouter une ligne `ensure gf_essai` sans documenter la
+  ressource, ou allonger un fichier toléré, fait échouer la vérification.
+
+## C21 — Mesure du flux de correctifs
+
+- **Constat** : la part de correctifs (24 pour 25 fonctionnalités sur 60
+  commits) a été comptée à la main ; rien ne dit si la méthode la fait
+  baisser.
+- **Faire** : `scripts/mesurer_flux.py`, en lecture seule sur `git log` :
+  nombre de commits par type, rapport correctifs / fonctionnalités,
+  correctifs par portée, correctifs qui suivent une fonctionnalité de la
+  même portée de moins de N jours (7 par défaut), en texte ou en JSON.
+- **Matière brute** : l'historique de `main` (titres en Conventional
+  Commits).
+- **Outils** : bibliothèque standard Python ; tests sur un dépôt Git
+  temporaire.
+- **Preuve** : sur ce dépôt, le script retrouve 25 fonctionnalités et 24
+  correctifs sur les 60 commits du 26 au 28 novembre 2026.
+
+## C22 — Calques NUI possédés par gf_ui
+
+- **Constat** : gf_admin, gf_maps, gf_menu et gf_vehicles émettent
+  `gf_lobby:menuOverlay` pour masquer le lobby sous leur page ; le protocole
+  n'est écrit nulle part. Quatre correctifs ont porté sur des pages ou
+  effets NUI restés affichés ou mal superposés (#18, #63, #65, #117).
+- **Faire** : une pile de calques dans gf_ui (`PushLayer`, `PopLayer`,
+  événement de changement) ; gf_lobby, gf_menu, gf_maps, gf_admin et
+  gf_vehicles l'utilisent ; `gf_lobby:menuOverlay` disparaît.
+- **Matière brute** : les appels à `SetNuiFocus` et `menuOverlay` des
+  ressources.
+- **Outils** : harnais Lua (C18), `scripts/capturer-jeu.ps1`, clic NUI.
+- **Preuve** : chaque page ouverte depuis le lobby, depuis le menu pause et
+  pendant un match, une capture par situation, avant et après.
+
+## C23 — gf_core sans connaissance des modes
+
+- **Constat** : gf_core appelle `exports.gf_attack:CanJoin()`, expose
+  `UpdateRedzoneWeapons` et nomme les ressources des modes dans sa
+  configuration ; gf_attack et gf_redzone dépendent de gf_core : cycles au
+  fonctionnement. `gf_core/server.lua` fait 913 lignes.
+- **Faire** : un point d'enregistrement `RegisterMode(nom, contrat)` dans
+  gf_core ; gf_attack et gf_redzone s'y enregistrent ; remplacement de
+  `UpdateRedzoneWeapons` par une fonction générique ; registre des contrats
+  mis à jour.
+- **Matière brute** : `gf_core/server.lua`, `gf_core/config.lua`, les
+  appels des modes.
+- **Outils** : harnais Lua, scénarios console (C19).
+- **Preuve** : le registre ne montre plus de cycle gf_core ↔ mode ;
+  rejoindre chaque mode et changer d'arme en Redzone, vus en jeu par un
+  humain.
+
+## C24 — Utilitaires communs et données d'armes exposées
+
+- **Constat** : `gf_core/rate_limit.lua` n'est utilisé que par gf_core ;
+  gf_lobby, gf_menu et gf_thumbs écrivent chacun leur délai entre deux
+  requêtes. Le marqueur de plantage en KVP existe deux fois (gf_core,
+  gf_thumbs). gf_inventory lit les `weapons.meta` de gf_weapons avec
+  `LoadResourceFile`.
+- **Faire** : le limiteur de débit et le marqueur de plantage exposés par
+  la plateforme et repris par ces ressources ; gf_weapons expose les
+  données d'armes dont gf_inventory a besoin.
+- **Matière brute** : les limiteurs existants et leurs valeurs, à conserver.
+- **Outils** : harnais Lua (C18).
+- **Preuve** : mêmes refus aux mêmes cadences qu'avant (tests T2) ; casier
+  et accessoires inchangés en jeu.
