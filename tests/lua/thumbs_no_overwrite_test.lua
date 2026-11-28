@@ -1,29 +1,51 @@
 -- Une capture automatique ne doit pas écraser une photo présente sur le serveur.
-local root = os.getenv('GF_ROOT') or '.'
-local events, writes, updated = {}, 0, 0
-local existing = true
-local stub = function() end
-local env = setmetatable({
-    source = 1,
-    Config = { Kinds = { weapons = {} }, Folder = 'thumbs', MaxImageBytes = 1024 },
+package.path = (os.getenv('GF_ROOT') or '.') .. '/tests/lua/lib/?.lua;' .. package.path
+local T = require('assert')
+local F = require('fivem')
+
+local writes = 0
+local files = { ['thumbs/weapons/WEAPON_TEST.png'] = 'photo' }
+
+local sb = F.sandbox({
+    resource = 'gf_thumbs',
+    globals = {
+        Config = { Kinds = { weapons = {} }, Folder = 'thumbs', MaxImageBytes = 1024 },
+        Base64 = { decode = function() return '\137PNG\r\n\26\nimage' end },
+        RegisterCommand = function() end,
+    },
     exports = { gf_core = { IsAdmin = function() return true end } },
-    Base64 = { decode = function() return '\137PNG\r\n\26\nimage' end },
-    GetCurrentResourceName = function() return 'gf_thumbs' end,
-    RegisterCommand = stub,
-    RegisterNetEvent = function(name, fn) events[name] = fn end,
-    AddEventHandler = stub,
-    LoadResourceFile = function() if existing then return 'photo' end end,
-    SaveResourceFile = function() writes = writes + 1 return true end,
-    TriggerClientEvent = function(name) if name == 'gf_thumbs:updated' then updated = updated + 1 end end,
-}, { __index = _G })
-assert(loadfile(root .. '/server-data/resources/[gunfight]/gf_thumbs/server.lua', 't', env))()
-local save = assert(events['gf_thumbs:save'])
-save('weapons', 'WEAPON_TEST', 'data:image/png;base64,abc', true)
-assert(writes == 0 and updated == 1, 'photo existante conservée')
-existing = false
-save('weapons', 'WEAPON_TEST', 'data:image/png;base64,abc', true)
-assert(writes == 1, 'nouvelle photo automatique enregistrée')
-existing = true
-save('weapons', 'WEAPON_TEST', 'data:image/png;base64,abc', false)
-assert(writes == 2, 'photo manuelle remplaçable')
-print('Photos : protection des images existantes vérifiée')
+    files = files,
+    overrides = {
+        SaveResourceFile = function(resource, path, content, length)
+            writes = writes + 1
+            files[path] = content
+            return true
+        end,
+    },
+})
+
+local function updatedCount()
+    local count = 0
+    for _, message in ipairs(sb.sent) do
+        if message.nom == 'gf_thumbs:updated' then count = count + 1 end
+    end
+    return count
+end
+
+sb:load('server-data/resources/[gunfight]/gf_thumbs/server.lua')
+
+-- Photo existante : une capture automatique ne doit pas l'écraser.
+sb:emit('gf_thumbs:save', 'weapons', 'WEAPON_TEST', 'data:image/png;base64,abc', true)
+T.check(writes == 0 and updatedCount() == 1, 'photo existante conservée')
+
+-- Photo absente : la capture automatique doit être enregistrée.
+files['thumbs/weapons/WEAPON_TEST.png'] = nil
+sb:emit('gf_thumbs:save', 'weapons', 'WEAPON_TEST', 'data:image/png;base64,abc', true)
+T.equal(writes, 1, 'nouvelle photo automatique enregistrée')
+
+-- Photo existante : une capture manuelle doit pouvoir la remplacer.
+files['thumbs/weapons/WEAPON_TEST.png'] = 'photo'
+sb:emit('gf_thumbs:save', 'weapons', 'WEAPON_TEST', 'data:image/png;base64,abc', false)
+T.equal(writes, 2, 'photo manuelle remplaçable')
+
+T.finish('Photos')

@@ -291,7 +291,9 @@ server-data/
     gf_weapons  armes ajoutées (stream/, data/<ARME>/*.meta), via scripts/ajouter_arme.py
     gf_inventory armes possédées et équipées par joueur
     gf_stats    statistiques persistantes (MariaDB via oxmysql)
-    gf_journal  journal JSON des événements de match (morts, tueurs, résultats)
+    gf_journal  journal brut des matchs (table gf_match_events : morts, tueurs, résultats)
+    gf_audit    audit passif de la vie et des soins (anomalies journalisées, sans sanction)
+    gf_thumbs   photos des menus prises en jeu (armes, véhicules)
     gf_menu     menu pause NUI (Échap) : profil, règlement, Discord, quitter
     gf_admin    panneau d'administration (F10 ou menu Échap > ADMIN) : joueurs, parties, outils
     gf_screen   écran en direct des joueurs pour les admins (2 à 5 images/s)

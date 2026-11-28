@@ -2,7 +2,7 @@
 --  gf_lobby - tests de la file d'attente (module pur + intégration serveur).
 --
 --  Lancement (depuis la racine du dépôt) : lua5.4 tests/lua/lobby_queue_test.lua
---  La racine est calculée comme dans tests/lua/lobby_nui_callbacks.lua
+--  La racine est calculée comme dans tests/lua/lobby_nui_callbacks_test.lua
 --  (GF_ROOT ou debug.getinfo du script).
 --
 --  Les deux premières parties testent queue.lua sans FiveM. La dernière charge

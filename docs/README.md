@@ -22,6 +22,7 @@ décrivent le fonctionnement interne et l'exploitation.
 |---|---|
 | [`architecture.md`](architecture.md) | tu veux comprendre comment le serveur est assemblé (Docker, ressources, données) |
 | [`evenements-serveur.md`](evenements-serveur.md) | tu ajoutes ou modifies un événement réseau (validation, limite de débit, droits) |
+| [`contrats.md`](contrats.md) | tu cherches qui fournit, appelle, émet ou écoute quoi entre les ressources (généré par `python scripts/contrats.py --doc`) |
 | [`lobby.md`](lobby.md) | tu travailles sur le lobby, l'escouade ou la création de personnage |
 | [`menu-pause.md`](menu-pause.md) | tu travailles sur le menu pause (Échap), sa page NUI ou son protocole |
 | [`panneau-admin.md`](panneau-admin.md) | tu travailles sur le panneau admin (F10) ou ses actions |

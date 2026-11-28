@@ -34,18 +34,6 @@ def run(command: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
-class LuaUnitTests(unittest.TestCase):
-    def test_lua_suites_pass(self) -> None:
-        lua = shutil.which("lua5.4") or shutil.which("lua")
-        exiger(self, "lua", lua)
-        suites = sorted((ROOT / "tests" / "lua").glob("*.lua"))
-        self.assertTrue(suites, "no Lua suite found")
-        for suite in suites:
-            with self.subTest(suite=suite.name):
-                result = run([lua, str(suite.relative_to(ROOT))])
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-
 class JsUnitTests(unittest.TestCase):
     def test_node_suites_pass(self) -> None:
         node = shutil.which("node")

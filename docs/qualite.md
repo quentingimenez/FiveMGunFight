@@ -132,16 +132,36 @@ les deux versions sont identiques. Dependabot suit l'image de base
 | Classe | Vérifie |
 |---|---|
 | `ManifestesFiveM` | chaque dossier de ressource a un `fxmanifest.lua`, avec `fx_version` et le jeu déclaré ; chaque fichier cité (scripts, `ui_page`, `files`) existe réellement |
-| `ConfigurationServeur` | les six ressources `gf_*` sont démarrées dans `server.cfg` ; `sessionmanager`/`hardcap` n'y reviennent pas ; `.env.example` contient toutes les clés attendues et aucun secret ; `.gitignore` et `.dockerignore` protègent `.env`, `secrets.cfg`, le cache et `gf_lobby/data/characters.json` |
+| `ConfigurationServeur` | chaque ressource `gf_*` du dépôt (liste calculée depuis les dossiers qui ont un `fxmanifest.lua`) est démarrée dans `server.cfg` ; `sessionmanager`/`hardcap` n'y reviennent pas ; `.env.example` contient toutes les clés attendues et aucun secret ; `.gitignore` et `.dockerignore` protègent `.env`, `secrets.cfg`, le cache et `gf_lobby/data/characters.json` |
 | `InfraDocker` | txAdmin limité à 127.0.0.1, healthcheck FXServer, plafonds mémoire des deux services, nom de projet Compose, `secrets.cfg` en 600, `FROM` Debian épinglé par digest, image MariaDB épinglée par digest, `GF_SEED_MAPS`/`MAPS_DEFAUT` dans l'entrypoint |
 | `EnvironnementsCompose` | les trois fichiers Compose existent ; le dev construit l'image et monte `./server-data` ; la prod utilise `${IMAGE_REF}`, le volume `maps` et les volumes `gunfight-prod-*` distincts ; le socle ne déclare ni `build` ni `image` pour `fxserver` |
 | `ChaineCI` | toutes les actions sont épinglées par SHA ; chaque job a un timeout, des permissions explicites et tourne sur les runners GitHub `ubuntu-24.04` ; les nouveaux contrôles (luacheck, actionlint, hadolint, gitleaks, ruff) sont présents ; `.fxserver-version` est renseigné avec une URL et un SHA256 valides ; Dependabot suit les actions, les images et `docker-compose` et ignore MariaDB ≥ 11.5 ; `docker.yml` a la concurrence de l'image, le smoke avec un groupe de concurrence par référence, l'artefact de journaux et le test statique sans licence ; le nom du check de démarrage et sa présence dans la protection de branche sont inchangés |
 | `MapsEnJeu` | structure de `maps.json` : noms, rayons positifs, polygones d'au moins trois sommets, points de départ présents, identifiants uniques |
 | `Documentation` | les documents (`README`, `CONTRIBUTING`, `SECURITY`, `docs/`, dont `docs/lobby.md`, modèle de PR, `CODEOWNERS`) existent et ne sont pas vides ; le README cite chaque ressource ; chaque workflow déclare `on:` et `jobs:` |
 | `DepotGit` | aucun fichier secret n'est suivi par Git (`git ls-files`), y compris `gf_lobby/data/characters.json` |
+| `Methode` | les documents de `docs/methode/` sont indexés ; les ADR sont indexés et numérotés sans trou ; `AGENTS.md` impose la fiche d'impact ; le modèle de PR garde ses sections et les catégories de cause racine |
+| `DocumentationSynchronisee` | la table des ressources et l'ordre de démarrage de `architecture.md` suivent `server.cfg` ; `docs/README.md` indexe chaque document ; cliquet de taille : un fichier `.lua` ou `.js` de plus de 600 lignes est listé dans `TAILLES_TOLEREES` et ne grossit plus (règle A6) |
 
 Ces tests n'ont pas de dépendance réseau ni de conteneur : ils tournent en
 quelques secondes et peuvent être lancés avant chaque commit.
+
+## Le filet entre ressources et au démarrage
+
+Ajouté par la [méthode de développement](methode/README.md) (chantiers C17
+à C21). Tout tourne dans `bash scripts/verifier-docker.sh`, sauf les
+scénarios, qui ont besoin du serveur de développement.
+
+| Outil | Vérifie | Quand |
+|---|---|---|
+| `scripts/contrats.py` et `tests/test_contrats.py` | le `contrat.json` de chaque ressource correspond au code (exports fournis et consommés, événements `gf:*` et `gf_<ressource>:*` émis et écoutés, state bags, dépendances) ; tout export consommé existe ; tout événement d'une autre ressource y est écouté ; dépendances cachées et cycles listés dans la `dette` ; [`contrats.md`](contrats.md) à jour | CI et local. Après un changement de lien : `python scripts/contrats.py --initialiser`, relire le diff des `contrat.json`, puis `--doc` |
+| `tests/lua/lib/` (`assert.lua`, `fivem.lua`) | harnais commun des tests Lua : bac à sable FiveM (événements, exports, horloge, threads, NUI, state bags, fichiers) ; nouveaux tests en `*_test.lua` ; un test touché est migré | CI et local |
+| `scripts/verifier-journal-serveur.sh <journal>` | aucune `SCRIPT ERROR`, `Error loading script`, `Couldn't start resource`, `Failed to load script` ; appelé par le job `smoke` | CI ; en local sur `docker compose … logs fxserver` |
+| `scripts/scenario.py <scénario.json>` | une suite de commandes rcon et de lignes de journal attendues ou interdites ; scénarios fournis dans `scripts/scenarios/` | local, serveur de développement démarré (`TXADMIN=false`) |
+| `scripts/mesurer_flux.py` | nombre de commits par type, rapport fix/feat, correctifs par portée, correctifs qui suivent une fonctionnalité de moins de 7 jours | à la demande ; l'indicateur de la [méthode](methode/README.md#p7--capitaliser) |
+
+Le smoke attend désormais la **dernière** ressource `ensure gf_` de
+`server.cfg` avant de lire le journal : attendre `gf_core` seulement laissait
+passer un démarrage incomplet (PR #128, `gf_attack` pas encore démarré).
 
 ## Lancer les contrôles en local
 

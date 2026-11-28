@@ -42,11 +42,11 @@ faire · ✅ fait · ❓ hypothèse à vérifier avant tout correctif.
 | C14 | Rendu du lobby comparé à une référence | basse | ⬜ | — | V6 |
 | C15 | Documentation contradictoire | basse | ✅ | — | — |
 | C16 | Délais, boucles par image et taille des fichiers | basse | 🟡 | C7, C17 | A4, A6, P1 |
-| C17 | Registre des contrats entre ressources | haute | ⬜ | — | A2, S3 |
-| C18 | Harnais Lua partagé | haute | ⬜ | — | V2, V3 |
-| C19 | Démarrage sans erreur de script et scénarios console | haute | ⬜ | — | V6, A7 |
-| C20 | Documentation tenue par les tests | moyenne | ⬜ | — | A6, V1 |
-| C21 | Mesure du flux de correctifs | moyenne | ⬜ | — | V8 |
+| C17 | Registre des contrats entre ressources | haute | ✅ | — | A2, S3 |
+| C18 | Harnais Lua partagé | haute | 🟡 | — | V2, V3 |
+| C19 | Démarrage sans erreur de script et scénarios console | haute | ✅ | — | V6, A7 |
+| C20 | Documentation tenue par les tests | moyenne | ✅ | — | A6, V1 |
+| C21 | Mesure du flux de correctifs | moyenne | ✅ | — | V8 |
 | C22 | Calques NUI possédés par gf_ui | moyenne | ⬜ | C17, C18 | A2, N2 |
 | C23 | gf_core sans connaissance des modes | moyenne | ⬜ | C17, C18, C19 | A1, A2 |
 | C24 | Utilitaires communs et données d'armes exposées | basse | ⬜ | C17 | A2, A3 |
@@ -74,7 +74,12 @@ de développement.
 | C11 | #100 | Lecteur RPF7 de `scripts/ajouter_vehicule.py` durci : traversée de chemin, lectures hors bornes, cycles de répertoires, profondeur des `.rpf` imbriqués limitée à 8, bombe de décompression (512 Mo par fichier, 4 Go au total) ; 14 tests, dont un fuzz déterministe de 2 000 mutations (bibliothèque standard) ; 8 vrais packs extraits à l'identique de l'ancien code | Test de mutation, Hypothesis et atheris avec fuzz nocturne en CI (dépendance et CI à décider) |
 | C12 | #56, #95 | Ressource `gf_db` : migrations numérotées et table `gf_schema_version` ; preuve #95 : une base en version 2 (migrations 1 et 2) a migré au démarrage jusqu'à la version 4, avec sauvegarde, vérification et restauration en local sur piles jetables, serveur restauré en marche | La seule variante « en CI » de la preuve n'est pas automatisée |
 | C13 | #57 | `vendorise.json` et `scripts/suivre_vendorise.py`, testés | — |
-| C16 | #58 | Délais de `gf_attack` passés à `GetGameTimer()` | Mesurer chaque `Wait(0)` avec `resmon` ; découper `gf_lobby/server.lua`, `gf_lobby/client.lua` et `gf_attack/server.lua` (644 lignes) |
+| C17 | #129 | `contrat.json` pour les 18 ressources, `scripts/contrats.py`, `tests/test_contrats.py`, [`contrats.md`](contrats.md) généré ; dette relevée : cycles gf_core ↔ gf_admin, gf_core ↔ gf_attack, gf_attack ↔ gf_lobby, gf_thumbs ↔ gf_vehicles, dépendance cachée gf_journal → gf_core ; sabotage vu en échec | Les appels à travers une variable (`local inv = exports.gf_inventory`) échappent à l'extraction : les écrire en appel direct au fil des PR |
+| C18 | #129 | `tests/lua/lib/assert.lua` et `fivem.lua` ; trois tests migrés sans perte d'assertion (3, 56 et 18), sabotage vu en échec ; les suites Lua ne tournent plus qu'une fois | Migrer les autres tests quand on les touche |
+| C19 | #129 | `scripts/verifier-journal-serveur.sh` dans le smoke, qui attend aussi la dernière ressource de `server.cfg` ; `scripts/scenario.py` et deux scénarios joués sur le serveur de développement | — |
+| C20 | #129 | Liste des ressources calculée, table et ordre de démarrage d'`architecture.md`, index de `docs/README.md`, cliquet de taille ; documents périmés corrigés | — |
+| C21 | #129 | `scripts/mesurer_flux.py` : 24 fonctionnalités, 22 correctifs, 3 chaînes correctif après fonctionnalité sur les 60 derniers commits au 28 novembre 2026 | Relever le chiffre après chaque lot de PR |
+| C16 | #58 | Délais de `gf_attack` passés à `GetGameTimer()` | Mesurer chaque `Wait(0)` avec `resmon` ; découper `gf_lobby/server.lua`, `gf_lobby/client.lua` et `gf_attack/server.lua` (775 lignes) |
 
 Le smoke de la CI (#96) lit la liste des ressources vérifiées dans les lignes
 `ensure gf_` de `server-data/server.cfg` : `gf_audit` et `gf_inventory`,
@@ -375,8 +380,10 @@ le 26/11 : la mort est vérifiée sur une vie serveur pas encore à jour.
 - **Constat** :
   - `gf_attack` mesure ses délais avec `os.time()`, à la seconde près ;
   - 24 appels `Wait(0)` dans les ressources `gf_*`, à justifier un par un ;
-  - `gf_lobby/server.lua` (1 395 lignes), `gf_lobby/client.lua` (1 161) et
-    `gf_attack/server.lua` (801) dépassent le seuil de la règle A6.
+  - `gf_lobby/server.lua` (1 527 lignes), `gf_lobby/client.lua` (1 172),
+    `gf_attack/server.lua` (775) et `gf_attack/rules.lua` (693) dépassent le
+    seuil de la règle A6 (relevé du 28 novembre 2026 ; le cliquet de C20 les
+    empêche de grossir).
 - **Faire** : passer les délais à `GetGameTimer()` pendant C7 ; mesurer chaque
   `Wait(0)` avec `resmon` et allonger l'attente hors des moments qui en ont
   besoin ; découper ces fichiers quand on y travaille, dans une PR `refactor`.
@@ -477,8 +484,10 @@ le 26/11 : la mort est vérifiée sur une vie serveur pas encore à jour.
   Commits).
 - **Outils** : bibliothèque standard Python ; tests sur un dépôt Git
   temporaire.
-- **Preuve** : sur ce dépôt, le script retrouve 25 fonctionnalités et 24
-  correctifs sur les 60 commits du 26 au 28 novembre 2026.
+- **Preuve** : le décompte du script concorde avec `git log` : 25
+  fonctionnalités et 24 correctifs sur les 60 commits qui finissent à
+  `8efec29` ; 24 et 22 sur les 60 derniers commits au 28 novembre 2026, après
+  la fusion de la méthode (#128).
 
 ## C22 — Calques NUI possédés par gf_ui
 

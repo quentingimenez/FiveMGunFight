@@ -40,8 +40,10 @@ Niveau S : seules les lignes « Demande », « Où » et « Contrats touchés »
 
 ## Trouver ce qu'un changement touche
 
-Le registre des contrats (chantier C17) donnera ces réponses directement.
-D'ici là, et pour vérifier le registre, on cherche dans
+Le registre des contrats répond en premier : [`docs/contrats.md`](../contrats.md)
+(généré) et les `contrat.json` de chaque ressource disent qui fournit, appelle,
+émet ou écoute quoi. Il ne voit pas les appels faits à travers une variable :
+pour ceux-là, et pour confirmer, on cherche dans
 `server-data/resources/` avec `rg` (ou l'outil de recherche de l'agent) :
 
 | Question | Recherche |

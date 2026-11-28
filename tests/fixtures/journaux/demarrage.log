@@ -1,0 +1,5 @@
+[     123456] [b3889_GTAProce]             MainThrd/ Creating script environments for gf_stats
+[     123457] [b3889_GTAProce]             MainThrd/ Couldn't start resource gf_stats
+[     123458] [b3889_GTAProce]             MainThrd/ raison : dépendance gf_db indisponible au démarrage
+[     123459] [b3889_GTAProce]             MainThrd/ couldn’t redémarrer automatiquement la ressource
+[     123460] [b3889_GTAProce]             MainThrd/ Started resource gf_core

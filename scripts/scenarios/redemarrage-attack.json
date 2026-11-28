@@ -1,0 +1,11 @@
+{
+  "nom": "Redémarrage de gf_attack sans erreur de script",
+  "etapes": [
+    {"rcon": "restart gf_attack"},
+    {
+      "attendre": "Started resource gf_attack",
+      "delai": 60
+    },
+    {"absent": "SCRIPT ERROR"}
+  ]
+}

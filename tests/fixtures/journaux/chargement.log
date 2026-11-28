@@ -1,0 +1,5 @@
+[     123456] [b3889_GTAProce]             MainThrd/ Creating script environments for gf_maps
+[     123457] [b3889_GTAProce]             MainThrd/ Error loading script server.lua in resource gf_maps: @gf_maps/server.lua:3: unexpected symbol near '}'
+[     123458] [b3889_GTAProce]             MainThrd/ ^ 
+[     123459] [b3889_GTAProce]             MainThrd/ [gf_maps] chargement interrompu
+[     123460] [b3889_GTAProce]             MainThrd/ Started resource gf_maps

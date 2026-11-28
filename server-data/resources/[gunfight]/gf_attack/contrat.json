@@ -1,0 +1,67 @@
+{
+  "ressource": "gf_attack",
+  "exports": [
+    "CanJoin",
+    "GetMapChoices",
+    "RegisterSquads",
+    "SetNextMap",
+    "StartTestRound"
+  ],
+  "consomme": [
+    "gf_admin:LogAction",
+    "gf_lobby:ForceLaunchQueue",
+    "gf_maps:GetActiveMaps"
+  ],
+  "emet": [
+    "gf:itemUsed",
+    "gf:matchAborted",
+    "gf:matchEnded",
+    "gf:matchResults",
+    "gf:matchStarted",
+    "gf:modeKill",
+    "gf:phase",
+    "gf:roundEnded",
+    "gf_ui:announce",
+    "gf_ui:hud",
+    "gf_ui:items",
+    "gf_ui:loadout_close",
+    "gf_ui:loadout_open",
+    "gf_ui:match_results",
+    "gf_ui:scoreboard"
+  ],
+  "ecoute": [
+    "gf:loadoutChosen",
+    "gf:modeJoined",
+    "gf:modeLeft",
+    "gf:playerKilled",
+    "gf_core:modeChanged",
+    "gf_core:spawned",
+    "gf_maps:updated"
+  ],
+  "state_bags": {
+    "ecrit": [
+      "gf_alive"
+    ],
+    "lit": [
+      "gf_alive",
+      "gf_mode",
+      "gf_protected",
+      "gf_team"
+    ]
+  },
+  "dependances": {
+    "dures": [
+      "gf_core",
+      "gf_maps",
+      "gf_ui"
+    ],
+    "optionnelles": [
+      "gf_admin",
+      "gf_lobby"
+    ]
+  },
+  "dette": [
+    "cycle:gf_core",
+    "cycle:gf_lobby"
+  ]
+}

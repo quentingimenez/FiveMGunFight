@@ -22,8 +22,35 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[1]
 RESSOURCES = RACINE / "server-data" / "resources"
-RESSOURCES_GUNFIGHT = ("gf_core", "gf_ui", "gf_maps", "gf_attack", "gf_redzone", "gf_lobby", "gf_stats", "gf_menu", "gf_vehicles", "gf_thumbs", "gf_db", "gf_journal", "gf_weapons")
+BASE_GUNFIGHT = RESSOURCES / "[gunfight]"
+# Cette liste est calculée au chargement du module à partir des ressources
+# effectivement présentes dans le dépôt : elle n'est pas recopiée à la main.
+RESSOURCES_GUNFIGHT = tuple(
+    sorted(
+        dossier.name
+        for dossier in BASE_GUNFIGHT.iterdir()
+        if dossier.is_dir()
+        and dossier.name.startswith("gf_")
+        and (dossier / "fxmanifest.lua").is_file()
+    )
+)
 MAPS_JSON = RESSOURCES / "[gunfight]" / "gf_maps" / "data" / "maps.json"
+
+# Taille maximale tolérée (nombre de lignes) des fichiers déjà au-dessus de 600
+# lignes (règle A6). Cliquet : chaque valeur ne peut que baisser, et une entrée
+# devient caduque dès que le fichier repasse sous la limite ou disparaît.
+TAILLES_TOLEREES = {
+    "server-data/resources/[gunfight]/gf_admin/html/app.js": 832,
+    "server-data/resources/[gunfight]/gf_attack/rules.lua": 693,
+    "server-data/resources/[gunfight]/gf_attack/server.lua": 775,
+    "server-data/resources/[gunfight]/gf_core/server.lua": 913,
+    "server-data/resources/[gunfight]/gf_lobby/client.lua": 1172,
+    "server-data/resources/[gunfight]/gf_lobby/html/js/creator.js": 1826,
+    "server-data/resources/[gunfight]/gf_lobby/html/js/modes.js": 790,
+    "server-data/resources/[gunfight]/gf_lobby/html/js/squad.js": 686,
+    "server-data/resources/[gunfight]/gf_lobby/server.lua": 1527,
+    "server-data/resources/[gunfight]/gf_menu/html/js/app.js": 624,
+}
 
 MOTS_SCRIPTS = (
     "client_script",
@@ -47,6 +74,20 @@ def dossiers_ressources() -> list[Path]:
 
 def manifestes() -> list[Path]:
     return sorted(RESSOURCES.glob("*/*/fxmanifest.lua"))
+
+
+def scripts_gunfight() -> list[Path]:
+    """Fichiers .lua/.js des ressources gunfight, hors dossiers vendor."""
+    return sorted(
+        chemin
+        for chemin in BASE_GUNFIGHT.rglob("*")
+        if chemin.is_file()
+        and chemin.suffix in {".lua", ".js"}
+        and not any(
+            dossier.lower() == "vendor"
+            for dossier in chemin.relative_to(BASE_GUNFIGHT).parent.parts
+        )
+    )
 
 
 def chemins_declares(manifeste: Path) -> set[str]:
@@ -752,6 +793,113 @@ class Documentation(unittest.TestCase):
             with self.subTest(workflow=workflow.name):
                 self.assertRegex(texte, r"(?m)^on:")
                 self.assertRegex(texte, r"(?m)^jobs:")
+
+
+class DocumentationSynchronisee(unittest.TestCase):
+    """Les documents d'architecture et l'index suivent l'état réel du dépôt.
+
+    Une ressource ajoutée, un `ensure` réordonné ou un document oublié dans
+    l'index doit faire échouer la suite : la documentation n'est plus écrite
+    à la main sans garde-fou. Le cliquet de taille empêche aussi qu'un fichier
+    toléré grossisse (règle A6).
+    """
+
+    ARCHITECTURE = RACINE / "docs" / "architecture.md"
+    INDEX_DOCS = RACINE / "docs" / "README.md"
+    CONFIG = RACINE / "server-data" / "server.cfg"
+    DOCS = RACINE / "docs"
+    PHRASE_ORDRE = "Ordre de démarrage imposé par `server.cfg`"
+
+    def test_architecture_decrit_chaque_ressource(self) -> None:
+        architecture = lire(self.ARCHITECTURE)
+        for ressource in RESSOURCES_GUNFIGHT:
+            with self.subTest(ressource=ressource):
+                self.assertIn(
+                    f"| `{ressource}` |",
+                    architecture,
+                    "ressource absente de la table de docs/architecture.md",
+                )
+
+    def test_architecture_ordre_de_demarrage(self) -> None:
+        architecture = lire(self.ARCHITECTURE)
+        self.assertIn(
+            self.PHRASE_ORDRE,
+            architecture,
+            "phrase annonçant l'ordre de démarrage absente de architecture.md",
+        )
+        apres_phrase = architecture.split(self.PHRASE_ORDRE, 1)[1]
+        bloc = re.search(r"(?ms)^```text[^\n]*\n(.*?)^```[^\n]*$", apres_phrase)
+        self.assertIsNotNone(
+            bloc, "bloc ```text d'ordre de démarrage introuvable après la phrase"
+        )
+        documentes = [
+            nom.strip()
+            for ligne in bloc.group(1).splitlines()
+            for nom in ligne.split("·")
+            if nom.strip()
+        ]
+        assures = re.findall(r"^\s*ensure\s+(\S+)", lire(self.CONFIG), re.MULTILINE)
+        self.assertEqual(
+            documentes,
+            assures,
+            "l'ordre de architecture.md doit être exactement celui des lignes "
+            "`ensure` de server.cfg (mêmes noms, même ordre, aucun nom omis)",
+        )
+
+    def test_index_docs_complet(self) -> None:
+        index = lire(self.INDEX_DOCS)
+        fichiers = (
+            sorted(f for f in self.DOCS.glob("*.md") if f != self.INDEX_DOCS)
+            + sorted((self.DOCS / "runbooks").glob("*.md"))
+            + sorted((self.DOCS / "methode").glob("*.md"))
+        )
+        self.assertTrue(fichiers, "aucun document à vérifier dans l'index")
+        for fichier in fichiers:
+            relatif = fichier.relative_to(self.DOCS).as_posix()
+            with self.subTest(document=relatif):
+                self.assertIn(
+                    f"]({relatif})",
+                    index,
+                    "document absent de l'index docs/README.md",
+                )
+
+    def test_cliquet_de_taille(self) -> None:
+        for chemin in scripts_gunfight():
+            relatif = chemin.relative_to(RACINE).as_posix()
+            lignes = len(lire(chemin).splitlines())
+            with self.subTest(fichier=relatif):
+                if lignes > 600:
+                    self.assertIn(
+                        relatif,
+                        TAILLES_TOLEREES,
+                        f"{relatif} fait {lignes} lignes : découper le fichier, "
+                        "règle A6 de docs/regles-de-code.md",
+                    )
+                    self.assertGreaterEqual(
+                        TAILLES_TOLEREES[relatif],
+                        lignes,
+                        f"{relatif} fait {lignes} lignes : "
+                        "le fichier ne doit plus grossir",
+                    )
+        for relatif, maximum in TAILLES_TOLEREES.items():
+            chemin = RACINE / relatif
+            with self.subTest(fichier=relatif):
+                self.assertTrue(
+                    chemin.is_file(),
+                    f"{relatif} n'existe plus : retirer la ligne du dictionnaire",
+                )
+                lignes = len(lire(chemin).splitlines())
+                self.assertGreater(
+                    lignes,
+                    600,
+                    f"{relatif} ne fait plus que {lignes} lignes : "
+                    "retirer la ligne du dictionnaire",
+                )
+                self.assertLessEqual(
+                    lignes,
+                    maximum,
+                    f"{relatif} fait {lignes} lignes : le fichier ne doit plus grossir",
+                )
 
 
 class Methode(unittest.TestCase):

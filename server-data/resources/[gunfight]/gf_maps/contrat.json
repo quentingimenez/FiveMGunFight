@@ -1,0 +1,30 @@
+{
+  "ressource": "gf_maps",
+  "exports": [
+    "GetActiveMaps",
+    "GetMaps"
+  ],
+  "consomme": [
+    "gf_admin:LogAction"
+  ],
+  "emet": [
+    "gf_lobby:menuOverlay"
+  ],
+  "ecoute": [
+    "gf_core:modeChanged",
+    "gf_lobby:state"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_core"
+    ],
+    "optionnelles": [
+      "gf_admin"
+    ]
+  },
+  "dette": []
+}

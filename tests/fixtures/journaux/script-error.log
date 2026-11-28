@@ -1,0 +1,5 @@
+[     123456] [b3889_GTAProce]             MainThrd/ Creating script environments for gf_lobby
+[     123457] [b3889_GTAProce]             MainThrd/ SCRIPT ERROR: @gf_lobby/server.lua:12: attempt to index a nil value
+[     123458] [b3889_GTAProce]             MainThrd/ > fn (@gf_lobby/server.lua:12)
+[     123459] [b3889_GTAProce]             MainThrd/ [gf_lobby] initialisation terminée
+[     123460] [b3889_GTAProce]             MainThrd/ Started resource gf_lobby

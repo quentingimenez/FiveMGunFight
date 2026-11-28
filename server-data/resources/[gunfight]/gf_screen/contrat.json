@@ -1,0 +1,26 @@
+{
+  "ressource": "gf_screen",
+  "exports": [],
+  "consomme": [
+    "gf_admin:LogAction",
+    "gf_core:GetWeaponThumbList"
+  ],
+  "emet": [],
+  "ecoute": [],
+  "state_bags": {
+    "ecrit": [],
+    "lit": [
+      "gf_mode"
+    ]
+  },
+  "dependances": {
+    "dures": [
+      "gf_admin",
+      "gf_core"
+    ],
+    "optionnelles": [
+      "gf_admin"
+    ]
+  },
+  "dette": []
+}

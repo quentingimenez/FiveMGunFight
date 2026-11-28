@@ -148,7 +148,7 @@ reste possible pour des constantes du code, comme les icônes de
 
 **N2 — Un callback NUI répond toujours.** Chaque `RegisterNUICallback`
 appelle `cb` sur tous ses chemins, erreur comprise, sinon la page attend sans
-fin (`tests/lua/lobby_nui_callbacks.lua`). *Doit. Test Lua.*
+fin (`tests/lua/lobby_nui_callbacks_test.lua`). *Doit. Test Lua.*
 
 **N3 — Ce qui vient de la NUI est une entrée client.** Le Lua client relaie
 au serveur, qui applique S2. *Doit. Revue.*
