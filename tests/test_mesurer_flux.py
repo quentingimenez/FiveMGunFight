@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Tests du mesureur de flux : fonctions pures, dépôt Git temporaire et CLI."""
 
 from __future__ import annotations
