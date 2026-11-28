@@ -169,6 +169,7 @@ modifiées, démarrées avant nos ressources.
 | Ressource | Responsabilité | Fichiers |
 |---|---|---|
 | `gf_core` | base commune : modes, apparition, armes (catalogue, armes possédées, choix validé côté serveur), morts, anti-tir entre coéquipiers, multi-kills | `config.lua` (partagé), `server.lua`, `client.lua` |
+| `gf_killcam` | killcam : tampon des dernières secondes par joueur, clip serveur envoyé à la victime sur `gf:playerKilled`, rejeu côté client | `config.lua`, `track.lua` (partagés), `record.lua`, `replay.lua`, `server.lua` |
 | `gf_ui` | interface NUI : HUD, kill feed, dégâts, annonces, classement, menu de choix des armes | `html/` (page `ui_page`), `client.lua` |
 | `gf_maps` | éditeur de maps en jeu (`/editor`), liste (`/maps`), stockage `data/maps.json` ; caméra orbitale (cap et inclinaison) dans le module pur `camera.lua`, réglages dans `config.lua` | `html/`, `config.lua`, `camera.lua`, `server.lua`, `client.lua` |
 | `gf_attack` | mode Attaque de zone : deux équipes, manches en 3 phases (choix des armes, placement, combat), voitures, spectateur sur les alliés | `config.lua`, `server.lua`, `client.lua` |
@@ -187,7 +188,7 @@ Ordre de démarrage imposé par `server.cfg` (les dépendances vont dans ce sens
 
 ```text
 mapmanager · spawnmanager · baseevents
-oxmysql · gf_db · gf_thumbs · gf_vehicles · gf_ui · gf_core · gf_lobby · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu · gf_admin
+oxmysql · gf_db · gf_thumbs · gf_vehicles · gf_ui · gf_core · gf_killcam · gf_lobby · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu · gf_admin
 ```
 
 Les interfaces NUI sont portées par `gf_ui` (HUD, classement, choix des armes)
