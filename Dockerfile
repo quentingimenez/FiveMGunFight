@@ -27,8 +27,12 @@ ARG FX_SHA256=""
 
 # L'image de base épinglée peut retarder sur les correctifs de sécurité Debian
 # (ex. CVE-2025-6020, libpam) : l'upgrade au build les applique ; Dependabot propose les nouveaux digests.
+# La CI garde cette couche en cache : quand Trivy signale un correctif Debian
+# déjà publié (ex. CVE-2026-124851, libzstd1), changer cette date la reconstruit.
+ARG DEBIAN_PATCHES=2026-11-28
 # hadolint ignore=DL3005
-RUN apt-get update \
+RUN echo "Correctifs Debian : ${DEBIAN_PATCHES}" \
+ && apt-get update \
  && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
  && rm -rf /var/lib/apt/lists/*
