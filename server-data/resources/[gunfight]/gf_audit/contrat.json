@@ -1,0 +1,30 @@
+{
+  "ressource": "gf_audit",
+  "exports": [],
+  "consomme": [
+    "gf_core:GetMode"
+  ],
+  "emet": [
+    "gf:anomalie"
+  ],
+  "ecoute": [
+    "gf:armourGranted",
+    "gf:healGranted",
+    "gf:hit",
+    "gf:itemUsed",
+    "gf:modeLeft",
+    "gf:playerKilled",
+    "gf:spawned"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_core"
+    ],
+    "optionnelles": []
+  },
+  "dette": []
+}

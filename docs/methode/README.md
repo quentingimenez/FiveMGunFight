@@ -10,7 +10,8 @@ l'agent (Claude, Codex, DeepSeek, Gemini…) ou l'humain. Il complète :
   changer pour que le code existant respecte ces règles.
 
 La méthode répond à un constat mesuré : sur les 60 commits du 26 au
-28 novembre 2026, il y a eu 24 correctifs pour 25 fonctionnalités. Les
+28 novembre 2026 qui précèdent la méthode (jusqu'à `8efec29`), il y a eu 24
+correctifs pour 25 fonctionnalités. Les
 chaînes de régression (chat retiré, remis, retiré ; file d'Attaque reprise
 sept fois ; photos de `gf_thumbs` reprises quatre fois ; pages NUI
 superposées quatre fois ; `IsAdmin` qui renvoyait `1`) ont toutes la même
@@ -104,7 +105,7 @@ produit un changement **dans la même PR**.
 | `calques-nui` : page NUI derrière ou devant une autre | éditeur de carte sous le lobby (#117) | propriétaire unique des calques |
 | `asset` : modèle ou pack tiers non vérifié en jeu | Bison qui faisait planter les clients (#66) | essai en jeu avant fusion |
 
-`scripts/mesurer_flux.py` (à venir, chantier C21) compte les correctifs par
+`scripts/mesurer_flux.py` (chantier C21) compte les correctifs par
 zone et les correctifs qui suivent une fonctionnalité de moins de sept jours :
 c'est l'indicateur que cette méthode doit faire baisser.
 

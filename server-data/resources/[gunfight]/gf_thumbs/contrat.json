@@ -1,0 +1,28 @@
+{
+  "ressource": "gf_thumbs",
+  "exports": [
+    "Get"
+  ],
+  "consomme": [
+    "gf_vehicles:ApplyCustom"
+  ],
+  "emet": [],
+  "ecoute": [
+    "gf_core:modeChanged"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": [
+      "gf_mode"
+    ]
+  },
+  "dependances": {
+    "dures": [],
+    "optionnelles": [
+      "gf_vehicles"
+    ]
+  },
+  "dette": [
+    "cycle:gf_vehicles"
+  ]
+}

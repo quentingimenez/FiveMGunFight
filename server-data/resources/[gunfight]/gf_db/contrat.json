@@ -1,0 +1,23 @@
+{
+  "ressource": "gf_db",
+  "exports": [
+    "Pret",
+    "Version"
+  ],
+  "consomme": [],
+  "emet": [],
+  "ecoute": [],
+  "state_bags": {
+    "ecrit": [
+      "gf_db_version"
+    ],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "oxmysql"
+    ],
+    "optionnelles": []
+  },
+  "dette": []
+}

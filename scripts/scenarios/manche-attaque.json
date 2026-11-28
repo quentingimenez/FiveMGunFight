@@ -1,0 +1,11 @@
+{
+  "nom": "Commande startround sans joueur : refus propre, sans erreur de script",
+  "etapes": [
+    {"rcon": "startround"},
+    {
+      "attendre": "[gf_attack] Aucun joueur dans le mode Attaque.",
+      "delai": 30
+    },
+    {"absent": "SCRIPT ERROR"}
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "ressource": "gf_redzone",
+  "exports": [
+    "AllowDamage",
+    "CanChangeWeapons"
+  ],
+  "consomme": [
+    "gf_admin:LogAction",
+    "gf_core:DeleteModeVehicle",
+    "gf_core:GiveModeVehicle",
+    "gf_killcam:RemainingMs",
+    "gf_maps:GetActiveMaps"
+  ],
+  "emet": [
+    "gf:healGranted",
+    "gf:matchEnded",
+    "gf:matchResults",
+    "gf:matchStarted",
+    "gf:modeKill",
+    "gf:phase",
+    "gf_ui:announce",
+    "gf_ui:hud",
+    "gf_ui:scoreboard",
+    "gf_ui:scoreboard_show"
+  ],
+  "ecoute": [
+    "gf:modeJoined",
+    "gf:modeLeft",
+    "gf:playerKilled",
+    "gf_core:modeChanged",
+    "gf_core:spawned",
+    "gf_inventory:selectionChanged"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_core",
+      "gf_maps",
+      "gf_ui"
+    ],
+    "optionnelles": [
+      "gf_admin",
+      "gf_killcam"
+    ]
+  },
+  "dette": []
+}

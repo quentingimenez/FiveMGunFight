@@ -1,0 +1,26 @@
+{
+  "ressource": "gf_ui",
+  "exports": [],
+  "consomme": [
+    "gf_thumbs:Get"
+  ],
+  "emet": [
+    "gf:loadoutChosen"
+  ],
+  "ecoute": [
+    "gf_thumbs:updated"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": [
+      "gf_mode"
+    ]
+  },
+  "dependances": {
+    "dures": [],
+    "optionnelles": [
+      "gf_thumbs"
+    ]
+  },
+  "dette": []
+}

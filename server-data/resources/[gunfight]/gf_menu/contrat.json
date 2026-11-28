@@ -1,0 +1,41 @@
+{
+  "ressource": "gf_menu",
+  "exports": [],
+  "consomme": [
+    "gf_core:GetMode",
+    "gf_core:IsAdmin",
+    "gf_stats:GetPlayerStats",
+    "gf_thumbs:Get"
+  ],
+  "emet": [
+    "gf_admin:open",
+    "gf_inventory:adminGive",
+    "gf_inventory:equip",
+    "gf_inventory:requestLocker",
+    "gf_inventory:setAccessories",
+    "gf_lobby:menuOverlay"
+  ],
+  "ecoute": [
+    "gf_core:modeChanged",
+    "gf_core:spawned",
+    "gf_inventory:accessoriesSaved",
+    "gf_inventory:adminData",
+    "gf_inventory:locker",
+    "gf_inventory:openAdmin",
+    "gf_lobby:state"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_core",
+      "gf_stats"
+    ],
+    "optionnelles": [
+      "gf_thumbs"
+    ]
+  },
+  "dette": []
+}

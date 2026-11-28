@@ -1,0 +1,39 @@
+{
+  "ressource": "gf_admin",
+  "exports": [
+    "LogAction"
+  ],
+  "consomme": [
+    "gf_db:Pret",
+    "gf_thumbs:Get"
+  ],
+  "emet": [
+    "gf:healGranted",
+    "gf_lobby:menuOverlay",
+    "gf_ui:announce",
+    "gf_ui:notify"
+  ],
+  "ecoute": [
+    "gf_core:modeChanged",
+    "gf_core:spawned",
+    "gf_lobby:state"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_core",
+      "gf_db",
+      "oxmysql"
+    ],
+    "optionnelles": [
+      "gf_db",
+      "gf_thumbs"
+    ]
+  },
+  "dette": [
+    "cycle:gf_core"
+  ]
+}

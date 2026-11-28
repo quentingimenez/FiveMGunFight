@@ -21,8 +21,8 @@ Le serveur est un empilement de trois choses :
 2. le dossier **`server-data/`** : monté depuis le dépôt en développement pour
    modifier `server.cfg` et les ressources Lua sans reconstruire l'image ; en
    production, c'est celui de l'image, et seules les maps sont un volume ;
-3. un conteneur **MariaDB** prêt pour la phase 2 (statistiques), sans port
-   exposé.
+3. un conteneur **MariaDB** (statistiques, journal des matchs, inventaire,
+   journal admin, via `oxmysql`), sans port exposé.
 
 ## Trois fichiers Compose
 
@@ -168,13 +168,20 @@ modifiées, démarrées avant nos ressources.
 
 | Ressource | Responsabilité | Fichiers |
 |---|---|---|
+| `gf_db` | migrations du schéma MariaDB au démarrage via `oxmysql`, sommes enregistrées dans `gf_schema_version` | `server.lua`, `migrations.lua`, `migrations/` |
+| `gf_journal` | journal brut des matchs (table `gf_match_events`) : morts, tueurs, résultats, écouté sur le bus `gf:*` ; relu par `scripts/recalculer_match.py` | `journal.lua` (module pur), `server.lua` ; dépend de `oxmysql` et `gf_db` |
+| `gf_thumbs` | photos des menus prises en jeu par un admin à son arrivée au lobby (familles armes, véhicules) | `config.lua` (partagé), `base64.lua`, `server.lua`, `client.lua`, `html/`, `thumbs/` |
+| `gf_weapons` | armes ajoutées : modèles 3D et fichiers `.meta` par arme, via `scripts/ajouter_arme.py` | `stream/`, `data/<ARME>/`, `client.lua` |
+| `gf_vehicles` | véhicules du serveur (`stream/`, `data/<modèle>/`, sons) et personnalisation admin (`/customveh`) | `config.lua`, `server.lua`, `client.lua`, `html/`, `custom/` |
 | `gf_core` | base commune : modes, apparition, armes (catalogue, armes possédées, choix validé côté serveur), morts, anti-tir entre coéquipiers, multi-kills | `config.lua` (partagé), `server.lua`, `client.lua` |
 | `gf_killcam` | killcam : tampon des dernières secondes par joueur, clip serveur envoyé à la victime sur `gf:playerKilled`, rejeu côté client | `config.lua`, `track.lua` (partagés), `record.lua`, `replay.lua`, `server.lua` |
 | `gf_ui` | interface NUI : HUD, kill feed, dégâts, annonces, classement, menu de choix des armes | `html/` (page `ui_page`), `client.lua` |
+| `gf_inventory` | armes possédées et équipées par joueur, casier, accessoires | `accessories.lua`, `server.lua` ; dépend de `oxmysql`, `gf_db`, `gf_core` et `gf_weapons` |
+| `gf_lobby` | lobby : création de personnage, escouade, invitations, file d'attente et vote de la map d'Attaque | `config.lua`, `appearance_schema.lua` (partagés), `queue.lua`, `server.lua`, `appearance.lua`, `backdrop.lua`, `client.lua`, `html/`, `data/` ; dépend de `gf_core` |
 | `gf_maps` | éditeur de maps en jeu (`/editor`), liste (`/maps`), stockage `data/maps.json` ; caméra orbitale (cap et inclinaison) dans le module pur `camera.lua`, réglages dans `config.lua` | `html/`, `config.lua`, `camera.lua`, `server.lua`, `client.lua` |
 | `gf_attack` | mode Attaque de zone : deux équipes, manches en 3 phases (choix des armes, placement, combat), voitures, spectateur sur les alliés | `config.lua`, `server.lua`, `client.lua` |
 | `gf_redzone` | mode Redzone : zone libre, prise de véhicule, podium | `config.lua`, `server.lua`, `client.lua` |
-| `gf_db` | migrations du schéma MariaDB au démarrage via `oxmysql`, sommes enregistrées dans `gf_schema_version` | `server.lua`, `migrations.lua`, `migrations/` |
+| `gf_audit` | audit passif : soins et touches mortelles incohérents journalisés comme anomalies, sans sanction | `config.lua`, `audit.lua`, `server.lua` (+ `@gf_core/validation.lua`) ; dépend de `gf_core` |
 | `gf_stats` | statistiques persistantes (MariaDB via `oxmysql`), export `GetPlayerStats` | `server.lua` |
 | `gf_menu` | menu pause NUI (Échap) remplaçant le frontend natif : profil, règlement, Discord, déconnexion | `html/` (page `ui_page`), `config.lua`, `menu_state.lua`, `server.lua`, `client.lua` ; dépend de `gf_core` et `gf_stats` |
 | `gf_admin` | panneau d'administration : joueurs, parties, outils ; ouverture par F10 ou depuis le menu Échap, données via `gf_admin:requestData`, actions réussies journalisées dans `gf_admin_log` | `html/` (page `ui_page`), `commands.lua` (liste blanche des commandes, partagé), `@oxmysql/lib/MySQL.lua`, `audit.lua` (`LogAction`), `server.lua`, `client.lua` ; dépend de `gf_core`, `gf_db` et `oxmysql` |
@@ -189,7 +196,7 @@ Ordre de démarrage imposé par `server.cfg` (les dépendances vont dans ce sens
 
 ```text
 mapmanager · spawnmanager · baseevents
-oxmysql · gf_db · gf_thumbs · gf_vehicles · gf_ui · gf_core · gf_killcam · gf_lobby · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu · gf_admin · gf_screen
+oxmysql · gf_db · gf_journal · gf_thumbs · gf_weapons · gf_vehicles · gf_ui · gf_core · gf_killcam · gf_inventory · gf_lobby · gf_maps · gf_attack · gf_redzone · gf_audit · gf_stats · gf_menu · gf_admin · gf_screen
 ```
 
 La page NUI de `gf_screen` embarque `html/vendor/three.min.js`, une copie
@@ -309,14 +316,16 @@ pour garder les changements de version manuels.
 
 ## Limites connues
 
-- La logique Lua a des tests unitaires dans `tests/lua/` : `lobby_backdrop.lua`
-  couvre la géométrie du fond du lobby (plan, triangles, ligne de sol,
-  hauteur du regard) ; `lobby_nui_callbacks.lua` vérifie que chaque callback
-  NUI répond une fois, référence de fonction FiveM comprise ; `run.lua` couvre
-  les modules purs de `gf_core` (netId, distance, véhicule, rate-limit, crédit
-  des kills, confirmation de mort). `tests/test_lobby_nui.py` les lance avec
-  `lua5.4` ou `lua`, et saute le test si l'interpréteur manque. La plupart de
-  la logique de jeu (`gf_attack`, le reste de `gf_core`…) n'est pas couverte.
+- La logique Lua a des tests unitaires dans `tests/lua/`, lancés par
+  `scripts/verifier.sh` dans l'image de vérification : les règles de manche
+  (`gf_attack/rules.lua`), la file du lobby, les modules purs de `gf_core`,
+  le panneau admin, la killcam, le journal, l'inventaire, les photos. Le code
+  client reste peu couvert ; la carte de couverture et les niveaux de test
+  exigés sont dans [`methode/strategie-de-test.md`](methode/strategie-de-test.md).
+- Les liens entre ressources (exports, événements, state bags) sont
+  décrits par les `contrat.json` de chaque ressource et vérifiés par
+  `tests/test_contrats.py` ; la vue d'ensemble générée est
+  [`contrats.md`](contrats.md).
 - Le test de démarrage nécessite le secret `CFX_LICENSE_KEY` ; sans lui (PR de
   fork ou de Dependabot), le job reste vert mais le démarrage n'est pas testé.
   Les autres vérifications restent bloquantes.

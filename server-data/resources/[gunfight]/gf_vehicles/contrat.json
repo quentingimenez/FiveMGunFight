@@ -1,0 +1,39 @@
+{
+  "ressource": "gf_vehicles",
+  "exports": [
+    "ApplyCustom",
+    "GetThumbList"
+  ],
+  "consomme": [
+    "gf_admin:LogAction",
+    "gf_thumbs:Get"
+  ],
+  "emet": [
+    "gf_lobby:menuOverlay"
+  ],
+  "ecoute": [
+    "gf_core:modeChanged",
+    "gf_lobby:state"
+  ],
+  "state_bags": {
+    "ecrit": [
+      "gf_vehicle_base",
+      "gf_vehicle_customs",
+      "gf_vehicle_versions"
+    ],
+    "lit": [
+      "gf_vehicle_customs",
+      "gf_vehicle_versions"
+    ]
+  },
+  "dependances": {
+    "dures": [],
+    "optionnelles": [
+      "gf_admin",
+      "gf_thumbs"
+    ]
+  },
+  "dette": [
+    "cycle:gf_thumbs"
+  ]
+}

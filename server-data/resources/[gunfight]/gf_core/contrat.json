@@ -1,0 +1,80 @@
+{
+  "ressource": "gf_core",
+  "exports": [
+    "BuildWeaponList",
+    "DeleteModeVehicle",
+    "DeleteVehicle",
+    "Freeze",
+    "GetEquippedWeapons",
+    "GetMode",
+    "GetModeVehicle",
+    "GetOwnedWeapons",
+    "GetPlayersInMode",
+    "GetSelectionSettings",
+    "GetStarterWeapons",
+    "GetTeam",
+    "GetWeaponCatalog",
+    "GetWeaponThumbList",
+    "GiveModeVehicle",
+    "GiveWeapons",
+    "IsAdmin",
+    "IsProtected",
+    "Notify",
+    "OwnsWeapon",
+    "ResolveSelection",
+    "SetMode",
+    "SetProtected",
+    "SetTeam",
+    "Spawn",
+    "UpdateRedzoneWeapons"
+  ],
+  "consomme": [
+    "gf_admin:LogAction",
+    "gf_attack:CanJoin",
+    "gf_vehicles:ApplyCustom"
+  ],
+  "emet": [
+    "gf:anomalie",
+    "gf:armourGranted",
+    "gf:hit",
+    "gf:modeJoined",
+    "gf:modeLeft",
+    "gf:playerKilled",
+    "gf:spawned",
+    "gf_ui:hit",
+    "gf_ui:hud",
+    "gf_ui:kill",
+    "gf_ui:killfeed",
+    "gf_ui:notify",
+    "gf_ui:scoreboard",
+    "gf_ui:weapons"
+  ],
+  "ecoute": [],
+  "state_bags": {
+    "ecrit": [
+      "gf_mode",
+      "gf_protected",
+      "gf_team"
+    ],
+    "lit": [
+      "gf_mode",
+      "gf_vehicle_base",
+      "gf_vehicle_versions"
+    ]
+  },
+  "dependances": {
+    "dures": [
+      "gf_ui"
+    ],
+    "optionnelles": [
+      "gf_admin",
+      "gf_attack",
+      "gf_inventory",
+      "gf_vehicles"
+    ]
+  },
+  "dette": [
+    "cycle:gf_admin",
+    "cycle:gf_attack"
+  ]
+}

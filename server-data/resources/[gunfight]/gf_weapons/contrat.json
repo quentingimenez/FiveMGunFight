@@ -1,0 +1,16 @@
+{
+  "ressource": "gf_weapons",
+  "exports": [],
+  "consomme": [],
+  "emet": [],
+  "ecoute": [],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [],
+    "optionnelles": []
+  },
+  "dette": []
+}

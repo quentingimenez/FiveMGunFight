@@ -22,7 +22,7 @@ procédures de production.
 | Panneau txAdmin | `http://127.0.0.1:40120` | `TXADMIN=true` (défaut) | publié uniquement sur la boucle locale ; voir section 9 du README |
 | Journaux du serveur | `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f fxserver` | — | `--since 10m`, `--tail 200` pour cibler |
 | Console du serveur | `console.bat` ou `docker attach gunfight-fxserver` | `stdin_open`/`tty` du service | `Ctrl+P` puis `Ctrl+Q` pour se détacher sans arrêter |
-| MariaDB | `docker compose ... exec mariadb mariadb -u gunfight -p gunfight` | `.env` (`MARIADB_*`) | aucun port exposé sur l'hôte ; la base n'est pas encore utilisée par le jeu |
+| MariaDB | `docker compose ... exec mariadb mariadb -u gunfight -p gunfight` | `.env` (`MARIADB_*`) | aucun port exposé sur l'hôte ; tables du jeu créées par les migrations de `gf_db` |
 | Fichiers montés | `server-data/` | `docker-compose.dev.yml` | les modifications Lua/NUI sont prises en compte sans reconstruire l'image |
 | Personnages | `server-data/resources/[gunfight]/gf_lobby/data/characters.json` | `gf_lobby/config.lua` | ignoré par Git ; `resetchar` dans la console F8 pour repartir de zéro |
 | Maps | `server-data/resources/[gunfight]/gf_maps/data/maps.json` | `gf_maps/server.lua` | suivi par Git ; sauvegarde-le après une création volontaire |
@@ -315,6 +315,16 @@ pas été terminé : c'est attendu, pas une panne du jeu.
 - Sans console : `python scripts/fivem_rcon.py restart gf_<nom>` envoie la
   commande par rcon (surcouche dev et `TXADMIN=false` seulement ; détail et
   autres outils d'essai dans [`pieges-fivem.md`](pieges-fivem.md) § 1).
+- Scénario console rejouable (niveau T4 de la
+  [stratégie de test](methode/strategie-de-test.md)) : `python
+  scripts/scenario.py scripts/scenarios/redemarrage-attack.json` envoie les
+  commandes rcon du scénario et attend les lignes de journal prévues ; code 0
+  si tout passe, 1 à la première étape en échec. Un scénario se décrit en
+  JSON (`rcon`, `attendre`, `absent`, `pause`) ; le texte attendu se recopie
+  du code, jamais de mémoire.
+- Erreurs de script dans le journal du serveur de développement :
+  `docker compose -f docker-compose.yml -f docker-compose.dev.yml logs --no-color fxserver > fx.log`
+  (hors du dépôt), puis `bash scripts/verifier-journal-serveur.sh fx.log`.
 - Après une modification Lua ou NUI sous `server-data/`, `restart gf_<nom>`
   suffit le plus souvent. Si l'interface NUI garde l'ancien fichier,
   reconnecte-toi ou redémarre `gf_lobby`.

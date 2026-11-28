@@ -1,0 +1,34 @@
+{
+  "ressource": "gf_inventory",
+  "exports": [
+    "GetEquipped",
+    "GetObtained",
+    "GetWeaponAccessories",
+    "GiveWeaponToLocker"
+  ],
+  "consomme": [
+    "gf_admin:LogAction",
+    "gf_db:Pret",
+    "gf_redzone:CanChangeWeapons"
+  ],
+  "emet": [],
+  "ecoute": [],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_core",
+      "gf_db",
+      "gf_weapons",
+      "oxmysql"
+    ],
+    "optionnelles": [
+      "gf_admin",
+      "gf_db",
+      "gf_redzone"
+    ]
+  },
+  "dette": []
+}

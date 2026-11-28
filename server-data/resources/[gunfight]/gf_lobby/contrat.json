@@ -1,0 +1,45 @@
+{
+  "ressource": "gf_lobby",
+  "exports": [
+    "ForceLaunchQueue",
+    "GetLobbyAppearance"
+  ],
+  "consomme": [
+    "gf_admin:LogAction",
+    "gf_attack:CanJoin",
+    "gf_attack:GetMapChoices",
+    "gf_attack:RegisterSquads",
+    "gf_attack:SetNextMap",
+    "gf_core:GetMode",
+    "gf_core:GetPlayersInMode",
+    "gf_core:SetMode"
+  ],
+  "emet": [
+    "gf_ui:hud",
+    "gf_ui:notify"
+  ],
+  "ecoute": [
+    "gf:modeJoined",
+    "gf:modeLeft",
+    "gf_core:modeChanged",
+    "gf_core:spawned"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": [
+      "gf_mode"
+    ]
+  },
+  "dependances": {
+    "dures": [
+      "gf_core"
+    ],
+    "optionnelles": [
+      "gf_admin",
+      "gf_attack"
+    ]
+  },
+  "dette": [
+    "cycle:gf_attack"
+  ]
+}

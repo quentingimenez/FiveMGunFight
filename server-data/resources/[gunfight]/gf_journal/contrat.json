@@ -1,0 +1,38 @@
+{
+  "ressource": "gf_journal",
+  "exports": [],
+  "consomme": [
+    "gf_core:GetMode",
+    "gf_core:GetTeam",
+    "gf_db:Pret"
+  ],
+  "emet": [],
+  "ecoute": [
+    "gf:anomalie",
+    "gf:hit",
+    "gf:matchAborted",
+    "gf:matchEnded",
+    "gf:matchResults",
+    "gf:matchStarted",
+    "gf:modeJoined",
+    "gf:modeKill",
+    "gf:modeLeft",
+    "gf:phase",
+    "gf:playerKilled",
+    "gf:roundEnded"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_db",
+      "oxmysql"
+    ],
+    "optionnelles": []
+  },
+  "dette": [
+    "dependance-cachee:gf_core"
+  ]
+}

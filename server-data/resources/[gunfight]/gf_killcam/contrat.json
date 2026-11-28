@@ -1,0 +1,27 @@
+{
+  "ressource": "gf_killcam",
+  "exports": [
+    "RemainingMs"
+  ],
+  "consomme": [
+    "gf_core:GetMode"
+  ],
+  "emet": [],
+  "ecoute": [
+    "gf:modeLeft",
+    "gf:playerKilled"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": [
+      "gf_mode"
+    ]
+  },
+  "dependances": {
+    "dures": [
+      "gf_core"
+    ],
+    "optionnelles": []
+  },
+  "dette": []
+}

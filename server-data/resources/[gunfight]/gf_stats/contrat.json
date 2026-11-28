@@ -1,0 +1,26 @@
+{
+  "ressource": "gf_stats",
+  "exports": [
+    "GetPlayerStats"
+  ],
+  "consomme": [
+    "gf_db:Pret"
+  ],
+  "emet": [],
+  "ecoute": [
+    "gf:matchEnded",
+    "gf:modeKill"
+  ],
+  "state_bags": {
+    "ecrit": [],
+    "lit": []
+  },
+  "dependances": {
+    "dures": [
+      "gf_db",
+      "oxmysql"
+    ],
+    "optionnelles": []
+  },
+  "dette": []
+}

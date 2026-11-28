@@ -334,6 +334,14 @@ jobs:
         if: env.disponible == 'true'
         run: |
           set -uo pipefail
+          # La dernière ressource `ensure gf_` de server.cfg est celle qui
+          # démarre en fin de liste : attendre gf_core seulement laissait passer
+          # un démarrage incomplet. Même extraction que l'étape suivante.
+          derniere="$(awk '$1 == "ensure" && $2 ~ /^gf_/ { print $2 }' server-data/server.cfg | tail -n 1)"
+          if [ -z "$derniere" ]; then
+            echo "::error::Aucune ressource gf_ trouvée dans server-data/server.cfg."
+            exit 1
+          fi
           demarre=false
           for i in $(seq 1 60); do
             if [ "$(docker inspect -f '{{.State.Running}}' smoke 2>/dev/null || true)" != "true" ]; then
@@ -342,7 +350,7 @@ jobs:
               exit 1
             fi
             if curl -fsS --max-time 2 "http://127.0.0.1:30120/dynamic.json" >/dev/null 2>&1 \
-              && docker logs smoke 2>&1 | grep "Started resource gf_core" >/dev/null; then
+              && docker logs smoke 2>&1 | grep "Started resource $derniere" >/dev/null; then
               echo "Serveur démarré après $((i * 3)) s."
               demarre=true
               break
@@ -390,6 +398,7 @@ jobs:
               exit 1
             fi
           done
+          bash scripts/verifier-journal-serveur.sh smoke.log
           echo "Ressources scannées et ressources gunfight démarrées."
 
       # Même en échec : on rassemble les journaux, puis on vérifie qu'aucune
