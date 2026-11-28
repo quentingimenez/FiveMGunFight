@@ -335,7 +335,19 @@ AddEventHandler('gf:playerKilled', function(victim, killer, weapon, mode)
     S.dirty = true
 
     SetTimeout(Config.RespawnDelay * 1000, function()
-        if S.players[victim] then spawnPlayer(victim) end
+        if not S.players[victim] then return end
+        -- Le killcam peut prolonger l'attente : on reprogramme l'apparition
+        -- après la fin du clip plutôt que de couper la lecture.
+        if GetResourceState('gf_killcam') == 'started' then
+            local ok, reste = pcall(function() return exports.gf_killcam:RemainingMs(victim) end)
+            if ok and type(reste) == 'number' and reste > 0 then
+                SetTimeout(reste, function()
+                    if S.players[victim] then spawnPlayer(victim) end
+                end)
+                return
+            end
+        end
+        spawnPlayer(victim)
     end)
 end)
 

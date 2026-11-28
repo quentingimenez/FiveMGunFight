@@ -28,6 +28,8 @@ globals = {
   "AuditVie",
   "Base64",
   "GFAdminCommands",
+  -- Module partagé de suivi des échantillons de la killcam (gf_killcam).
+  "GFKillcamTrack",
   "GFLobbyAppearance",
   "GFLobbyAppearanceSchema",
   "GFLobbyBackdrop",

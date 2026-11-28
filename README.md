@@ -279,6 +279,7 @@ server-data/
   resources/[gunfight]/
     gf_db       migrations du schéma MariaDB au démarrage (gf_schema_version)
     gf_core     modes, apparition, armes, morts, anti-tir sur coéquipier
+    gf_killcam  killcam : la victime revoit les dernières secondes du point de vue du tueur
     gf_lobby    création de personnage, caméra fixe, escouade, invitations, choix du mode
     gf_attack   mode Attaque de zone
     gf_redzone  mode Redzone
