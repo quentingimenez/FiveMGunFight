@@ -3,48 +3,12 @@
 WeaponAccessories = {}
 
 local vanilla = {
-    WEAPON_CARBINERIFLE = { clip = { 'COMPONENT_CARBINERIFLE_CLIP_01', 'COMPONENT_CARBINERIFLE_CLIP_02', 'COMPONENT_CARBINERIFLE_CLIP_03' },
-        sight = { 'COMPONENT_AT_SCOPE_MEDIUM' },
-        grip = { 'COMPONENT_AT_AR_AFGRIP' },
-        light = { 'COMPONENT_AT_AR_FLSH' },
-        suppressor = { 'COMPONENT_AT_AR_SUPP' } },
-    WEAPON_ASSAULTRIFLE = { clip = { 'COMPONENT_ASSAULTRIFLE_CLIP_01', 'COMPONENT_ASSAULTRIFLE_CLIP_02', 'COMPONENT_ASSAULTRIFLE_CLIP_03' },
-        sight = { 'COMPONENT_AT_SCOPE_MACRO' },
-        grip = { 'COMPONENT_AT_AR_AFGRIP' },
-        light = { 'COMPONENT_AT_AR_FLSH' },
-        suppressor = { 'COMPONENT_AT_AR_SUPP_02' } },
     WEAPON_SPECIALCARBINE = { clip = { 'COMPONENT_SPECIALCARBINE_CLIP_01', 'COMPONENT_SPECIALCARBINE_CLIP_02', 'COMPONENT_SPECIALCARBINE_CLIP_03' },
         sight = { 'COMPONENT_AT_SCOPE_MEDIUM' },
         grip = { 'COMPONENT_AT_AR_AFGRIP' },
         light = { 'COMPONENT_AT_AR_FLSH' },
         suppressor = { 'COMPONENT_AT_AR_SUPP_02' } },
-    WEAPON_BULLPUPRIFLE = { clip = { 'COMPONENT_BULLPUPRIFLE_CLIP_01', 'COMPONENT_BULLPUPRIFLE_CLIP_02' },
-        sight = { 'COMPONENT_AT_SCOPE_SMALL' },
-        grip = { 'COMPONENT_AT_AR_AFGRIP' },
-        light = { 'COMPONENT_AT_AR_FLSH' },
-        suppressor = { 'COMPONENT_AT_AR_SUPP' } },
-    WEAPON_SMG = { clip = { 'COMPONENT_SMG_CLIP_01', 'COMPONENT_SMG_CLIP_02', 'COMPONENT_SMG_CLIP_03' },
-        sight = { 'COMPONENT_AT_SCOPE_MACRO_02' },
-        light = { 'COMPONENT_AT_AR_FLSH' },
-        suppressor = { 'COMPONENT_AT_PI_SUPP' } },
-    WEAPON_COMBATPDW = { clip = { 'COMPONENT_COMBATPDW_CLIP_01', 'COMPONENT_COMBATPDW_CLIP_02', 'COMPONENT_COMBATPDW_CLIP_03' },
-        sight = { 'COMPONENT_AT_SCOPE_SMALL' },
-        grip = { 'COMPONENT_AT_AR_AFGRIP' },
-        light = { 'COMPONENT_AT_AR_FLSH' } },
-    WEAPON_PUMPSHOTGUN = { clip = { 'COMPONENT_PUMPSHOTGUN_CLIP_01' }, light = { 'COMPONENT_AT_AR_FLSH' },
-        suppressor = { 'COMPONENT_AT_SR_SUPP' } },
-    WEAPON_MARKSMANRIFLE = { clip = { 'COMPONENT_MARKSMANRIFLE_CLIP_01', 'COMPONENT_MARKSMANRIFLE_CLIP_02' },
-        sight = { 'COMPONENT_AT_SCOPE_LARGE_FIXED_ZOOM' },
-        grip = { 'COMPONENT_AT_AR_AFGRIP' },
-        light = { 'COMPONENT_AT_AR_FLSH' },
-        suppressor = { 'COMPONENT_AT_AR_SUPP' } },
-    WEAPON_PISTOL = { clip = { 'COMPONENT_PISTOL_CLIP_01', 'COMPONENT_PISTOL_CLIP_02' },
-        light = { 'COMPONENT_AT_PI_FLSH' },
-        suppressor = { 'COMPONENT_AT_PI_SUPP_02' } },
-    WEAPON_PISTOL50 = { clip = { 'COMPONENT_PISTOL50_CLIP_01', 'COMPONENT_PISTOL50_CLIP_02' },
-        light = { 'COMPONENT_AT_PI_FLSH' },
-        suppressor = { 'COMPONENT_AT_AR_SUPP_02' } },
-    WEAPON_HEAVYPISTOL = { clip = { 'COMPONENT_HEAVYPISTOL_CLIP_01', 'COMPONENT_HEAVYPISTOL_CLIP_02' },
+    WEAPON_APPISTOL = { clip = { 'COMPONENT_APPISTOL_CLIP_01', 'COMPONENT_APPISTOL_CLIP_02' },
         light = { 'COMPONENT_AT_PI_FLSH' },
         suppressor = { 'COMPONENT_AT_PI_SUPP' } },
 }
@@ -62,7 +26,8 @@ local optionalDefaults = {
     },
     WEAPON_WOLFRIFLE = { suppressor = 'wolfrifle_supp' },
 }
-local stockMagazines = { WEAPON_PUMPSHOTGUN = true, WEAPON_MARKSMANRIFLE = true }
+-- Chargeurs GTA d'origine, sans chargeur de 60 ajouté.
+local stockMagazines = { WEAPON_APPISTOL = true }
 
 function WeaponAccessories.catalog(name)
     local result = {}

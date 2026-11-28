@@ -91,17 +91,8 @@ Config.HealthRegen = false
 --   tint       : (optionnel) couleur de l'arme (0 à 7)
 -- ---------------------------------------------------------------------------
 Config.Weapons = {
-    carbine     = { name = 'WEAPON_CARBINERIFLE',   label = 'Carabine',            category = 'Fusil d\'assaut', ammo = 300 },
-    assault     = { name = 'WEAPON_ASSAULTRIFLE',   label = 'Fusil d\'assaut',     category = 'Fusil d\'assaut', ammo = 300 },
     special     = { name = 'WEAPON_SPECIALCARBINE', label = 'Carabine spéciale',   category = 'Fusil d\'assaut', ammo = 300 },
-    bullpup     = { name = 'WEAPON_BULLPUPRIFLE',   label = 'Fusil bullpup',       category = 'Fusil d\'assaut', ammo = 300 },
-    smg         = { name = 'WEAPON_SMG',            label = 'SMG',                 category = 'Mitraillette',    ammo = 360 },
-    pdw         = { name = 'WEAPON_COMBATPDW',      label = 'PDW',                 category = 'Mitraillette',    ammo = 360 },
-    pump        = { name = 'WEAPON_PUMPSHOTGUN',    label = 'Fusil à pompe',       category = 'Fusil à pompe',   ammo = 60 },
-    marksman    = { name = 'WEAPON_MARKSMANRIFLE',  label = 'Fusil de précision',  category = 'Précision',       ammo = 60 },
-    pistol      = { name = 'WEAPON_PISTOL',         label = 'Pistolet',            category = 'Pistolet',        ammo = 96 },
-    pistol50    = { name = 'WEAPON_PISTOL50',       label = 'Pistolet .50',        category = 'Pistolet',        ammo = 72 },
-    heavypistol = { name = 'WEAPON_HEAVYPISTOL',    label = 'Pistolet lourd',      category = 'Pistolet',        ammo = 72 },
+    appistol    = { name = 'WEAPON_APPISTOL',       label = 'Pistolet perforant',  category = 'Pistolet',        ammo = 96 },
     ghostfair = { name = 'WEAPON_GHOSTFAIR', label = 'Ghost Fair Honey Badger', category = 'Mitraillette', ammo = 360 },
     revenant15 = { name = 'WEAPON_REVENANT15', label = 'Revenant 15', category = 'Fusil d\'assaut', ammo = 300 },
     akfemvvsblue = { name = 'WEAPON_AKFEMVVSBLUE', label = 'AKFEMVVSBLUE', category = 'Fusil d\'assaut', ammo = 300 },
@@ -161,10 +152,10 @@ Config.Weapons = {
 }
 
 -- Armes que tout le monde possède dès le départ (identifiants de Config.Weapons)
-Config.StarterWeapons = { 'carbine', 'assault', 'special', 'bullpup', 'smg', 'pdw', 'pump', 'marksman', 'pistol', 'pistol50', 'heavypistol' }
+Config.StarterWeapons = { 'special', 'appistol' }
 
 -- Choix par défaut si le joueur ne choisit rien
-Config.DefaultSelection = { 'carbine', 'pistol' }
+Config.DefaultSelection = { 'special', 'appistol' }
 
 -- Nombre d'armes à choisir et gilet pare-balles donné avec
 Config.SelectionCount = 2
@@ -181,15 +172,15 @@ Config.Loadouts = {
     attack = {
         armour = 100,
         weapons = {
-            { 'WEAPON_CARBINERIFLE', 300 },
-            { 'WEAPON_PISTOL', 72 },
+            { 'WEAPON_SPECIALCARBINE', 300 },
+            { 'WEAPON_APPISTOL', 72 },
         },
     },
     redzone = {
         armour = 100,
         weapons = {
             { 'WEAPON_SPECIALCARBINE', 400 },
-            { 'WEAPON_PISTOL50', 72 },
+            { 'WEAPON_APPISTOL', 72 },
         },
     },
 }
