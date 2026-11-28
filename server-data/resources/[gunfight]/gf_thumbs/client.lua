@@ -139,11 +139,20 @@ local Subjects = {
             local hash = joaat(id)
             if not IsWeaponValid(hash) then return nil end
             RequestWeaponAsset(hash, 31, 0)
-            if not waitLoaded(function() return HasWeaponAssetLoaded(hash) end) then return nil end
+            if not waitLoaded(function() return HasWeaponAssetLoaded(hash) end) then
+                RemoveWeaponAsset(hash)
+                return nil
+            end
             local obj = CreateWeaponObject(hash, 0, pos.x, pos.y, pos.z, true, 1.0, 0)
-            if obj == 0 then return nil end
+            if obj == 0 then
+                RemoveWeaponAsset(hash)
+                return nil
+            end
             return obj
         end,
+        -- Sans libération, chaque arme photographiée reste en mémoire de streaming :
+        -- une série de photos sature le streaming (sol et textures de la carte disparaissent).
+        release = function(id) RemoveWeaponAsset(joaat(id)) end,
         view = 'side', -- de profil, perpendiculaire à l'axe le plus long
     },
 }
@@ -262,6 +271,7 @@ local function shoot(kind, id, version, automatic)
     DestroyCam(cam, false)
     SetEntityAsMissionEntity(ent, true, true)
     DeleteEntity(ent)
+    if subject.release then subject.release(id) end
 
     if type(data) == 'table' and type(data.url) == 'string' then
         TriggerLatentServerEvent('gf_thumbs:save', 200000, kind, id, data.url, automatic == true)
