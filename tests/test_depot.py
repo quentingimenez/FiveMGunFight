@@ -919,6 +919,21 @@ class ChaineCI(unittest.TestCase):
         self.assertIn("fetch-depth: 0", texte)
         self.assertIn("run: gitleaks git", texte)
 
+    def test_qualite_n_annule_que_sur_pull_request(self) -> None:
+        # Sur main, une annulation laisserait le commit de fusion sans check
+        # requis et sans issue d'alerte (conclusion « cancelled » non surveillée).
+        texte = lire(self.WORKFLOWS / "qualite.yml")
+        self.assertIn(
+            "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+            texte,
+            "qualite.yml doit annuler seulement les runs de pull request",
+        )
+        self.assertNotIn(
+            "cancel-in-progress: true",
+            texte,
+            "un run de main ne doit jamais être annulé",
+        )
+
     def test_qualite_met_l_image_en_cache(self) -> None:
         # Sans cache, l'apt-get de l'image dépend du débit d'archive.ubuntu.com
         # (jusqu'à 10 minutes) ; le scope distinct protège le cache de docker.yml.

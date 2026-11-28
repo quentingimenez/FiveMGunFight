@@ -15,8 +15,14 @@ permissions:
   contents: read
 
 concurrency:
+  # Sur une pull request, un nouvel envoi annule le run précédent : seul le
+  # dernier porte un résultat utile. Sur main, deux fusions rapprochées
+  # lancent deux runs sur refs/heads/main : annuler le premier laisserait son
+  # commit de fusion sans validation, et sans issue d'alerte (« cancelled »
+  # n'est pas surveillé par alerte-main.yml). Les runs de main ne s'annulent
+  # donc jamais, comme pour les jobs image et smoke de docker.yml.
   group: qualite-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Utilisées par le job « securite ». L'image de vérification duplique ces

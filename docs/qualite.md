@@ -11,17 +11,27 @@ se contente pas de « lancer des tests » : les checks requis sont déclarés co
 
 | Workflow | Job affiché | Déclencheur | Durée typique |
 |---|---|---|---|
-| `.github/workflows/qualite.yml` | `Qualité du dépôt` | chaque pull request, chaque envoi sur `main` | 3 à 4 min (image de vérification construite à chaque run) |
-| `.github/workflows/qualite.yml` | `Sécurité de l'historique` | chaque pull request, chaque envoi sur `main` | moins d'1 min |
-| `.github/workflows/docker.yml` | `Construire et publier l'image` | chaque pull request, `main`, tags `v*`, et chaque lundi à 03:17 UTC | 2 à 4 min (seule l'étape `base` du Dockerfile est mise en cache) |
-| `.github/workflows/docker.yml` | `Vérifier le démarrage des ressources` | chaque pull request, `main`, tags `v*`, et chaque lundi à 03:17 UTC | 10 à 25 min |
+| `.github/workflows/qualite.yml` | `Qualité du dépôt` | chaque pull request, chaque envoi sur `main` | 1 min 30 à 2 min (image de vérification construite à chaque run) |
+| `.github/workflows/qualite.yml` | `Sécurité de l'historique` | chaque pull request, chaque envoi sur `main` | moins d'une minute |
+| `.github/workflows/docker.yml` | `Construire et publier l'image` | chaque pull request, `main`, tags `v*`, et chaque lundi à 03:17 UTC | 2 à 3 min (seule l'étape `base` du Dockerfile est mise en cache) |
+| `.github/workflows/docker.yml` | `Vérifier le démarrage des ressources` | chaque pull request, `main`, tags `v*`, et chaque lundi à 03:17 UTC | 1 à 2 min |
 | `.github/workflows/alerte-main.yml` | `Signaler une CI rouge sur main` | échec de `Qualité` ou de `Docker` sur `main` ; ouvre ou complète l'issue « CI rouge sur main » | quelques secondes |
 
-Le job `Sécurité de l'historique` est un contrôle supplémentaire : il n'est pas
-encore listé dans les `contexts` requis de
-[`.github/branch-protection.json`](../.github/branch-protection.json). Son échec
-est visible, mais ne bloque la fusion qu'une fois la protection mise à jour avec
-les droits d'administration.
+Ces durées sont les médianes mesurées sur 40 runs des 27 et 28 novembre 2026
+(API GitHub, 20 runs `Qualité` et 20 runs `Docker`) : une pull request
+complète prend 3 à 4 minutes, et la CI de `main` autant. Le chemin critique
+est toujours la chaîne Docker (`Construire et publier l'image`, puis
+`Vérifier le démarrage des ressources`) ; `Qualité du dépôt` (1 min 44) et
+`Sécurité de l'historique` (26 s) finissent bien avant et ne retardent jamais
+une fusion. La file d'attente des runners est nulle sur les 40 runs.
+
+Les quatre jobs — `Qualité du dépôt`, `Sécurité de l'historique`,
+`Construire et publier l'image` et `Vérifier le démarrage des ressources` —
+sont les checks requis du ruleset « Protection de main » (voir
+[`protection-branche.md`](protection-branche.md)). Le fichier
+[`.github/branch-protection.json`](../.github/branch-protection.json) est un
+**ancien modèle** (trois checks, une approbation) : il ne décrit plus l'état
+réel et ne doit pas servir de référence.
 
 Le job de démarrage réel (`smoke`) construit désormais l'image **sur chaque
 pull request, même sans secret**. Il exécute d'abord un test statique qui ne
@@ -59,6 +69,16 @@ l'empêche pas techniquement mais le déconseille ; le smoke ne dure que
 quelques minutes et ne reçoit aucun joueur. Si cela pose problème, la parade
 est une deuxième clé CI (un compte a droit à trois clés), pas un groupe de
 concurrence partagé.
+
+### Aucun run de `main` n'est annulé
+
+`qualite.yml` ne s'annule que sur pull request
+(`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`). Deux fusions
+rapprochées lancent deux runs sur `refs/heads/main` : avec une annulation
+inconditionnelle, le premier était annulé, son commit de fusion restait sans
+validation et aucune issue n'était ouverte (`cancelled` ne fait pas partie des
+conclusions surveillées par `alerte-main.yml`). Les jobs `image` et `smoke` de
+`docker.yml` ont la même règle depuis le début.
 
 ## Les vérifications (`scripts/verifier.sh`, dans l'image)
 

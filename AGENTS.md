@@ -215,10 +215,10 @@ gh pr checks --watch
 gh pr view --json number,state,mergeable,statusCheckRollup
 ```
 
-- Attendre la fin de **tous** les checks : `Qualité du dépôt` (3–4 min :
+- Attendre la fin de **tous** les checks : `Qualité du dépôt` (1 min 30 à 2 min :
   construction de l'image de vérification comprise),
-  `Construire et publier l'image` (3–8 min) et `Vérifier le démarrage des
-  ressources` (10–20 min, sauté avec une note si le secret CI est absent).
+  `Construire et publier l'image` (2 à 3 min) et `Vérifier le démarrage des
+  ressources` (1 à 2 min, sauté avec une note si le secret CI est absent).
 - **Rouge** : corriger sur la même branche, commit additionnel, `git push`, puis
   relancer le suivi. Pas de désactivation ni de contournement d'un check
   (`--admin` interdit).
@@ -271,7 +271,7 @@ Il attend la fin des checks de la PR (un check rouge bloque la fusion),
 fusionne en squash, puis suit jusqu'au bout chaque run lancé sur `main` par le
 commit de fusion. Il ne sort en code 0 que si la CI de `main` est verte ; sinon
 il affiche le lien du run rouge. Le lancer en arrière-plan si l'outil limite la
-durée d'une commande : la CI de `main` dure de 10 à 20 minutes.
+durée d'une commande : la CI de `main` dure de 3 à 4 minutes.
 
 - Squash **uniquement** (jamais de merge commit ni de rebase) : l'historique de
   `main` reste une suite de changements complets.
