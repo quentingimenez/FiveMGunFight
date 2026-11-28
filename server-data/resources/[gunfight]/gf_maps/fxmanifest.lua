@@ -23,4 +23,5 @@ client_scripts {
 
 dependencies {
     'gf_core',
+    'gf_ui',
 }

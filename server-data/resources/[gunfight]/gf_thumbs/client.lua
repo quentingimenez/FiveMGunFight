@@ -82,21 +82,14 @@ local capturing = false
 -- jeu : il est mis de côté (plus de photo automatique) et signalé au serveur.
 -- La mise de côté vaut pour une version du modèle (fournie par la liste, ex. taille
 -- du .yft) : si le fichier change, la photo est retentée toute seule.
-local INFLIGHT = 'gf_thumbs:inflight'
-local function badKey(kind, id) return ('gf_thumbs:badv:%s/%s'):format(kind, id) end
+local crashMarker = CrashMarker.new('gf_thumbs:inflight', 'gf_thumbs:badv:', { get = GetResourceKvpString, set = SetResourceKvp, del = DeleteResourceKvp })
 local function isBad(kind, id, version)
-    return GetResourceKvpString(badKey(kind, id)) == tostring(version or '0')
+    return crashMarker:isBad(('%s/%s'):format(kind, id), version)
 end
-do
-    local crashed = GetResourceKvpString(INFLIGHT) -- « famille/id@version »
-    if crashed and crashed ~= '' then
-        local ref, version = crashed:match('^([^@]+)@(.*)$')
-        ref = ref or crashed
-        SetResourceKvp('gf_thumbs:badv:' .. ref, version or '0')
-        DeleteResourceKvp(INFLIGHT)
-        print(('^1[gf_thumbs] %s a fait planter le jeu pendant sa photo : ignoré tant que le modèle ne change pas^0'):format(ref))
-        TriggerServerEvent('gf_thumbs:broken', ref)
-    end
+local ref = crashMarker:recover()
+if ref then
+    print(('^1[gf_thumbs] %s a fait planter le jeu pendant sa photo : ignoré tant que le modèle ne change pas^0'):format(ref))
+    TriggerServerEvent('gf_thumbs:broken', ref)
 end
 local captureWaiter = nil -- promesse de la photo en cours
 
@@ -205,7 +198,7 @@ local function shoot(kind, id, version, automatic)
     local subject = Subjects[def.subject]
     local s = Config.Studio
     local pos = vector3(s.x, s.y, s.z)
-    SetResourceKvp(INFLIGHT, ('%s/%s@%s'):format(kind, id, tostring(version or '0')))
+    crashMarker:begin(('%s/%s'):format(kind, id), version)
     local ent = subject.spawn(id, pos)
     if not ent then
         print(('[gf_thumbs] %s/%s : modèle introuvable, ignoré'):format(kind, id))
@@ -311,9 +304,9 @@ local function runBatch(jobs, why)
         print(('[gf_thumbs] Photo %d/%d : %s/%s (%s)'):format(i, #jobs, job.kind, job.id, why))
         if shoot(job.kind, job.id, job.version, why == 'automatique') then
             ok = ok + 1
-            DeleteResourceKvp(badKey(job.kind, job.id)) -- refait avec succès : plus « cassé »
+            crashMarker:clear(('%s/%s'):format(job.kind, job.id)) -- refait avec succès : plus « cassé »
         end
-        DeleteResourceKvp(INFLIGHT)
+        crashMarker:finish()
         Wait(300)
     end
 

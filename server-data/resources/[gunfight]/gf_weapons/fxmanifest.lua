@@ -401,3 +401,4 @@ data_file 'PED_PERSONALITY_FILE' 'data/**/pedpersonality.meta'
 data_file 'WEAPONINFO_FILE' 'data/**/weapons.meta'
 
 client_script 'client.lua'
+server_script 'server.lua'

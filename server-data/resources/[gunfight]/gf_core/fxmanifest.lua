@@ -14,7 +14,7 @@ server_script 'shot_validation.lua'
 -- changement d'état y est enregistré et s'appuie sur les tables du serveur.
 server_script 'state_guard.lua'
 server_script 'server.lua'
-client_script 'client.lua'
+client_scripts { 'crash_marker.lua', 'client.lua' }
 
 dependencies {
     'baseevents',

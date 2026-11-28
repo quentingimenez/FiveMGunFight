@@ -6,6 +6,7 @@ local function record(name)
 end
 local env = setmetatable({
     Config = { PageReadyTimeoutMs = 1000 },
+    exports = { gf_ui = { PushLayer = function() return true end, PopLayer = function() return true end } },
     RegisterNUICallback = function(name, fn) callbacks[name] = fn end,
     RegisterNetEvent = function(name, fn) events[name] = fn end,
     AddEventHandler = function(name, fn) events[name] = fn end,

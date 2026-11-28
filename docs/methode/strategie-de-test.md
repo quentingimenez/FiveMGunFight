@@ -19,13 +19,24 @@ peut le détecter** : une règle de manche se teste en T1, pas en jouant.
 | **T2 ressource en bac à sable** | un vrai `server.lua` ou `client.lua` chargé dans un faux FiveM : handlers, exports, refus, journalisation | `tests/lua/*_test.lua` avec le harnais partagé `tests/lua/lib/fivem.lua` (C18) | idem | oui |
 | **T3 contrats et structure** | ce qui relie les ressources et le dépôt : événements déclarés, exports fournis, manifestes, `server.cfg`, migrations, documentation synchronisée | `tests/test_depot.py`, `tests/test_evenements.py`, registre des contrats `tests/test_contrats.py` (C17) | idem | oui |
 | **T4 serveur réel** | les ressources démarrent sans `SCRIPT ERROR` ; une commande console produit la ligne de journal attendue | job `smoke` de la CI ; en local `docker compose … up -d --force-recreate fxserver`, `scripts/fivem_rcon.py`, `scripts/verifier-journal-serveur.sh`, scénarios `scripts/scenario.py` (C19) | agent | en partie |
-| **T5 client unique** | une page NUI s'ouvre au bon calque et répond ; rendu comparé à une référence ; journal client sans erreur | `scripts/capturer-jeu.ps1`, clic NUI, `scripts/comparer_rendu.py`, `scripts/journal_client.py` | agent | en partie |
+| **T5 client unique** | une page NUI s'ouvre au bon calque, se ferme, et son ouverture change le rendu ; journal client sans erreur | `scripts/verifier_nui.py` (passerelle `gf_testbridge`, `scripts/capturer-jeu.ps1`, `scripts/comparer_rendu.py`, `scripts/journal_client.py`) | agent | oui, client installé |
 | **T6 humain** | tir, kill, conduite, deux joueurs, latence | `FiveM.exe -cl2`, clumsy | **humain** ; l'agent prépare le scénario et le demande | non |
 
+Le T5 est **automatisé** par `scripts/verifier_nui.py` : le script démarre la
+passerelle de test `gf_testbridge` (développement uniquement), lance le client
+FiveM si besoin, ouvre puis ferme chaque page par rcon, capture l'écran ouvert
+et fermé, compare les deux images (la page doit modifier le rendu) et lit le
+journal client. Il referme le client s'il l'a lancé. Ce niveau n'est pas dans
+la CI (le runner n'a ni client ni GPU) : il se lance en local avant la porte
+G3, et sa sortie va dans la section « Tests et preuve » de la PR. Ne demande
+jamais à l'utilisateur un test que ce script sait faire.
+
 Un agent ne peut ni tirer ni conduire ([`debug-test.md`](../debug-test.md)
-§ 6). Quand T6 est exigé, il écrit le scénario pas à pas (qui fait quoi,
-ce qu'on doit voir, quelle ligne de journal le confirme) et le demande à
-l'utilisateur **avant** la porte G3, jamais après la fusion.
+§ 6). Ce que le T5 automatisé ne couvre pas (une page qui n'apparaît qu'en
+match, un clic précis dans une page, une action qui exige deux joueurs) reste
+**T6** : l'agent écrit alors le scénario pas à pas (qui fait quoi, ce qu'on doit
+voir, quelle ligne de journal le confirme) et le demande à l'utilisateur
+**avant** la porte G3, jamais après la fusion.
 
 ## Matrice : ce qui est exigé
 
@@ -80,7 +91,8 @@ exigences.
 | une fonction JS de page NUI | `tests/js/<sujet>.test.js` (T1), la fonction exportée par un module sans DOM |
 | un script Python ou shell | `tests/test_<script>.py` |
 | un démarrage, une commande console | scénario rcon (T4, C19) |
-| un rendu | image de référence + `scripts/comparer_rendu.py` (T5, C14) |
+| une page NUI qui s'ouvre ou se ferme | `scripts/verifier_nui.py` (T5) : la page est ajoutée à sa liste et la passerelle rapporte son calque |
+| un rendu | `scripts/verifier_nui.py` et `scripts/comparer_rendu.py` (T5, C14) ; capture de référence si le seuil de similarité ne suffit pas |
 
 ## Les cas difficiles
 
@@ -91,8 +103,11 @@ exigences.
 - **Timing réseau** (mort annoncée avant que la vie soit à 0, #70) : le
   module pur reçoit le temps en paramètre, et le test rejoue l'ordre des
   événements observé dans le journal.
-- **Calques NUI** : la matrice exige T5 pour toute page qui prend le focus :
-  ouvrir la page **depuis le lobby, depuis le menu pause et pendant un
-  match**, une capture par situation.
+- **Calques NUI** : la matrice exige T5 pour toute page qui prend le focus.
+  `scripts/verifier_nui.py` couvre l'ouverture et la fermeture de chaque page
+  connue depuis un client connecté ; une page qui ne s'ouvre qu'en match, ou
+  une action qui exige un clic précis, se vérifie en T6 (scénario écrit) ou en
+  étendant la passerelle. Une feuille de calque qui reste empilée après la
+  fermeture de la page fait échouer le T5 (`calques=0` attendu).
 - **Pack tiers** : ce qu'il contient est une donnée, jamais exécutée ; le
   modèle se charge en jeu (T5) avant la fusion.

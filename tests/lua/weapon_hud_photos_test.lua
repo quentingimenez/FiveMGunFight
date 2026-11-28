@@ -14,13 +14,22 @@ local env = setmetatable({
     GetResourceState = function() return available and 'started' or 'stopped' end,
     CreateThread = function(fn) if not loading then fn() end end,
     SetTimeout = function(_, fn) timers[#timers + 1] = fn end,
-    exports = { gf_thumbs = { Get = function(_, kind, names)
-        calls[#calls + 1] = { kind = kind, names = names }
-        return { WEAPON_GHOSTFAIR = 'data:image/png;base64,photo' }
-    end } },
+    exports = {},
 }, { __index = _G })
 
+local provided = {}
+setmetatable(env.exports, {
+    __call = function(_, name, fn) provided[name] = fn end,
+})
+env.exports.gf_thumbs = { Get = function(_, kind, names)
+    calls[#calls + 1] = { kind = kind, names = names }
+    return { WEAPON_GHOSTFAIR = 'data:image/png;base64,photo' }
+end }
+
 local root = os.getenv('GF_ROOT') or '.'
+local layersChunk, layersErr = loadfile(root .. '/server-data/resources/[gunfight]/gf_ui/layers.lua', 't', env)
+assert(layersChunk, layersErr)
+layersChunk()
 local chunk, err = loadfile(root .. '/server-data/resources/[gunfight]/gf_ui/client.lua', 't', env)
 assert(chunk, err)
 chunk()

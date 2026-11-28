@@ -47,6 +47,10 @@ data_file 'AUDIO_GAMEDATA' 'audioconfig/lg247hemi57_game.dat'
 data_file 'AUDIO_SOUNDDATA' 'audioconfig/lg247hemi57_sounds.dat'
 data_file 'AUDIO_WAVEPACK' 'sfx/dlc_lg247hemi57'
 
+dependencies {
+    'gf_ui',
+}
+
 shared_script 'config.lua'
 server_script 'server.lua'
 client_script 'client.lua'

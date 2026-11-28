@@ -6,7 +6,6 @@
 -- =============================================================================
 
 local ouvert = false
-local lobbyUiOpen = false
 
 -- FiveM transmet le callback NUI comme référence de fonction : une table avec
 -- un métaméthode __call, pas une fonction Lua. Tester seulement type(cb)
@@ -29,7 +28,7 @@ end
 local function ouvrir()
     if ouvert then return end
     ouvert = true
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', true) end
+    exports.gf_ui:PushLayer(GetCurrentResourceName())
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
     SendNUIMessage({ type = 'open' })
@@ -42,23 +41,18 @@ local function fermer()
     SetNuiFocusKeepInput(false)
     SendNUIMessage({ type = 'close' })
     -- En dernier : le lobby reprend le focus après nous.
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
+    exports.gf_ui:PopLayer(GetCurrentResourceName())
 end
+
+-- Passerelle de test NUI : fermeture demandée par la console serveur.
+RegisterNetEvent('gf_testbridge:fermer', function(page)
+    if page ~= GetCurrentResourceName() then return end
+    if ouvert then fermer() end
+end)
 
 -- ---------------------------------------------------------------------- État
 
--- Le lobby garde la priorité sur son propre focus ; on mémorise son ouverture
--- exactement comme gf_menu le fait.
-RegisterNetEvent('gf_lobby:state', function(data)
-    lobbyUiOpen = type(data) == 'table'
-        and type(data.me) == 'table'
-        and data.me.inLobby == true
-end)
-
 RegisterNetEvent('gf_core:modeChanged', function(mode)
-    if type(mode) == 'string' and mode ~= 'lobby' then
-        lobbyUiOpen = false
-    end
     if ouvert then fermer() end
 end)
 

@@ -5,18 +5,19 @@
   ],
   "consomme": [
     "gf_db:Pret",
-    "gf_thumbs:Get"
+    "gf_thumbs:Get",
+    "gf_ui:PopLayer",
+    "gf_ui:PushLayer"
   ],
   "emet": [
     "gf:healGranted",
-    "gf_lobby:menuOverlay",
     "gf_ui:announce",
     "gf_ui:notify"
   ],
   "ecoute": [
     "gf_core:modeChanged",
     "gf_core:spawned",
-    "gf_lobby:state"
+    "gf_testbridge:fermer"
   ],
   "state_bags": {
     "ecrit": [],
@@ -26,6 +27,7 @@
     "dures": [
       "gf_core",
       "gf_db",
+      "gf_ui",
       "oxmysql"
     ],
     "optionnelles": [

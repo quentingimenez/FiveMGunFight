@@ -47,6 +47,14 @@ essai**.
    conteneur ou le même FiveM se cassent mutuellement leurs essais (lancement
    d'un mode pendant que l'autre capture, changement de branche sous les pieds
    de l'autre).
+6. **`restart` d'une dépendance arrête celles qui en dépendent, sans les
+   relancer.** Mesuré le 28 novembre 2026 : après `restart gf_ui` et
+   `restart gf_weapons`, `restart gf_thumbs` et `restart gf_inventory`
+   répondent « Can't restart a stopped resource ». gf_ui (calques NUI) et
+   gf_core sont des dépendances de beaucoup de ressources : pour les essayer,
+   recréer le conteneur (`up -d --force-recreate fxserver`) plutôt que les
+   redémarrer à chaud, puis vérifier que chaque ressource `ensure gf_` a
+   démarré. `python scripts/contrats.py --doc` liste qui dépend de quoi.
 
 ## 2. Natifs
 

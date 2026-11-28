@@ -6,14 +6,13 @@
   ],
   "consomme": [
     "gf_admin:LogAction",
-    "gf_thumbs:Get"
+    "gf_thumbs:Get",
+    "gf_ui:PopLayer",
+    "gf_ui:PushLayer"
   ],
-  "emet": [
-    "gf_lobby:menuOverlay"
-  ],
+  "emet": [],
   "ecoute": [
-    "gf_core:modeChanged",
-    "gf_lobby:state"
+    "gf_testbridge:fermer"
   ],
   "state_bags": {
     "ecrit": [
@@ -27,7 +26,9 @@
     ]
   },
   "dependances": {
-    "dures": [],
+    "dures": [
+      "gf_ui"
+    ],
     "optionnelles": [
       "gf_admin",
       "gf_thumbs"

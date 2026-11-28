@@ -10,7 +10,8 @@ local core = {
     Notify = function() end,
 }
 local ex = { gf_core = core, gf_db = { Pret = function() return true end },
-    gf_redzone = { CanChangeWeapons = function() return outside end } }
+    gf_redzone = { CanChangeWeapons = function() return outside end },
+    gf_weapons = { GetWeaponMeta = function(_, name) return nil end } }
 setmetatable(ex, { __call = function(_, name, fn) exported[name] = fn end })
 local env = setmetatable({
     exports = ex, source = 1,

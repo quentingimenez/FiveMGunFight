@@ -47,8 +47,8 @@ Exemples de ce que la règle interdit, et de la forme à prendre :
 |---|---|
 | gf_core appelle `exports.gf_attack:CanJoin()` | gf_attack appelle au démarrage `exports.gf_core:RegisterMode('attack', { canJoin = … })` ; gf_core ne connaît que le contrat d'un mode (C23) |
 | gf_core expose `UpdateRedzoneWeapons` | une fonction générique de gf_core (« remplacer l'équipement d'un joueur ») appelée par gf_redzone (C23) |
-| gf_inventory lit `weapons.meta` dans gf_weapons | gf_weapons expose ses données d'armes (C24) |
-| quatre ressources émettent `gf_lobby:menuOverlay` | gf_ui possède les calques : `PushLayer(nom)` / `PopLayer(nom)`, et gf_lobby s'y abonne comme les autres (C22) |
+| gf_inventory lisait `weapons.meta` dans gf_weapons | fait (#130) : gf_inventory appelle `exports.gf_weapons:GetWeaponMeta` |
+| quatre ressources émettaient `gf_lobby:menuOverlay` | fait (#130) : gf_ui possède la pile des calques (`PushLayer(nom)` / `PopLayer(nom)`, événement local `gf_ui:layersChanged(nombre, sommet)`) ; gf_lobby s'y abonne et masque sa page tant qu'un calque est ouvert |
 
 ## Propriétaires
 

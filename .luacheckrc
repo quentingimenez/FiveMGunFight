@@ -35,6 +35,9 @@ globals = {
   "GFLobbyBackdrop",
   "GFMapsCamera",
   "GFMenuState",
+  -- Modules partagés de la passerelle de test NUI (gf_testbridge).
+  "GfTestbridge",
+  "GfTestbridgeGuard",
   "GardeEtat",
   -- Globale fournie par le runtime FiveM (W112 sur les champs mutés).
   "GlobalState",

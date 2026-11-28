@@ -47,9 +47,9 @@ faire · ✅ fait · ❓ hypothèse à vérifier avant tout correctif.
 | C19 | Démarrage sans erreur de script et scénarios console | haute | ✅ | — | V6, A7 |
 | C20 | Documentation tenue par les tests | moyenne | ✅ | — | A6, V1 |
 | C21 | Mesure du flux de correctifs | moyenne | ✅ | — | V8 |
-| C22 | Calques NUI possédés par gf_ui | moyenne | ⬜ | C17, C18 | A2, N2 |
+| C22 | Calques NUI possédés par gf_ui | moyenne | 🧪 | C17, C18 | A2, N2 |
 | C23 | gf_core sans connaissance des modes | moyenne | ⬜ | C17, C18, C19 | A1, A2 |
-| C24 | Utilitaires communs et données d'armes exposées | basse | ⬜ | C17 | A2, A3 |
+| C24 | Utilitaires communs et données d'armes exposées | basse | ✅ | C17 | A2, A3 |
 
 Les chantiers C17 à C24 viennent de la [méthode de développement](methode/README.md)
 (ADR [0003](adr/0003-methode-de-developpement.md) et
@@ -79,6 +79,8 @@ de développement.
 | C19 | #129 | `scripts/verifier-journal-serveur.sh` dans le smoke, qui attend aussi la dernière ressource de `server.cfg` ; `scripts/scenario.py` et deux scénarios joués sur le serveur de développement | — |
 | C20 | #129 | Liste des ressources calculée, table et ordre de démarrage d'`architecture.md`, index de `docs/README.md`, cliquet de taille ; documents périmés corrigés | — |
 | C21 | #129 | `scripts/mesurer_flux.py` : 24 fonctionnalités, 22 correctifs, 3 chaînes correctif après fonctionnalité sur les 60 derniers commits au 28 novembre 2026 | Relever le chiffre après chaque lot de PR |
+| C22 | #130 | Pile de calques dans gf_ui (`layers.lua`, exports `PushLayer`/`PopLayer`, événement `gf_ui:layersChanged`, calque retiré à l'arrêt de sa ressource) ; gf_admin, gf_maps, gf_menu et gf_vehicles l'utilisent ; `gf_lobby:menuOverlay` supprimé, interdit par `tests/test_lobby_nui.py` | Captures de chaque page ouverte depuis le lobby, le menu pause et un match |
+| C24 | #130 | `gf_core/crash_marker.lua` repris par gf_core et gf_thumbs (mêmes clés KVP) ; gf_thumbs limite ses requêtes avec `RateLimit` de gf_core ; gf_weapons expose `GetWeaponMeta`, gf_inventory ne lit plus ses fichiers. Le délai de gf_menu reste son module testé `menu_state.lua` | — |
 | C16 | #58 | Délais de `gf_attack` passés à `GetGameTimer()` | Mesurer chaque `Wait(0)` avec `resmon` ; découper `gf_lobby/server.lua`, `gf_lobby/client.lua` et `gf_attack/server.lua` (775 lignes) |
 
 Le smoke de la CI (#96) lit la liste des ressources vérifiées dans les lignes

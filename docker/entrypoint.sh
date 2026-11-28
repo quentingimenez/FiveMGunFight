@@ -157,6 +157,15 @@ if [ "${GF_DEV_RCON:-}" = "true" ] && [ "$TXADMIN" != "true" ]; then
   echo "rcon             : actif (développement, mot de passe dans cache/rcon_password)"
 fi
 
+# --- passerelle de test NUI (gf_testbridge) ---
+# La ressource n'est JAMAIS assurée par server.cfg : seul le script de test
+# l'ensure par rcon. La convar lue par guard.lua n'est posée qu'en développement
+# via la surcouche docker-compose.dev.yml ; en production elle reste absente.
+if [ "${GF_DEV_TESTBRIDGE:-}" = "true" ]; then
+  echo "set gf_dev_testbridge \"true\"" >> "$DATA/secrets.cfg"
+  echo "testbridge       : actif (développement)"
+fi
+
 # En production, gf_maps/data est un volume. Docker recopie le contenu de
 # l'image dans un volume nommé neuf, mais un volume créé vide (ancien
 # déploiement, volume préparé à la main) n'a pas de maps.json : on l'amorce avec

@@ -32,6 +32,7 @@ local function updatedCount()
     return count
 end
 
+sb:load('server-data/resources/[gunfight]/gf_core/rate_limit.lua')
 sb:load('server-data/resources/[gunfight]/gf_thumbs/server.lua')
 
 -- Photo existante : une capture automatique ne doit pas l'écraser.

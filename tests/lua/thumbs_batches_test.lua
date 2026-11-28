@@ -31,6 +31,7 @@ local env = setmetatable({
     end,
 }, { __index = _G })
 -- FiveM utilise p:resolve(...), la fonction stockée reçoit implicitement p.
+assert(loadfile(root .. '/server-data/resources/[gunfight]/gf_core/crash_marker.lua', 't', env))()
 assert(loadfile(path .. 'client.lua', 't', env))()
 local ids = {}
 for i = 1, 20 do ids[i] = tostring(i) end

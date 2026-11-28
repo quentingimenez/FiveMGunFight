@@ -34,6 +34,10 @@ RESSOURCES_GUNFIGHT = tuple(
         and (dossier / "fxmanifest.lua").is_file()
     )
 )
+# Ressources de développement, ensure par le pilote de test et jamais par
+# server.cfg : gf_testbridge ne doit pas démarrer sur une installation réelle.
+RESSOURCES_DEV = frozenset({"gf_testbridge"})
+RESSOURCES_SERVEUR = tuple(r for r in RESSOURCES_GUNFIGHT if r not in RESSOURCES_DEV)
 MAPS_JSON = RESSOURCES / "[gunfight]" / "gf_maps" / "data" / "maps.json"
 
 # Taille maximale tolérée (nombre de lignes) des fichiers déjà au-dessus de 600
@@ -253,13 +257,25 @@ class ConfigurationServeur(unittest.TestCase):
     def test_server_cfg_demarre_les_ressources_gunfight(self) -> None:
         texte = lire(RACINE / "server-data" / "server.cfg")
         assurees = re.findall(r"^\s*ensure\s+(\S+)", texte, re.MULTILINE)
-        for ressource in RESSOURCES_GUNFIGHT:
+        for ressource in RESSOURCES_SERVEUR:
             with self.subTest(ressource=ressource):
                 self.assertIn(ressource, assurees, "ressource absente de server.cfg")
                 self.assertTrue(
                     (RESSOURCES / "[gunfight]" / ressource).is_dir(),
                     "ressource assurée mais absente du dépôt",
                 )
+
+    def test_server_cfg_n_assure_pas_la_passerelle_de_test(self) -> None:
+        texte = lire(RACINE / "server-data" / "server.cfg")
+        assurees = re.findall(r"^\s*ensure\s+(\S+)", texte, re.MULTILINE)
+        self.assertNotIn(
+            "gf_testbridge", assurees,
+            "gf_testbridge est une ressource de dev : seul le pilote l'ensure par rcon",
+        )
+        self.assertTrue(
+            (RESSOURCES / "[gunfight]" / "gf_testbridge").is_dir(),
+            "dossier de la passerelle de test absent du dépôt",
+        )
 
     def test_server_cfg_n_assure_pas_de_ressource_supprimee(self) -> None:
         texte = lire(RACINE / "server-data" / "server.cfg")

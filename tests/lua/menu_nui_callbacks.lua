@@ -48,6 +48,8 @@ local function loadClient()
         TriggerServerEvent = function(name) serverEvents[#serverEvents + 1] = name end,
         GetGameTimer = function() return gameTimer end,
         GetCurrentResourceName = function() return 'gf_menu' end,
+        -- Pile des calques NUI de gf_ui : le menu y pousse/retire sa page (C22).
+        exports = { gf_ui = { PushLayer = stub, PopLayer = stub } },
         SetNuiFocus = stub,
         SetNuiFocusKeepInput = stub,
         DisableFrontendThisFrame = stub,

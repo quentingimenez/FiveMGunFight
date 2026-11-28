@@ -5,20 +5,6 @@
 --  - Menu /customveh (admin) : aperçu local du véhicule, caméra, réglages en direct.
 -- =============================================================================
 
-local lobbyUiOpen = false
-
-RegisterNetEvent('gf_lobby:state', function(data)
-    lobbyUiOpen = type(data) == 'table'
-        and type(data.me) == 'table'
-        and data.me.inLobby == true
-end)
-
-RegisterNetEvent('gf_core:modeChanged', function(mode)
-    if type(mode) == 'string' and mode ~= 'lobby' then
-        lobbyUiOpen = false
-    end
-end)
-
 -- Noms affichés des véhicules (au lieu de « NULL ») et modèle -> nom
 local MODEL_BY_HASH = {}
 for _, v in ipairs(Config.Vehicles) do
@@ -168,8 +154,14 @@ local function closeMenu()
     previewHash, currentModel, menu = nil, nil, nil
     FreezeEntityPosition(PlayerPedId(), false)
     -- En dernier : le lobby reprend le focus après nous.
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
+    exports.gf_ui:PopLayer(GetCurrentResourceName())
 end
+
+-- Passerelle de test NUI : fermeture demandée par la console serveur.
+RegisterNetEvent('gf_testbridge:fermer', function(page)
+    if page ~= GetCurrentResourceName() then return end
+    if menu then closeMenu() end
+end)
 
 -- Véhicule local (non réseau) : seul l'admin le voit
 local function spawnPreview()
@@ -230,7 +222,7 @@ RegisterNetEvent('gf_vehicles:openMenu', function(data)
     SetCamFov(cam, 50.0)
     RenderScriptCams(true, true, 500, true, true)
 
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', true) end
+    exports.gf_ui:PushLayer(GetCurrentResourceName())
     SetNuiFocus(true, true)
     SendNUIMessage({ type = 'open', options = buildOptions(), props = props })
 end)

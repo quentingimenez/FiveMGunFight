@@ -141,8 +141,14 @@ local function fermerMenu()
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
     SendNUIMessage({ type = 'close' })
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
+    exports.gf_ui:PopLayer(GetCurrentResourceName())
 end
+
+-- Passerelle de test NUI : fermeture demandée par la console serveur.
+RegisterNetEvent('gf_testbridge:fermer', function(page)
+    if page ~= GetCurrentResourceName() then return end
+    if menuOuvert then fermerMenu() end
+end)
 
 local function ouvrirMenu()
     if menuOuvert then return end
@@ -302,7 +308,7 @@ RegisterNetEvent('gf_inventory:accessoriesSaved', function(weaponId)
 end)
 RegisterNetEvent('gf_inventory:adminData', function(data) transmettreArmes('armory', data) end)
 RegisterNetEvent('gf_inventory:openAdmin', function(data)
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', true) end
+    exports.gf_ui:PushLayer(GetCurrentResourceName())
     ouvrirMenu()
     transmettreArmes('armory', data)
 end)
@@ -354,6 +360,6 @@ AddEventHandler('onResourceStop', function(resourceName)
     if menuOuvert then
         SetNuiFocus(false, false)
         SetNuiFocusKeepInput(false)
-        if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
+        exports.gf_ui:PopLayer(GetCurrentResourceName())
     end
 end)

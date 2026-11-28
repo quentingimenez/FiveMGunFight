@@ -39,6 +39,9 @@ services:
       # le conteneur) : actif seulement si TXADMIN=false, mot de passe aléatoire
       # tiré par docker/entrypoint.sh. Jamais dans le socle, la prod ou le staging.
       GF_DEV_RCON: "true"
+      # Passerelle de test NUI : active gf_testbridge uniquement en dev. La
+      # ressource est ensure par le script de test, jamais par server.cfg.
+      GF_DEV_TESTBRIDGE: "true"
 
   mariadb:
     environment:

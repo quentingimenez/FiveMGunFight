@@ -16,7 +16,7 @@ server_scripts {
 }
 client_script 'client.lua'
 
-dependencies { 'oxmysql', 'gf_core', 'gf_db' }
+dependencies { 'oxmysql', 'gf_core', 'gf_db', 'gf_ui' }
 
 files {
     'html/index.html',

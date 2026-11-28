@@ -17,7 +17,9 @@
     ]
   },
   "dependances": {
-    "dures": [],
+    "dures": [
+      "gf_core"
+    ],
     "optionnelles": [
       "gf_vehicles"
     ]

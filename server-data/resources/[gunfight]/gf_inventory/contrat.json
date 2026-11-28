@@ -9,7 +9,8 @@
   "consomme": [
     "gf_admin:LogAction",
     "gf_db:Pret",
-    "gf_redzone:CanChangeWeapons"
+    "gf_redzone:CanChangeWeapons",
+    "gf_weapons:GetWeaponMeta"
   ],
   "emet": [],
   "ecoute": [],
