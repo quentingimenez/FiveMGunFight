@@ -102,22 +102,52 @@ réel du joueur, utilisez la commande `screen` décrite ci-dessous.
 
 ### Écran en direct
 
-La commande `screen <id>` permet à un administrateur de voir l'écran réel du
-joueur désigné, et `screen` seule arrête l'écran en cours. Elle est réservée aux
-administrateurs et utilisable **en jeu seulement**, comme `spectate`.
+La commande `screen <id> [basse|moyenne|haute|ultra]` permet à un administrateur
+de voir l'écran du joueur désigné, avec le préréglage de qualité choisi. Taper
+`screen` seule arrête l'écran en cours. Elle est réservée aux administrateurs
+et utilisable **en jeu seulement**, comme `spectate`. Un préréglage inconnu est
+refusé avec le message « Qualité inconnue : basse, moyenne, haute ou ultra. ».
 
-L'image est transmise au travers de la NUI de `gf_screen` à raison de 2 à 5
-images par seconde (`Config.Fps` vaut 3 par défaut, borné entre 1 et 5). La vue
-s'arrête automatiquement après `Config.MaxSeconds` (600 secondes). Il n'y a
-qu'une seule vue par cible : changer de cible arrête la vue précédente avant de
-démarrer la nouvelle. **La cible n'est pas prévenue** et son image n'est ni
-enregistrée ni diffusée à d'autres joueurs. Le débit généré chez le joueur
-regardé est d'environ 60 à 100 Ko/s.
+Le préréglage par défaut est `haute`. Les quatre préréglages sont :
 
-Deux limites sont à connaître : la capture d'écran ne voit pas les triches qui
-ne s'affichent que chez le joueur (overlays, menus ESP…), qui restent donc
-invisibles ; il s'agit d'une capture périodique d'images, et non d'un flux vidéo
-continu. Le contrat réseau de `gf_screen` est décrit dans
+| Préréglage | Largeur | Images par seconde | Qualité |
+|---|---|---|---|
+| `basse` | 640 px | 3 i/s | 0,5 |
+| `moyenne` | 960 px | 5 i/s | 0,6 |
+| `haute` | 1280 px | 8 i/s | 0,7 |
+| `ultra` | 1280 px | 15 i/s | 0,6 |
+
+Relancer `screen` sur la même cible avec un autre préréglage change la qualité
+de la capture **sans interrompre la vue en cours**. Taper `screen <même id>`
+sans préréglage arrête la vue. Changer de cible arrête silencieusement la vue
+précédente avant de démarrer la nouvelle. La vue s'arrête automatiquement après
+`Config.MaxSeconds` (600 secondes).
+
+Les images sont encodées en WebP. Chaque image tient dans un budget de
+`Config.MaxFrameChars`, soit 600 000 caractères de données d'image au maximum.
+La capture dure au plus 600 secondes.
+
+Le coût réseau chez le joueur regardé dépend du préréglage : environ 60 Ko/s en
+`basse`, 200 Ko/s en `moyenne`, 500 Ko/s en `haute` et environ 1 Mo/s en `ultra`
+(ordres de grandeur). Au-delà de 15 i/s en 1280 px, l'encodage dans la page
+dépasse le temps d'une image et le jeu du joueur ralentit.
+
+Une barre d'informations est affichée sous l'image. Elle contient le nombre
+d'images par seconde, le préréglage, la vie, le kevlar, l'arme, le chargeur et
+les munitions, le mode, le véhicule et la vitesse. Ces informations ne font pas
+partie de l'image : le HUD NUI du joueur n'est pas capturé. Ses données sont
+envoyées à part avec chaque image et affichées par la visionneuse.
+
+Ce qui apparaît dans l'image, ce sont les éléments que le jeu dessine dans son
+rendu : le monde, les armes, les véhicules et le HUD dessiné par le jeu. Les
+surcouches hors rendu du jeu, comme le HUD NUI, les menus ou les notifications
+NUI, n'apparaissent pas. Deux limites sont à connaître : la capture ne voit pas
+les triches qui ne s'affichent que chez le joueur (overlays, menus ESP…), qui
+restent donc invisibles ; il s'agit d'une capture périodique d'images, et non
+d'un flux vidéo continu.
+
+**La cible n'est pas prévenue** et son image n'est ni enregistrée ni diffusée à
+d'autres joueurs. Le contrat réseau de `gf_screen` est décrit dans
 [les événements serveur](evenements-serveur.md).
 
 ## Sécurité

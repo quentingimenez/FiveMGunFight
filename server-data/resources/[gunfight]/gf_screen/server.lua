@@ -6,10 +6,20 @@
 -- =============================================================================
 
 local core = exports.gf_core
-local PREFIXE = 'data:image/jpeg;base64,'
+local PREFIXES = {
+    'data:image/webp;base64,',
+    'data:image/jpeg;base64,',
+}
 local FENETRE_MS = 1000
 
-local Watching = {} -- [admin] = { target = id, startedAt = GetGameTimer() }
+-- Clés exactes de la table meta acceptée (ni plus, ni moins).
+local META_KEYS = {
+    hp = true, armour = true, weapon = true, clip = true, ammo = true,
+    mode = true, vehicle = true, speed = true, w = true, h = true,
+}
+local META_COUNT = 10
+
+local Watching = {} -- [admin] = { target = id, startedAt = GetGameTimer(), preset = nom }
 local Viewer = {}   -- [cible] = admin
 local Debit = {}    -- [cible] = { fenetre = GetGameTimer(), images = n }
 
@@ -37,6 +47,55 @@ local function cibleValide(args)
     return cible, nom
 end
 
+local function nombreFini(valeur)
+    if type(valeur) ~= 'number' then return false end
+    if valeur ~= valeur then return false end
+    return valeur ~= math.huge and valeur ~= -math.huge
+end
+
+-- Entier au sens mathématique : 50.0 passe, 50.5 est refusé.
+local function entier(valeur, min, max)
+    if not nombreFini(valeur) or valeur % 1 ~= 0 then return nil end
+    if valeur < min or valeur > max then return nil end
+    return math.floor(valeur)
+end
+
+-- Méta strictement validée : table invalide ou incomplète → nil (non bloquant).
+local function metaValide(meta)
+    if type(meta) ~= 'table' then return nil end
+    local count = 0
+    for key in pairs(meta) do
+        if not META_KEYS[key] then return nil end
+        count = count + 1
+    end
+    if count ~= META_COUNT then return nil end
+
+    local hp = entier(meta.hp, 0, 100)
+    local armour = entier(meta.armour, 0, 100)
+    local clip = entier(meta.clip, 0, 9999)
+    local ammo = entier(meta.ammo, 0, 9999)
+    local w = entier(meta.w, 1, 4096)
+    local h = entier(meta.h, 1, 4096)
+    if not hp or not armour or not clip or not ammo or not w or not h then return nil end
+    if type(meta.weapon) ~= 'string' or type(meta.mode) ~= 'string' then return nil end
+    if type(meta.vehicle) ~= 'boolean' then return nil end
+    if not nombreFini(meta.speed) or meta.speed < 0 or meta.speed > 999 then return nil end
+
+    return {
+        hp = hp, armour = armour, clip = clip, ammo = ammo,
+        weapon = meta.weapon:sub(1, 32), mode = meta.mode:sub(1, 16),
+        vehicle = meta.vehicle, speed = meta.speed, w = w, h = h,
+    }
+end
+
+local function imageValide(image)
+    if type(image) ~= 'string' or #image > Config.MaxFrameChars then return false end
+    for _, prefixe in ipairs(PREFIXES) do
+        if image:sub(1, #prefixe) == prefixe then return true end
+    end
+    return false
+end
+
 -- Arrêt complet d'une vue. silencieux = vrai lors d'un changement de cible ou
 -- d'un départ d'administrateur : aucun reply, mais les events partent quand même.
 local function stop(admin, message, silencieux)
@@ -53,7 +112,23 @@ local function stop(admin, message, silencieux)
     end
 end
 
--- screen <id> : ouvre une vue ; screen seul : arrête la vue en cours.
+local function demarrerVue(src, cible, nom, preset)
+    local P = Config.Presets[preset]
+    Watching[src] = { target = cible, startedAt = GetGameTimer(), preset = preset }
+    Viewer[cible] = src
+    Debit[cible] = { fenetre = GetGameTimer(), images = 0 }
+
+    TriggerClientEvent('gf_screen:captureStart', cible, {
+        fps = P.fps, width = P.width, quality = P.quality, format = 'webp',
+    })
+    TriggerClientEvent('gf_screen:viewStart', src, { target = cible, name = nom, preset = preset })
+    reply(src, ('Écran de %s (%s). Tape screen pour arrêter.'):format(nom, preset))
+    if GetResourceState('gf_admin') == 'started' then
+        pcall(function() exports.gf_admin:LogAction(src, 'screen', cible, 'qualite=' .. preset) end)
+    end
+end
+
+-- screen <id> [basse|moyenne|haute|ultra] : ouvre une vue ; screen seul : arrête la vue.
 RegisterCommand('screen', function(src, args)
     if not estAdmin(src) then
         core:Notify(src, 'Réservé aux administrateurs.')
@@ -70,6 +145,13 @@ RegisterCommand('screen', function(src, args)
         else
             reply(src, 'Usage : screen <id> (ex. screen 12) ; screen seul pour arrêter.')
         end
+        return
+    end
+
+    -- Validation du préréglage avant toute modification d'état.
+    local preset = args[2] or Config.DefaultPreset
+    if not Config.Presets[preset] then
+        reply(src, 'Qualité inconnue : basse, moyenne, haute ou ultra.')
         return
     end
 
@@ -91,51 +173,58 @@ RegisterCommand('screen', function(src, args)
     end
 
     if Watching[src] then
-        if Watching[src].target == cible then
-            stop(src)           -- même cible : arrêt simple
+        local etat = Watching[src]
+        if etat.target == cible then
+            if args[2] ~= nil then
+                -- Même cible, nouvelle qualité : on ne fait que réorienter la capture.
+                local P = Config.Presets[preset]
+                etat.preset = preset
+                Debit[cible] = { fenetre = GetGameTimer(), images = 0 }
+                TriggerClientEvent('gf_screen:captureStart', cible, {
+                    fps = P.fps, width = P.width, quality = P.quality, format = 'webp',
+                })
+            else
+                stop(src) -- même cible sans qualité : arrêt simple
+            end
             return
         end
-        stop(src, nil, true)    -- autre cible : arrêt muet puis nouvelle vue
+        stop(src, nil, true) -- autre cible : arrêt muet puis nouvelle vue
     end
 
-    Watching[src] = { target = cible, startedAt = GetGameTimer() }
-    Viewer[cible] = src
-    Debit[cible] = { fenetre = GetGameTimer(), images = 0 }
-
-    TriggerClientEvent('gf_screen:captureStart', cible, {
-        fps = Config.Fps, width = Config.Width, quality = Config.Quality,
-    })
-    TriggerClientEvent('gf_screen:viewStart', src, { target = cible, name = nom })
-    reply(src, ('Écran de %s. Tape screen pour arrêter.'):format(nom))
-    if GetResourceState('gf_admin') == 'started' then
-        pcall(function() exports.gf_admin:LogAction(src, 'screen', cible, nil) end)
-    end
+    demarrerVue(src, cible, nom, preset)
 end, false)
 
--- Une seule image reçue du joueur regardé, relayée telle quelle à son admin.
-RegisterNetEvent('gf_screen:frame', function(image)
+-- Une image reçue du joueur regardé, relayée à son admin avec sa méta.
+RegisterNetEvent('gf_screen:frame', function(payload)
     local src = source
 
     -- Seul le joueur effectivement regardé peut émettre ; tout le reste est
     -- ignoré silencieusement (pas de notify, pas d'event, rien de stocké).
     local admin = Viewer[src]
     if not admin then return end
-    if type(image) ~= 'string' then return end
-    if image:sub(1, #PREFIXE) ~= PREFIXE then return end
-    if #image > Config.MaxFrameChars then return end
+    if type(payload) ~= 'table' then return end
+    if not imageValide(payload.image) then return end
 
-    -- Fenêtre fixe de 1 000 ms, au plus Fps + 1 images. Les images invalides
-    -- sont écartées avant ce comptage : elles ne consomment aucun quota.
+    -- Fenêtre fixe de 1 000 ms, au plus (préréglage courant + 1) images. Les
+    -- images invalides sont écartées avant ce comptage : aucun quota consommé.
     local maintenant = GetGameTimer()
     local etat = Debit[src]
     if not etat or maintenant - etat.fenetre >= FENETRE_MS then
         etat = { fenetre = maintenant, images = 0 }
         Debit[src] = etat
     end
-    if etat.images >= Config.Fps + 1 then return end
+    local watch = Watching[admin]
+    if not watch then return end
+    local P = Config.Presets[watch.preset]
+    if not P then return end
+    if etat.images >= P.fps + 1 then return end
     etat.images = etat.images + 1
 
-    TriggerLatentClientEvent('gf_screen:frame', admin, 600000, image)
+    TriggerLatentClientEvent('gf_screen:frame', admin, Config.ForwardBps, {
+        image = payload.image,
+        meta = metaValide(payload.meta),
+        preset = watch.preset,
+    })
 end)
 
 -- Expiration des vues : admin parti, cible partie, durée maximale atteinte.

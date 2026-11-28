@@ -47,6 +47,14 @@
     return '\u2014';
   }
 
+  function screenPreset(value) {
+    var preset = safeString(value);
+    if (preset === 'basse' || preset === 'moyenne' || preset === 'haute' || preset === 'ultra') {
+      return preset;
+    }
+    return 'haute';
+  }
+
   function getResourceName() {
     try {
       if (typeof GetParentResourceName === 'function') {
@@ -678,8 +686,7 @@
       { node: refs.bringBtn, command: 'bring' },
       { node: refs.healBtn, command: 'heal' },
       { node: refs.freezeBtn, command: 'freeze' },
-      { node: refs.spectateBtn, command: 'spectate' },
-      { node: refs.screenBtn, command: 'screen' }
+      { node: refs.spectateBtn, command: 'spectate' }
     ];
     for (var a = 0; a < playerActionButtons.length; a += 1) {
       (function (action) {
@@ -690,6 +697,13 @@
         });
       })(playerActionButtons[a]);
     }
+
+    refs.screenBtn.addEventListener('click', function () {
+      var player = state.selectedPlayer;
+      if (!state.hasSelection || !player) { return; }
+      var preset = screenPreset(refs.screenQuality ? refs.screenQuality.value : '');
+      execute(refs.screenBtn, 'screen', [player.id, preset]);
+    });
 
     refs.kickBtn.addEventListener('click', function () {
       var player = state.selectedPlayer;
@@ -781,6 +795,7 @@
       refs.freezeBtn = byId('btn-freeze');
       refs.spectateBtn = byId('btn-spectate');
       refs.screenBtn = byId('btn-screen');
+      refs.screenQuality = byId('screen-quality');
       refs.kickBtn = byId('btn-kick');
       refs.announceText = byId('announce-text');
       refs.announceCount = byId('announce-count');
