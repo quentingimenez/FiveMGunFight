@@ -4,8 +4,8 @@ local handlers, localEvents, exported, changes, saves = {}, {}, {}, 0, 0
 local stored
 local mode, outside, tick = 'redzone', false, 0
 local core = {
-    OwnsWeapon = function(_, _, id) return id == 'carbine' end,
-    GetOwnedWeapons = function() return { { id = 'carbine', name = 'WEAPON_CARBINERIFLE' } } end,
+    OwnsWeapon = function(_, _, id) return id == 'special' end,
+    GetOwnedWeapons = function() return { { id = 'special', name = 'WEAPON_SPECIALCARBINE' } } end,
     GetMode = function() return mode end,
     Notify = function() end,
 }
@@ -17,7 +17,7 @@ local env = setmetatable({
     json = { encode = function(value) stored = value return 'stored' end, decode = function() return stored end },
     MySQL = { query = { await = function(query)
         if query:find('gf_weapon_accessories', 1, true) and stored then
-            return { { weapon_id = 'carbine', selections = 'stored' } }
+            return { { weapon_id = 'special', selections = 'stored' } }
         end
         return {}
     end }, single = { await = function() end },
@@ -35,22 +35,22 @@ local env = setmetatable({
 assert(loadfile(base .. 'gf_inventory/accessories.lua', 't', env))()
 assert(loadfile(base .. 'gf_inventory/server.lua', 't', env))()
 local set = assert(handlers['gf_inventory:setAccessories'])
-set('carbine', { sight = 'COMPONENT_AT_SCOPE_MEDIUM' })
+set('special', { sight = 'COMPONENT_AT_SCOPE_MEDIUM' })
 assert(saves == 0, 'zone de combat : écriture refusée')
 outside = true
-set('carbine', { sight = 'COMPONENT_AT_PI_SUPP' })
+set('special', { sight = 'COMPONENT_AT_PI_SUPP' })
 assert(saves == 0, 'composant incompatible refusé')
 set('other', { sight = 'COMPONENT_AT_SCOPE_MEDIUM' })
 assert(saves == 0, 'arme non possédée refusée')
-set('carbine', { sight = 'COMPONENT_AT_SCOPE_MEDIUM' })
+set('special', { sight = 'COMPONENT_AT_SCOPE_MEDIUM' })
 assert(saves == 1 and changes == 1, 'choix valide enregistré')
-local remove, add = exported.GetWeaponAccessories(1, 'carbine', 'WEAPON_CARBINERIFLE')
+local remove, add = exported.GetWeaponAccessories(1, 'special', 'WEAPON_SPECIALCARBINE')
 assert(#remove == 1 and remove[1] == 'COMPONENT_AT_SCOPE_MEDIUM' and add[1] == remove[1], 'composant transmis')
 mode = 'attack'
-set('carbine', { sight = '' })
+set('special', { sight = '' })
 assert(saves == 2, 'choix enregistrable en attaque')
 localEvents.playerDropped()
 handlers['gf_inventory:requestLocker']()
-remove, add = exported.GetWeaponAccessories(1, 'carbine', 'WEAPON_CARBINERIFLE')
+remove, add = exported.GetWeaponAccessories(1, 'special', 'WEAPON_SPECIALCARBINE')
 assert(#remove == 1 and #add == 0, 'choix restauré après reconnexion')
 print('Accessoires : propriété, zone, validation et application serveur vérifiées')
