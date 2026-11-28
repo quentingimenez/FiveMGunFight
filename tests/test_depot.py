@@ -1136,6 +1136,24 @@ class ChaineCI(unittest.TestCase):
         self.assertIn('grep -Fq -- "$CFX_LICENSE_KEY"', bloc)
         self.assertIn("if: always()", bloc, "les journaux doivent être collectés en échec")
 
+    def test_trivy_scanne_aussi_les_publications(self) -> None:
+        """Le scan ne doit pas se limiter aux pull requests.
+
+        La relance hebdomadaire n'a de sens que si elle scanne l'image publiée :
+        c'est la seule veille des CVE qui reste quand le dépôt ne change pas.
+        """
+        texte = lire(self.WORKFLOWS / "docker.yml")
+        etape = re.search(
+            r"(?ms)^      - name: Scanner l'image \(Trivy\).*?(?=^      - name:|\Z)",
+            texte,
+        )
+        if etape is None:
+            self.fail("étape Trivy absente de docker.yml")
+        self.assertNotIn("if:", etape.group(0))
+        self.assertIn(
+            "image-ref: ${{ env.IMAGE_LC }}:ci-${{ github.sha }}", etape.group(0)
+        )
+
     def test_smoke_echoue_sans_secret_hors_fork_et_dependabot(self) -> None:
         texte = lire(self.WORKFLOWS / "docker.yml")
         etape = re.search(

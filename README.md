@@ -692,7 +692,8 @@ et [ADR 0002 — FXServer épinglé](docs/adr/0002-fxserver-epingle.md).
   main », dépôt public) ;
 - `cosign` est appelé s'il est présent au déploiement, mais la CI ne signe pas
   encore les images ; FXServer est en revanche épinglé par `.fxserver-version`
-  (URL + SHA256) et l'image est scannée par Trivy sur les PR ;
+  (URL + SHA256) et l'image est scannée par Trivy sur les PR et sur chaque
+  image publiée ;
 - le conteneur tourne en **non-root** (`fivem`, uid 10001) avec `cap_drop: ALL`
   et `no-new-privileges` ; le système de fichiers n'est pas encore monté en
   `read_only` ;
