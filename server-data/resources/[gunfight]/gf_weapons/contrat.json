@@ -1,6 +1,8 @@
 {
   "ressource": "gf_weapons",
-  "exports": [],
+  "exports": [
+    "GetWeaponMeta"
+  ],
   "consomme": [],
   "emet": [],
   "ecoute": [],

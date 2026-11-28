@@ -169,6 +169,7 @@ local env = setmetatable({
     return function() end
 end })
 
+assert(loadfile(root .. '/server-data/resources/[gunfight]/gf_core/crash_marker.lua', 't', env))()
 assert(loadfile(path, 't', env))()
 local capture = assert(events['gf_thumbs:capture'], 'événement gf_thumbs:capture non enregistré')
 

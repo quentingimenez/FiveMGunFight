@@ -16,6 +16,7 @@ client_script 'client.lua'
 dependencies {
     'gf_core',
     'gf_stats',
+    'gf_ui',
 }
 
 files {

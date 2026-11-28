@@ -29,6 +29,7 @@ local env = setmetatable({
         handlers['gf_thumbs:data'](req, kind, result)
     end,
 }, { __index = _G })
+assert(loadfile(root .. '/server-data/resources/[gunfight]/gf_core/crash_marker.lua', 't', env))()
 assert(loadfile(root .. '/server-data/resources/[gunfight]/gf_thumbs/client.lua', 't', env))()
 handlers['gf_thumbs:autoCapture']()
 assert(requests[1] == 'weapons' and requests[2] == 'vehicles', 'armes vérifiées avant véhicules')

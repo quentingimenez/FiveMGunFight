@@ -31,21 +31,25 @@ exports('GetModeVehicle', function() return modeVehicle end)
 -- reprend le véhicule du mode, pour ne pas replanter en boucle. La mise de côté vaut
 -- pour une version du modèle (GlobalState.gf_vehicle_versions, publié par gf_vehicles) :
 -- si le fichier change, le modèle est retenté tout seul.
-local VEH_LOADING = 'gf_core:vehicleLoading'
+-- Marqueur et mises de côté gérés par le module commun CrashMarker (crash_marker.lua),
+-- avec les natives KVP passées explicitement (aucun appel au chargement du module).
+local crashMarker = CrashMarker.new('gf_core:vehicleLoading', 'gf_core:badv:', {
+    get = GetResourceKvpString,
+    set = SetResourceKvp,
+    del = DeleteResourceKvp,
+})
 local function vehicleVersion(model)
     local versions = GlobalState.gf_vehicle_versions
     return tostring(type(versions) == 'table' and versions[model] or '0')
 end
 local function badVehicle(model)
-    return GetResourceKvpString('gf_core:badv:' .. model) == vehicleVersion(model)
+    return crashMarker:isBad(model, vehicleVersion(model))
 end
 do
-    local crashed = GetResourceKvpString(VEH_LOADING) -- « modèle@version »
-    if crashed and crashed ~= '' then
-        local model, version = crashed:match('^([^@]+)@(.*)$')
-        model = model or crashed
-        SetResourceKvp('gf_core:badv:' .. model, version or '0')
-        DeleteResourceKvp(VEH_LOADING)
+    -- recover relève le plantage, écrit la mise de côté puis efface le marqueur
+    -- avant de renvoyer le modèle (on ignore la version, superflue ici).
+    local model = crashMarker:recover()
+    if model then
         print(("^1[gf_core] Le modèle %s a fait planter le jeu : mis de côté tant qu'il ne change pas^0"):format(model))
         TriggerServerEvent('gf_core:vehicleCrashed', model)
     end
@@ -63,17 +67,17 @@ local function giveVehicle(model, x, y, z, heading)
         print(('[gf_core] Modèle de véhicule inconnu : %s'):format(model))
         return
     end
-    SetResourceKvp(VEH_LOADING, model .. '@' .. vehicleVersion(model))
+    crashMarker:begin(model, vehicleVersion(model))
     RequestModel(hash)
     local timeout = GetGameTimer() + 10000
     while not HasModelLoaded(hash) and GetGameTimer() < timeout do Wait(0) end
-    if not HasModelLoaded(hash) then DeleteResourceKvp(VEH_LOADING) return end
+    if not HasModelLoaded(hash) then crashMarker:finish() return end
 
     local ped = PlayerPedId()
     local veh = CreateVehicle(hash, x, y, z, heading, true, false)
     SetModelAsNoLongerNeeded(hash)
     -- quelques images pour que le rendu du modèle ait eu lieu avant de lever le marqueur
-    CreateThread(function() Wait(3000) DeleteResourceKvp(VEH_LOADING) end)
+    CreateThread(function() Wait(3000) crashMarker:finish() end)
     if veh == 0 then return end
 
     SetVehicleOnGroundProperly(veh)

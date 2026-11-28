@@ -1,6 +1,9 @@
 {
   "ressource": "gf_ui",
-  "exports": [],
+  "exports": [
+    "PopLayer",
+    "PushLayer"
+  ],
   "consomme": [
     "gf_thumbs:Get"
   ],

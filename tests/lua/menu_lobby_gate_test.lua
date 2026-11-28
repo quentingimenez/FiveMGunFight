@@ -16,6 +16,12 @@ local pausePressed = false
 
 local sb = F.sandbox({
     resource = 'gf_menu',
+    exports = {
+        gf_ui = {
+            PushLayer = function() return true end,
+            PopLayer = function() return true end,
+        },
+    },
     globals = {
         DisableFrontendThisFrame = function() end,
         DisableControlAction = function() end,

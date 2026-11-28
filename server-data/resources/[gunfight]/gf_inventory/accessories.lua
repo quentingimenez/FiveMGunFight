@@ -55,7 +55,7 @@ function WeaponAccessories.catalog(name)
         return result
     end
     if type(name) ~= 'string' or not name:match('^WEAPON_[%w_]+$') then return result end
-    local xml = LoadResourceFile('gf_weapons', ('data/%s/weapons.meta'):format(name))
+    local xml = exports.gf_weapons:GetWeaponMeta(name)
     local points = xml and xml:match('<AttachPoints>(.-)</AttachPoints>')
     if not points then return result end
     for bone, components in points:gmatch('<Item>%s*<AttachBone>(.-)</AttachBone>%s*<Components>(.-)</Components>%s*</Item>') do

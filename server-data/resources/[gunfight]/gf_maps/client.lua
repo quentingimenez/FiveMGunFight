@@ -26,20 +26,6 @@ local E = {
     closed = false,    -- polygone fermé (attaque)
 }
 
-local lobbyUiOpen = false
-
-RegisterNetEvent('gf_lobby:state', function(data)
-    lobbyUiOpen = type(data) == 'table'
-        and type(data.me) == 'table'
-        and data.me.inLobby == true
-end)
-
-RegisterNetEvent('gf_core:modeChanged', function(mode)
-    if type(mode) == 'string' and mode ~= 'lobby' then
-        lobbyUiOpen = false
-    end
-end)
-
 -- ---------------------------------------------------------------- Maths
 local function cross(a, b)
     return vector3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
@@ -216,8 +202,8 @@ local function openEditor(maps)
     E.maps = maps or E.maps
     E.open = true
     E.editing = false
-    if not dejaOuvert and lobbyUiOpen then
-        TriggerEvent('gf_lobby:menuOverlay', true)
+    if not dejaOuvert then
+        exports.gf_ui:PushLayer(GetCurrentResourceName())
     end
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
@@ -243,7 +229,7 @@ local function closeEditor()
     DisplayRadar(true)
     sendState()
     -- En dernier : le lobby reprend le focus après nous.
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
+    exports.gf_ui:PopLayer(GetCurrentResourceName())
 end
 
 local function startEdit(kind, id)

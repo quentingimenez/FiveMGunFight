@@ -5,22 +5,20 @@
     "GetMaps"
   ],
   "consomme": [
-    "gf_admin:LogAction"
+    "gf_admin:LogAction",
+    "gf_ui:PopLayer",
+    "gf_ui:PushLayer"
   ],
-  "emet": [
-    "gf_lobby:menuOverlay"
-  ],
-  "ecoute": [
-    "gf_core:modeChanged",
-    "gf_lobby:state"
-  ],
+  "emet": [],
+  "ecoute": [],
   "state_bags": {
     "ecrit": [],
     "lit": []
   },
   "dependances": {
     "dures": [
-      "gf_core"
+      "gf_core",
+      "gf_ui"
     ],
     "optionnelles": [
       "gf_admin"

@@ -5,15 +5,16 @@
     "gf_core:GetMode",
     "gf_core:IsAdmin",
     "gf_stats:GetPlayerStats",
-    "gf_thumbs:Get"
+    "gf_thumbs:Get",
+    "gf_ui:PopLayer",
+    "gf_ui:PushLayer"
   ],
   "emet": [
     "gf_admin:open",
     "gf_inventory:adminGive",
     "gf_inventory:equip",
     "gf_inventory:requestLocker",
-    "gf_inventory:setAccessories",
-    "gf_lobby:menuOverlay"
+    "gf_inventory:setAccessories"
   ],
   "ecoute": [
     "gf_core:modeChanged",
@@ -31,7 +32,8 @@
   "dependances": {
     "dures": [
       "gf_core",
-      "gf_stats"
+      "gf_stats",
+      "gf_ui"
     ],
     "optionnelles": [
       "gf_thumbs"

@@ -11,6 +11,33 @@
 --    gf_ui:scoreboard (data | nil)   { title, columns{}, rows{ {cells{}, color} } }
 -- =============================================================================
 
+-- ------------------------------------------------------------------ Calques NUI
+-- Protocole : les autres ressources poussent/retirent leur nom dans la pile
+-- avec les exports PushLayer / PopLayer au lieu d'émettre l'ancien événement
+-- d'overlay du lobby.
+-- Tout changement effectif est annoncé par gf_ui:layersChanged(count, top) ;
+-- un calque resté empilé lors de l'arrêt de sa ressource est retiré automatiquement.
+
+local layers = Layers.new()
+
+exports('PushLayer', function(nom)
+    local changed = layers:push(nom)
+    if changed then TriggerEvent('gf_ui:layersChanged', layers:count(), layers:top()) end
+    return changed
+end)
+
+exports('PopLayer', function(nom)
+    local changed = layers:pop(nom)
+    if changed then TriggerEvent('gf_ui:layersChanged', layers:count(), layers:top()) end
+    return changed
+end)
+
+AddEventHandler('onClientResourceStop', function(resource)
+    if layers:pop(resource) then
+        TriggerEvent('gf_ui:layersChanged', layers:count(), layers:top())
+    end
+end)
+
 local WEAPON_LABELS = {
     WEAPON_PISTOL = 'Pistolet', WEAPON_PISTOL50 = 'Pistolet .50', WEAPON_COMBATPISTOL = 'Pistolet de combat',
     WEAPON_APPISTOL = 'Pistolet AP', WEAPON_HEAVYPISTOL = 'Pistolet lourd', WEAPON_REVOLVER = 'Revolver',

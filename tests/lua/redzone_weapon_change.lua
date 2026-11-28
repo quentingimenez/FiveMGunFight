@@ -28,6 +28,7 @@ local env = setmetatable({
     SetCurrentPedWeapon = function(_, hash) current = hash end,
     SetPedArmour = function(_, value) armour = value end,
 }, { __index = _G })
+assert(loadfile(root .. '/server-data/resources/[gunfight]/gf_core/crash_marker.lua', 't', env))()
 assert(loadfile(root .. '/server-data/resources/[gunfight]/gf_core/client.lua', 't', env))()
 events['gf_core:giveWeapons']({ { name = 'A', ammo = 30 }, { name = 'B', ammo = 20, components = { 'SIGHT' } } }, 70)
 weapons.B = 4

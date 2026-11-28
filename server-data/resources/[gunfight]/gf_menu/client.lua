@@ -141,7 +141,7 @@ local function fermerMenu()
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
     SendNUIMessage({ type = 'close' })
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
+    exports.gf_ui:PopLayer(GetCurrentResourceName())
 end
 
 local function ouvrirMenu()
@@ -302,7 +302,7 @@ RegisterNetEvent('gf_inventory:accessoriesSaved', function(weaponId)
 end)
 RegisterNetEvent('gf_inventory:adminData', function(data) transmettreArmes('armory', data) end)
 RegisterNetEvent('gf_inventory:openAdmin', function(data)
-    if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', true) end
+    exports.gf_ui:PushLayer(GetCurrentResourceName())
     ouvrirMenu()
     transmettreArmes('armory', data)
 end)
@@ -354,6 +354,6 @@ AddEventHandler('onResourceStop', function(resourceName)
     if menuOuvert then
         SetNuiFocus(false, false)
         SetNuiFocusKeepInput(false)
-        if lobbyUiOpen then TriggerEvent('gf_lobby:menuOverlay', false) end
+        exports.gf_ui:PopLayer(GetCurrentResourceName())
     end
 end)

@@ -9,15 +9,15 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 - Exports consommés
   - gf_db:Pret
   - gf_thumbs:Get
+  - gf_ui:PopLayer
+  - gf_ui:PushLayer
 - Événements émis
   - gf:healGranted
-  - gf_lobby:menuOverlay
   - gf_ui:announce
   - gf_ui:notify
 - Événements écoutés
   - gf_core:modeChanged
   - gf_core:spawned
-  - gf_lobby:state
 - State bags écrits
   - Aucun.
 - State bags lus
@@ -25,6 +25,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 - Dépendances dures
   - gf_core
   - gf_db
+  - gf_ui
   - oxmysql
 - Dépendances optionnelles
   - gf_db
@@ -215,6 +216,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
   - gf_admin:LogAction
   - gf_db:Pret
   - gf_redzone:CanChangeWeapons
+  - gf_weapons:GetWeaponMeta
 - Événements émis
   - Aucun.
 - Événements écoutés
@@ -314,6 +316,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
   - gf:modeLeft
   - gf_core:modeChanged
   - gf_core:spawned
+  - gf_ui:layersChanged
 - State bags écrits
   - Aucun.
 - State bags lus
@@ -333,17 +336,19 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
   - GetMaps
 - Exports consommés
   - gf_admin:LogAction
+  - gf_ui:PopLayer
+  - gf_ui:PushLayer
 - Événements émis
-  - gf_lobby:menuOverlay
+  - Aucun.
 - Événements écoutés
-  - gf_core:modeChanged
-  - gf_lobby:state
+  - Aucun.
 - State bags écrits
   - Aucun.
 - State bags lus
   - Aucun.
 - Dépendances dures
   - gf_core
+  - gf_ui
 - Dépendances optionnelles
   - gf_admin
 - Dette
@@ -358,13 +363,14 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
   - gf_core:IsAdmin
   - gf_stats:GetPlayerStats
   - gf_thumbs:Get
+  - gf_ui:PopLayer
+  - gf_ui:PushLayer
 - Événements émis
   - gf_admin:open
   - gf_inventory:adminGive
   - gf_inventory:equip
   - gf_inventory:requestLocker
   - gf_inventory:setAccessories
-  - gf_lobby:menuOverlay
 - Événements écoutés
   - gf_core:modeChanged
   - gf_core:spawned
@@ -380,6 +386,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 - Dépendances dures
   - gf_core
   - gf_stats
+  - gf_ui
 - Dépendances optionnelles
   - gf_thumbs
 - Dette
@@ -489,7 +496,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 - State bags lus
   - gf_mode
 - Dépendances dures
-  - Aucun.
+  - gf_core
 - Dépendances optionnelles
   - gf_vehicles
 - Dette
@@ -498,7 +505,8 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 ## gf_ui
 
 - Exports fournis
-  - Aucun.
+  - PopLayer
+  - PushLayer
 - Exports consommés
   - gf_thumbs:Get
 - Événements émis
@@ -524,11 +532,12 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 - Exports consommés
   - gf_admin:LogAction
   - gf_thumbs:Get
+  - gf_ui:PopLayer
+  - gf_ui:PushLayer
 - Événements émis
-  - gf_lobby:menuOverlay
+  - Aucun.
 - Événements écoutés
-  - gf_core:modeChanged
-  - gf_lobby:state
+  - Aucun.
 - State bags écrits
   - gf_vehicle_base
   - gf_vehicle_customs
@@ -537,7 +546,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
   - gf_vehicle_customs
   - gf_vehicle_versions
 - Dépendances dures
-  - Aucun.
+  - gf_ui
 - Dépendances optionnelles
   - gf_admin
   - gf_thumbs
@@ -547,7 +556,7 @@ Ce document est généré par `python scripts/contrats.py --doc` : il ne se modi
 ## gf_weapons
 
 - Exports fournis
-  - Aucun.
+  - GetWeaponMeta
 - Exports consommés
   - Aucun.
 - Événements émis

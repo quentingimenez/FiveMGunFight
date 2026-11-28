@@ -18,7 +18,7 @@ local PNG_PREFIX = 'data:image/png;base64,'
 local PNG_MAGIC = '\137PNG\r\n\26\n'
 
 local Cache = {}       -- [famille] = { [id] = dataURL | false (pas de photo) }
-local lastRequest = {} -- [src] = GetGameTimer()
+local requestLimit = {} -- [src] = horodatages, géré par RateLimit
 
 local function validId(id)
     return type(id) == 'string' and #id >= 1 and #id <= 64 and id:match('^[%w_]+$') ~= nil
@@ -97,9 +97,7 @@ end)
 RegisterNetEvent('gf_thumbs:request', function(reqId, kind, ids)
     local src = source
     if type(reqId) ~= 'number' or not Config.Kinds[kind] or type(ids) ~= 'table' then return end
-    local now = GetGameTimer()
-    if lastRequest[src] and now - lastRequest[src] < 250 then return end
-    lastRequest[src] = now
+    if not RateLimit.autoriser(requestLimit, src, 1, 250, GetGameTimer()) then return end
 
     local result = {}
     local count = 0
@@ -113,7 +111,7 @@ RegisterNetEvent('gf_thumbs:request', function(reqId, kind, ids)
 end)
 
 AddEventHandler('playerDropped', function()
-    lastRequest[source] = nil
+    RateLimit.oublier(requestLimit, source)
     lastAuto[source] = nil
 end)
 

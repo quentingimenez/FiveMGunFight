@@ -6,15 +6,12 @@
   ],
   "consomme": [
     "gf_admin:LogAction",
-    "gf_thumbs:Get"
+    "gf_thumbs:Get",
+    "gf_ui:PopLayer",
+    "gf_ui:PushLayer"
   ],
-  "emet": [
-    "gf_lobby:menuOverlay"
-  ],
-  "ecoute": [
-    "gf_core:modeChanged",
-    "gf_lobby:state"
-  ],
+  "emet": [],
+  "ecoute": [],
   "state_bags": {
     "ecrit": [
       "gf_vehicle_base",
@@ -27,7 +24,9 @@
     ]
   },
   "dependances": {
-    "dures": [],
+    "dures": [
+      "gf_ui"
+    ],
     "optionnelles": [
       "gf_admin",
       "gf_thumbs"

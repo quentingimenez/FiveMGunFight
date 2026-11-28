@@ -21,6 +21,7 @@ local env = setmetatable({
     TriggerServerEvent = function(name) sent[#sent + 1] = name end,
     Wait = stub,
 }, { __index = _G })
+assert(loadfile(root .. '/server-data/resources/[gunfight]/gf_core/crash_marker.lua', 't', env))()
 assert(loadfile(resource .. 'client.lua', 't', env))()
 local changed = assert(events['gf_core:modeChanged'])
 

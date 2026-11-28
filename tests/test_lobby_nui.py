@@ -56,21 +56,20 @@ class CreatorErrorText(unittest.TestCase):
                 self.assertRegex(line, r"errorText\(\s*(?:response|result)\.error\b")
 
 
-RESSOURCES = ROOT / "server-data" / "resources" / "[gunfight]"
+BASE_RESSOURCES = ROOT / "server-data" / "resources"
+RESSOURCES = BASE_RESSOURCES / "[gunfight]"
 
 FOCUS_NUI = re.compile(r"SetNuiFocus\s*\(\s*true\b")
-OVERLAY_TRUE = re.compile(
-    r"TriggerEvent\s*\(\s*['\"]gf_lobby:menuOverlay['\"]\s*,\s*true\s*\)"
-)
-OVERLAY_FALSE = re.compile(
-    r"TriggerEvent\s*\(\s*['\"]gf_lobby:menuOverlay['\"]\s*,\s*false\s*\)"
-)
+PUSH_LAYER = re.compile(r"exports\.gf_ui:PushLayer\s*\(")
+POP_LAYER = re.compile(r"exports\.gf_ui:PopLayer\s*\(")
+OVERLAY = "gf_lobby:menuOverlay"
 
 # Ressources exclues de la règle, avec leur justification (vérifiée dans leur client.lua) :
 EXCEPTIONS_NUI = {
-    # Fournit l'événement menuOverlay : son SetNuiFocus(true) est dans le
-    # gestionnaire qui réaffiche la page, pas dans un ouvreur à masquer.
-    "gf_lobby": "fournit l'overlay; son focus est le gestionnaire menuOverlay",
+    # gf_ui possède la pile des calques : gf_lobby s'abonne à
+    # gf_ui:layersChanged pour masquer/réafficher sa page, plus aucun client
+    # ne doit appeler directement menuOverlay.
+    "gf_lobby": "s'abonne à gf_ui:layersChanged",
     # N'ouvre que le choix des armes en partie via gf_ui:loadout_open, lancé par
     # gf_attack/server.lua pendant une manche : jamais au lobby.
     "gf_ui": "loadout de partie (gf_ui:loadout_open), jamais au lobby",
@@ -78,9 +77,20 @@ EXCEPTIONS_NUI = {
 
 
 class NuiFocusLobbyOverlay(unittest.TestCase):
-    """Toute NUI ouverte au lobby masque puis réaffiche la page du lobby."""
+    """Toute NUI ouverte au lobby empile un calque gf_ui et le retire à la fermeture."""
 
     def test_nui_focus_ouverts_masquent_le_lobby(self) -> None:
+        # Aucun client ne doit encore piloter l'overlay du lobby à la main :
+        # c'est désormais la pile de gf_ui qui pilote gf_lobby:layersChanged.
+        for chemin in sorted(BASE_RESSOURCES.rglob("*.lua")):
+            with self.subTest(ressource=str(chemin.relative_to(ROOT))):
+                self.assertNotIn(
+                    OVERLAY,
+                    chemin.read_text(encoding="utf-8"),
+                    f"{chemin} utilise encore {OVERLAY} : "
+                    "gf_ui possède la pile des calques, utilisez PushLayer/PopLayer",
+                )
+
         candidats = sorted(RESSOURCES.glob("gf_*/client.lua"))
         self.assertTrue(
             candidats, f"aucun client.lua gf_* trouvé dans {RESSOURCES}"
@@ -110,17 +120,17 @@ class NuiFocusLobbyOverlay(unittest.TestCase):
             with self.subTest(ressource=nom):
                 self.assertRegex(
                     source,
-                    OVERLAY_TRUE,
+                    PUSH_LAYER,
                     f"{nom} ouvre une NUI avec SetNuiFocus(true) sans "
-                    "TriggerEvent('gf_lobby:menuOverlay', true) : "
-                    "la page du lobby resterait au-dessus",
+                    "exports.gf_ui:PushLayer(...) : "
+                    "sans calque empilé, le lobby resterait affiché",
                 )
                 self.assertRegex(
                     source,
-                    OVERLAY_FALSE,
+                    POP_LAYER,
                     f"{nom} ouvre une NUI avec SetNuiFocus(true) sans "
-                    "TriggerEvent('gf_lobby:menuOverlay', false) : "
-                    "la page du lobby ne serait jamais réaffichée",
+                    "exports.gf_ui:PopLayer(...) : "
+                    "sans retrait de calque, le lobby ne reviendrait jamais",
                 )
 
 

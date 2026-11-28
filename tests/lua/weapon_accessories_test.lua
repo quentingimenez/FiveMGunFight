@@ -1,13 +1,17 @@
 local root = os.getenv('GF_ROOT') or '.'
 local base = root .. '/server-data/resources/[gunfight]/'
+local function readFile(resource, path)
+    local file = io.open(base .. resource .. '/' .. path, 'rb')
+    if not file then return nil end
+    local text = file:read('*a')
+    file:close()
+    return text
+end
 local env = setmetatable({
-    LoadResourceFile = function(resource, path)
-        local file = io.open(base .. resource .. '/' .. path, 'rb')
-        if not file then return nil end
-        local text = file:read('*a')
-        file:close()
-        return text
-    end,
+    LoadResourceFile = readFile,
+    exports = { gf_weapons = { GetWeaponMeta = function(_, name)
+        return readFile('gf_weapons', 'data/' .. name .. '/weapons.meta')
+    end } },
 }, { __index = _G })
 assert(loadfile(base .. 'gf_inventory/accessories.lua', 't', env))()
 local catalog = env.WeaponAccessories.catalog('WEAPON_SPECIALCARBINE')

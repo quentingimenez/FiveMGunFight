@@ -22,7 +22,8 @@
     "gf:modeJoined",
     "gf:modeLeft",
     "gf_core:modeChanged",
-    "gf_core:spawned"
+    "gf_core:spawned",
+    "gf_ui:layersChanged"
   ],
   "state_bags": {
     "ecrit": [],

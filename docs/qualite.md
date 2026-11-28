@@ -177,6 +177,13 @@ Git Bash marche aussi. La commande construit l'image au premier lancement
 `/depot` : contrôles statiques **et** tests Python. Une image déjà construite
 peut être réutilisée avec `GF_VERIFIER_IMAGE=<image>`.
 
+Écart connu entre Windows et la CI : un dossier Windows monté dans Docker
+présente **tous** les fichiers comme exécutables. Les règles de ruff sur le
+bit exécutable (`EXE001`, `EXE002`) ne peuvent donc pas échouer en local et
+n'échouent qu'en CI, sous Linux : un module de test ne commence jamais par
+une ligne `#!` (PR #129). En cas de doute, le mode réellement enregistré est
+celui de `git ls-files -s <fichier>` (`100644` ou `100755`).
+
 Pour isoler un échec, chaque contrôle peut être lancé seul dans l'image de
 vérification (sinon, il faut les mêmes outils sur le poste, aux mêmes
 versions) :

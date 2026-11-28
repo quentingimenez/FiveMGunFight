@@ -14,4 +14,7 @@ files {
     'html/app.js',
 }
 
-client_script 'client.lua'
+client_scripts {
+    'layers.lua',
+    'client.lua',
+}

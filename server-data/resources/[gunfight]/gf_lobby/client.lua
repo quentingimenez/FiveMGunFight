@@ -1161,11 +1161,11 @@ AddEventHandler('onResourceStop', function(resource)
     DisplayRadar(true)
 end)
 
--- Masque temporairement la NUI du lobby pendant l'interface d'administration.
-AddEventHandler('gf_lobby:menuOverlay', function(ouvert)
-    if not inLobby then return end
-    SendNUIMessage({ type = 'menuOverlay', data = { open = ouvert == true } })
-    if not ouvert then
+-- Masque la NUI du lobby tant que gf_ui signale une page ouverte.
+AddEventHandler('gf_ui:layersChanged', function(count)
+    if not inLobby or type(count) ~= 'number' then return end
+    SendNUIMessage({ type = 'menuOverlay', data = { open = count > 0 } })
+    if count <= 0 then
         SetNuiFocus(true, true)
         SetNuiFocusKeepInput(false)
     end
