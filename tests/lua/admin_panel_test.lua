@@ -156,6 +156,8 @@ ligne('announce', { 'Redémarrage dans 5 minutes' }, 'announce Redémarrage dans
 ligne('announce', { string.rep('a', 120) }, 'announce ' .. string.rep('a', 120))
 ligne('spectate', {}, 'spectate')
 ligne('spectate', { '12' }, 'spectate 12')
+ligne('screen', {}, 'screen')
+ligne('screen', { '12' }, 'screen 12')
 
 -- ---------------------------------------------------------------------------
 -- B. Refus de la liste blanche.
@@ -214,6 +216,16 @@ refuse('spectate', { [2] = '12' }, 'spectate table trouée (index 1 absent)')
 refuse('spectate', { [1] = '12', [3] = 'x' }, 'spectate table trouée (index 2 absent)')
 refuse('spectate', { id = '12' }, 'spectate table non positionnelle')
 refuse('spectate', '12', 'spectate args non table')
+refuse('screen', { '0' }, 'screen id zéro')
+refuse('screen', { '-1' }, 'screen id négatif')
+refuse('screen', { '3a' }, 'screen id non numérique')
+refuse('screen', { 3 }, 'screen id non chaîne')
+refuse('screen', { true }, 'screen id booléen')
+refuse('screen', { '3', 'x' }, 'screen deux arguments')
+refuse('screen', { [2] = '12' }, 'screen table trouée (index 1 absent)')
+refuse('screen', { [1] = '12', [3] = 'x' }, 'screen table trouée (index 2 absent)')
+refuse('screen', { id = '12' }, 'screen table non positionnelle')
+refuse('screen', '12', 'screen args non table')
 
 -- ---------------------------------------------------------------------------
 -- C. Normalisation de l'arme (mise en minuscules avant contrôle).
@@ -269,6 +281,7 @@ check(opensUi('editor') == true, 'opensUi(editor) vrai')
 check(opensUi('maps') == true, 'opensUi(maps) vrai')
 check(opensUi('customveh') == true, 'opensUi(customveh) vrai')
 check(opensUi('spectate') == true, 'opensUi(spectate) vrai')
+check(opensUi('screen') == true, 'opensUi(screen) vrai')
 check(opensUi('setmode') == false, 'opensUi(setmode) faux')
 check(opensUi('give') == false, 'opensUi(give) faux')
 check(opensUi('startround') == false, 'opensUi(startround) faux')

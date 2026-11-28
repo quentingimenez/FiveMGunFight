@@ -25,6 +25,8 @@ local ARGS = {
     kick = -1,
     -- spectate accepte 0 ou 1 argument (id), traité à part.
     spectate = -1,
+    -- screen accepte 0 ou 1 argument (id), traité comme spectate.
+    screen = -1,
     ['goto'] = 1,  -- mot réservé Lua : toujours comme clé de chaîne
     bring = 1,
     heal = 1,
@@ -34,7 +36,7 @@ local ARGS = {
 
 local MODES = { lobby = true, attack = true, redzone = true }
 local TEAMS = { A = true, B = true }
-local UI_COMMANDES = { editor = true, maps = true, customveh = true, spectate = true }
+local UI_COMMANDES = { editor = true, maps = true, customveh = true, spectate = true, screen = true }
 
 --- Identifiant joueur : chaîne correspondant à ^[1-9][0-9]*$
 --- (entier positif, sans signe, sans zéro initial, sans espace).
@@ -103,6 +105,19 @@ function GFAdminCommands.build(command, args)
         if nb == 0 then return finir('spectate') end
         if nb ~= 1 or not idValide(args[1]) then return nil end
         return finir('spectate ' .. args[1])
+    end
+
+    -- screen : aucun argument (arrêt) ou exactement un id positionnel [1].
+    -- Même comptage des clés via pairs que spectate (tables trouées incluses).
+    if command == 'screen' then
+        local nb = 0
+        for cle in pairs(args) do
+            nb = nb + 1
+            if cle ~= 1 then return nil end
+        end
+        if nb == 0 then return finir('screen') end
+        if nb ~= 1 or not idValide(args[1]) then return nil end
+        return finir('screen ' .. args[1])
     end
 
     if #args ~= attendu or args[attendu + 1] ~= nil then return nil end

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gf_screen — Écran partagé</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="viewer" class="hidden" aria-hidden="true">
+    <h1 id="viewer-title"></h1>
+    <div id="viewer-frame">
+      <img id="viewer-image" alt="">
+    </div>
+    <p id="viewer-hint"></p>
+    <div id="viewer-fps">0 i/s</div>
+  </div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

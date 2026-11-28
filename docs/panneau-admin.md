@@ -97,18 +97,40 @@ ne contient aucun identifiant (license, IP). Aucune ligne n'est ajoutée à
 l'arrêt.
 
 La vue utilise la caméra de spectateur du jeu, et non l'écran exact du joueur :
-un menu de triche affiché seulement chez lui reste invisible. Une capture
-d'écran est une évolution possible, avec une ressource dédiée.
+un menu de triche affiché seulement chez lui reste invisible. Pour voir l'écran
+réel du joueur, utilisez la commande `screen` décrite ci-dessous.
+
+### Écran en direct
+
+La commande `screen <id>` permet à un administrateur de voir l'écran réel du
+joueur désigné, et `screen` seule arrête l'écran en cours. Elle est réservée aux
+administrateurs et utilisable **en jeu seulement**, comme `spectate`.
+
+L'image est transmise au travers de la NUI de `gf_screen` à raison de 2 à 5
+images par seconde (`Config.Fps` vaut 3 par défaut, borné entre 1 et 5). La vue
+s'arrête automatiquement après `Config.MaxSeconds` (600 secondes). Il n'y a
+qu'une seule vue par cible : changer de cible arrête la vue précédente avant de
+démarrer la nouvelle. **La cible n'est pas prévenue** et son image n'est ni
+enregistrée ni diffusée à d'autres joueurs. Le débit généré chez le joueur
+regardé est d'environ 60 à 100 Ko/s.
+
+Deux limites sont à connaître : la capture d'écran ne voit pas les triches qui
+ne s'affichent que chez le joueur (overlays, menus ESP…), qui restent donc
+invisibles ; il s'agit d'une capture périodique d'images, et non d'un flux vidéo
+continu. Le contrat réseau de `gf_screen` est décrit dans
+[les événements serveur](evenements-serveur.md).
 
 ## Sécurité
 
 - Les droits sont revérifiés côté serveur sur `gf_admin:requestData`
   (`core:IsAdmin(src)`) **et** sur chaque commande exécutée depuis le panneau,
   même si le client affiche déjà `isAdmin === true`. Les commandes d'action
-  (`kick`, `goto`, `bring`, `heal`, `freeze`, `announce`, `spectate`) sont
-  enregistrées avec `RegisterCommand` côté serveur : **aucun nouveau message
-  client → serveur** n'est ajouté pour elles, la surface réseau décrite dans
-  [les événements serveur](evenements-serveur.md) reste inchangée.
+  (`kick`, `goto`, `bring`, `heal`, `freeze`, `announce`, `spectate`, `screen`)
+  sont enregistrées avec `RegisterCommand` côté serveur : **aucun nouveau
+  message client → serveur** n'est ajouté pour ces commandes. En revanche,
+  `gf_screen:frame` est le nouvel événement de la ressource `gf_screen`, envoyé
+  par le joueur regardé à l'admin qui le surveille ; il est documenté dans
+  [les événements serveur](evenements-serveur.md).
 - `gf_admin:requestData` ne prend **aucun argument** : le serveur utilise
   uniquement `source`, vérifie que le joueur est connecté et répond en lecture
   seule.
@@ -138,8 +160,8 @@ informations complémentaires de l'action.
 
 Les actions journalisées sont `setmode`, `setteam`, `startround`, `endmatch`,
 `nextzone`, `endgame`, `nextmap`, `give`, `admin_give`, `resetchar`, `kick`,
-`goto`, `bring`, `heal`, `freeze`, `announce`, `spectate`, `map_save`, `map_enable`,
-`map_delete` et `vehicle_custom`. L'écriture a lieu **uniquement
+`goto`, `bring`, `heal`, `freeze`, `announce`, `spectate`, `screen`, `map_save`,
+`map_enable`, `map_delete` et `vehicle_custom`. L'écriture a lieu **uniquement
 après le succès** de l'action : un refus ou un échec n'ajoute aucune ligne. Elle
 est asynchrone et ne se fait que si `gf_db` est démarrée et prête
 (`exports.gf_db:Pret()` renvoie vrai). Chaque action produit également une courte

@@ -178,6 +178,7 @@ modifiées, démarrées avant nos ressources.
 | `gf_stats` | statistiques persistantes (MariaDB via `oxmysql`), export `GetPlayerStats` | `server.lua` |
 | `gf_menu` | menu pause NUI (Échap) remplaçant le frontend natif : profil, règlement, Discord, déconnexion | `html/` (page `ui_page`), `config.lua`, `menu_state.lua`, `server.lua`, `client.lua` ; dépend de `gf_core` et `gf_stats` |
 | `gf_admin` | panneau d'administration : joueurs, parties, outils ; ouverture par F10 ou depuis le menu Échap, données via `gf_admin:requestData`, actions réussies journalisées dans `gf_admin_log` | `html/` (page `ui_page`), `commands.lua` (liste blanche des commandes, partagé), `@oxmysql/lib/MySQL.lua`, `audit.lua` (`LogAction`), `server.lua`, `client.lua` ; dépend de `gf_core`, `gf_db` et `oxmysql` |
+| `gf_screen` | écran en direct des joueurs pour les admins (`screen <id>`) : images JPEG transmises à l'admin qui regarde, cible non prévenue | `config.lua` (partagé), `server.lua`, `client.lua`, `html/` (page `ui_page`) ; dépend de `gf_core` et `gf_admin` |
 
 Chaque ressource déclare ses scripts dans `fxmanifest.lua`
 (`fx_version 'cerulean'`, `game 'gta5'`, `lua54 'yes'`). Les tests vérifient que
@@ -188,11 +189,17 @@ Ordre de démarrage imposé par `server.cfg` (les dépendances vont dans ce sens
 
 ```text
 mapmanager · spawnmanager · baseevents
-oxmysql · gf_db · gf_thumbs · gf_vehicles · gf_ui · gf_core · gf_killcam · gf_lobby · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu · gf_admin
+oxmysql · gf_db · gf_thumbs · gf_vehicles · gf_ui · gf_core · gf_killcam · gf_lobby · gf_maps · gf_attack · gf_redzone · gf_stats · gf_menu · gf_admin · gf_screen
 ```
 
-Les interfaces NUI sont portées par `gf_ui` (HUD, classement, choix des armes)
-et par `gf_menu`. Ce dernier remplace le menu pause natif : son `client.lua`
+La page NUI de `gf_screen` embarque `html/vendor/three.min.js`, une copie
+vendorisée de `@citizenfx/three` version 0.100.0 sous licence MIT, dont
+l'empreinte SHA-256 est
+`87A89AA6EF00A49A674FD26318460F06C6452AA25A213EB529EEFC45CCBE6470`.
+
+Les interfaces NUI sont portées par `gf_ui` (HUD, classement, choix des armes),
+par `gf_menu` et par `gf_screen` (écran en direct). `gf_menu` remplace le menu
+pause natif : son `client.lua`
 bloque le frontend à chaque frame, ouvre `html/index.html` avec Échap et reçoit
 l'état construit côté serveur à partir de `gf_stats`. Les callbacks
 (`ready`, `close`, `quit`, `openAdmin`) répondent une seule fois à la page ;
