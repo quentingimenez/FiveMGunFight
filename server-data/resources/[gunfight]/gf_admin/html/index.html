@@ -79,10 +79,12 @@
                     <button id="btn-heal" class="btn" type="button">SOIGNER</button>
                     <button id="btn-freeze" class="btn" type="button">Geler / dégeler</button>
                     <button id="btn-spectate" class="btn" type="button">REGARDER</button>
+                    <button id="btn-screen" class="btn" type="button">VOIR SON ÉCRAN</button>
                     <button id="btn-kick" class="btn btn-danger" type="button">EXPULSER</button>
                   </div>
                   <p class="action-desc">Téléportation possible seulement si les deux joueurs sont dans le même mode.</p>
                   <p class="action-desc">La caméra suit le joueur ; il n'est pas prévenu.</p>
+                  <p class="action-desc">Affiche l'écran du joueur en direct ; la cible n'est pas prévenue et la capture consomme sa bande passante.</p>
                 </div>
 
                 <div class="detail-section">
@@ -178,6 +180,13 @@
               <div class="action">
                 <button id="btn-stop-spectate" class="btn" type="button" data-run="spectate">ARRÊTER LA VUE</button>
                 <p class="action-desc">Quitte la vue du joueur et rend la caméra au jeu.</p>
+              </div>
+            </div>
+            <div class="panel action-group">
+              <h2 class="group-title">ÉCRAN</h2>
+              <div class="action">
+                <button id="btn-screen-stop" class="btn" type="button" data-run="screen">ARRÊTER L'ÉCRAN</button>
+                <p class="action-desc">Ferme la fenêtre de l'écran en direct.</p>
               </div>
             </div>
           </div>

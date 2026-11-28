@@ -164,6 +164,7 @@ Le chat est retiré : les commandes se tapent dans la console F8, sans barre obl
 | `heal <id>` | admin | soigne la cible (santé maximale si elle n'est pas morte) ; émet `gf:healGranted` avant `gf_admin:heal` |
 | `freeze <id>` | admin | bascule gel/dégel de la cible, notifiée ; le gel est oublié à la déconnexion |
 | `spectate [id]` | admin | en jeu seulement : `spectate [id]` regarde le joueur, `spectate` seul arrête ; même monde, cible non prévenue, arrêt automatique si elle part |
+| `screen [id]` | admin | en jeu seulement : `screen <id>` regarde l'écran réel du joueur (2 à 5 images/s), `screen` seul arrête ; cible non prévenue, arrêt automatique après 10 min |
 | `announce <texte...>` | admin | annonce à tous (titre ANNONCE, 8 s) ; texte nettoyé de 1 à 120 caractères, auteur et texte journalisés |
 | touche **E** en Redzone | tous | prendre son véhicule sur un point véhicule |
 | touche **F** en Redzone | tous | sortir du véhicule (il disparaît) |
@@ -292,7 +293,15 @@ server-data/
     gf_journal  journal JSON des événements de match (morts, tueurs, résultats)
     gf_menu     menu pause NUI (Échap) : profil, règlement, Discord, quitter
     gf_admin    panneau d'administration (F10 ou menu Échap > ADMIN) : joueurs, parties, outils
+    gf_screen   écran en direct des joueurs pour les admins (2 à 5 images/s)
 ```
+
+La page NUI de `gf_screen` embarque `html/vendor/three.min.js` : une copie
+vendorisée de `@citizenfx/three` version 0.100.0, sous licence MIT, dont
+l'empreinte SHA-256 est
+`87A89AA6EF00A49A674FD26318460F06C6452AA25A213EB529EEFC45CCBE6470`. Ce fichier
+est fourni avec la ressource : ne pas le remplacer par une version téléchargée
+à la main.
 
 Chaque mode a son propre « monde » (routing bucket) : les joueurs du lobby, de
 l'Attaque et de la Redzone ne se voient pas. Le score et les victoires sont décidés
