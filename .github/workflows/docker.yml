@@ -5,8 +5,9 @@ name: Docker
 # Sur les pull requests, aucune image n'est publiée : le job smoke la construit
 # localement, même sans secret. Un test statique sans licence (obligatoire)
 # vérifie le refus de la valeur d'exemple ; le démarrage complet n'a lieu que si
-# la clé CI est disponible. Une analyse Trivy bloque les PR sur les
-# vulnérabilités corrigeables CRITICAL/HIGH.
+# la clé CI est disponible. Une analyse Trivy bloque les vulnérabilités
+# corrigeables CRITICAL/HIGH pour tous les déclencheurs : pull requests,
+# `main`, tags et relance hebdomadaire.
 #
 # Le secret CFX_LICENSE_KEY doit être une clé CI dédiée, jamais la clé du
 # serveur de production : seule la vérification de démarrage l'utilise. Les pull
@@ -152,10 +153,13 @@ jobs:
           sbom: ${{ github.event_name != 'pull_request' }}
           cache-from: type=gha,scope=base
 
-      # Le scan tourne sur l'image PR réellement construite. Une vulnérabilité
-      # corrigeable CRITICAL/HIGH fait échouer le job.
+      # Le scan porte sur l'image réellement construite par ce run : chargée
+      # localement sur une pull request, publiée sur GHCR sinon (l'étiquette
+      # ci-<sha> existe dans les deux cas). Hors pull request, l'authentification
+      # vient du `docker login` fait plus haut : Trivy lit la configuration
+      # Docker du runner. Une vulnérabilité corrigeable CRITICAL/HIGH fait
+      # échouer le job.
       - name: Scanner l'image (Trivy)
-        if: github.event_name == 'pull_request'
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE_LC }}:ci-${{ github.sha }}

@@ -298,9 +298,18 @@ Procédure de mise à jour :
 
 ## Chaîne d'approvisionnement de l'image
 
-- **Trivy** scanne l'image construite sur chaque pull request
+- **Trivy** scanne l'image construite sur chaque pull request, et l'image
+  publiée sur `main`, sur un tag et à chaque relance hebdomadaire
   (`severity: CRITICAL,HIGH`, `ignore-unfixed: true`, `exit-code: 1`). Une
-  vulnérabilité critique corrigeable bloque donc la fusion.
+  vulnérabilité critique corrigeable bloque donc la fusion, et fait échouer
+  le run dès qu'elle apparaît sur `main`.
+- La relance du lundi est une **veille des CVE** : la base Debian et
+  FXServer sont épinglés, donc l'image reconstruite est identique, seule la
+  base de vulnérabilités de Trivy change. Un CVE corrigeable apparu dans la
+  semaine fait échouer le run, et `alerte-main.yml` ouvre l'issue « CI rouge
+  sur main ». Le scan coûte une trentaine de secondes sur `main` (image
+  téléchargée depuis GHCR) et rien sur une pull request, où elle est déjà
+  locale.
 - Le build publié (push sur `main`, tags, planification) produit une
   **attestation de provenance** (`provenance: mode=max`) et un **SBOM**
   (`sbom: true`), utiles pour vérifier ce qui est réellement publié.
