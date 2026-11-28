@@ -289,6 +289,30 @@ button { color: inherit; cursor: pointer; }
 .detail-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .button-row .btn { min-width: 74px; }
+.screen-control { display: inline-flex; align-items: flex-start; gap: 8px; }
+.screen-quality-group { display: flex; min-width: 0; max-width: 240px; flex-direction: column; gap: 3px; }
+.screen-quality-row { display: flex; min-height: 34px; align-items: center; gap: 8px; }
+.screen-quality-help { color: var(--muted); font-size: 10px; line-height: 1.35; }
+.screen-quality-label {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.select-quality {
+  width: auto;
+  min-width: 92px;
+  min-height: 34px;
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.select-quality option { background: var(--panel-solid); color: var(--text); }
 
 /* Catalogue d'armes. */
 .filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }

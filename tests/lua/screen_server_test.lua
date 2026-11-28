@@ -1,5 +1,6 @@
 -- =============================================================================
---  Tests du serveur gf_screen : commande screen, relais d'images et suivi.
+--  Tests du serveur gf_screen : commande screen, préréglages, relais d'images
+--  avec métadonnées et suivi du débit.
 --  Lancement (depuis la racine du dépôt) : lua5.4 tests/lua/screen_server_test.lua
 --  Les chunks Lua sont chargés avec loadfile(path, 't', env) dans un environnement
 --  simulé : ni FiveM, ni base de données, ni dépendance externe. Aucune règle
@@ -37,13 +38,23 @@ end
 local USAGE = 'Usage : screen <id> (ex. screen 12) ; screen seul pour arrêter.'
 local REFUS = 'Réservé aux administrateurs.'
 local CONSOLE = '[gf_screen] Commande à utiliser en jeu.'
-local PREFIXE = 'data:image/jpeg;base64,'
-local FPS, WIDTH, QUALITY = 3, 640, 0.5
-local LATENT_OCTETS = 600000
-local MAX_CHARS, MAX_SECONDS = 250000, 600
+local QUALITE_INCONNUE = 'Qualité inconnue : basse, moyenne, haute ou ultra.'
+local PREFIXE_WEBP = 'data:image/webp;base64,'
+local PREFIXE_JPEG = 'data:image/jpeg;base64,'
+local DEFAUT = 'haute'
+local PRESETS = {
+    basse = { width = 640, fps = 3, quality = 0.5 },
+    moyenne = { width = 960, fps = 5, quality = 0.6 },
+    haute = { width = 1280, fps = 8, quality = 0.7 },
+    ultra = { width = 1280, fps = 15, quality = 0.6 },
+}
+local UPLOAD_BPS = 1000000
+local LATENT_OCTETS = 1500000
+local MAX_CHARS = 600000
+local MAX_SECONDS = 600
 
--- Ids distincts pour éviter tout état résiduel : 1 et 2 adminstrateurs,
--- 3 à 5 cibles ; 6 est un joueur non adminstrateur.
+-- Ids distincts pour éviter tout état résiduel : 1 et 2 administrateurs,
+-- 3 à 5 cibles ; 6 est un joueur non administrateur.
 local admins = { [1] = true, [2] = true }
 local names = {
     [1] = 'AdminUn',
@@ -54,7 +65,7 @@ local names = {
 }
 
 -- Un seul journal pour les événements locaux, client et latents : l'ordre
--- relatives des envois, notifications et audits reste observable.
+-- relatif des envois, notifications et audits reste observable.
 local journal = {}       -- { { kind, name, target, data, bytes, ordre }, ... }
 local notices = {}       -- { { src, message, ordre }, ... }
 local prints = {}        -- lignes du print simulé
@@ -136,13 +147,16 @@ chunkConfig()
 local chunkServer = assert(loadfile(base .. 'server.lua', 't', env),
     'gf_screen/server.lua introuvable')
 chunkServer()
+local Config = env.Config
 
 -- ---------------------------------------------------------------------------
 -- Utilitaires du harnais.
 -- ---------------------------------------------------------------------------
+-- reinitialiser() vide les journaux et écarte toute fenêtre de débit, mais ne
+-- touche ni à Watching ni à Viewer : chaque cas arrête explicitement sa vue.
 local function reinitialiser()
     journal, notices, prints, audits = {}, {}, {}, {}
-    now = now + 2000 -- écarte toute fenêtre de débit résiduelle entre deux cas
+    now = now + 2000
     env.source = 1
 end
 
@@ -153,11 +167,15 @@ local function appeler(src, args)
     handler(src, args)
 end
 
--- L'événement client lit `source` dans env ; l'image est son seul argument.
-local function envoyerImage(src, image)
+-- L'événement client lit `source` dans env et reçoit une table { image, meta }.
+local function envoyerPayload(src, payload)
     env.source = src
     local handler = assert(handlers['gf_screen:frame'], 'event gf_screen:frame absent')
-    handler(image)
+    handler(payload)
+end
+
+local function envoyerImage(src, image, meta)
+    envoyerPayload(src, { image = image, meta = meta })
 end
 
 local function depart(src)
@@ -197,6 +215,13 @@ local function notice(src, message)
     return nil
 end
 
+-- Arrêt explicite d'une vue : défini APRÈS notice, dont il dépend.
+local function arret(admin, label)
+    appeler(admin, {})
+    check(notice(admin, 'Écran arrêté.') ~= nil,
+        ('%s : vue arrêtée explicitement'):format(label or 'arrêt'))
+end
+
 -- `aucunAutreEffet` ignore les notifications (le cas en attend souvent une).
 local function aucunAutreEffet()
     return #journal == 0 and #prints == 0 and #audits == 0
@@ -214,6 +239,47 @@ local function dataExact(e, nombreDeClefs, valeurs)
         if valeurs[cle] == nil or valeur ~= valeurs[cle] then return false end
     end
     return compte == nombreDeClefs
+end
+
+-- Métadonnées valides : exactement dix champs, modifiables pour les cas invalides.
+local function metaValide(changes)
+    local meta = {
+        hp = 82, armour = 35, weapon = 'WEAPON_CARBINE', clip = 12, ammo = 90,
+        mode = 'attack', vehicle = false, speed = 42.5, w = 640, h = 360,
+    }
+    if changes then
+        for cle, valeur in pairs(changes) do meta[cle] = valeur end
+    end
+    return meta
+end
+
+-- Comparaison profonde exacte d'une meta relayée (dix clés, aucune en trop).
+local function metaExact(meta, attendu)
+    if type(meta) ~= 'table' or type(attendu) ~= 'table' then return false end
+    local compte = 0
+    for cle, valeur in pairs(meta) do
+        compte = compte + 1
+        if attendu[cle] == nil or valeur ~= attendu[cle] then return false end
+    end
+    return compte == 10
+end
+
+-- Donnée latente exacte : image, preset et, seulement si elle est valide, meta.
+-- Quand meta est nil, la clé `meta` doit être ABSENTE (data a deux clés).
+local function frameDataExact(e, image, preset, meta)
+    if type(e) ~= 'table' or type(e.data) ~= 'table' then return false end
+    local compte = 0
+    for cle, valeur in pairs(e.data) do
+        compte = compte + 1
+        if cle ~= 'image' and cle ~= 'meta' and cle ~= 'preset' then return false end
+        if cle == 'image' and valeur ~= image then return false end
+        if cle == 'preset' and valeur ~= preset then return false end
+        if cle == 'meta' then
+            if meta == nil or not metaExact(valeur, meta) then return false end
+        end
+    end
+    if meta == nil then return compte == 2 end
+    return compte == 3
 end
 
 -- Suite ordonnée des seuls effets observables (envois, notifications, audits).
@@ -283,7 +349,33 @@ local function departAdmin(src, label)
 end
 
 -- ---------------------------------------------------------------------------
--- 1. Enregistrements attendus.
+-- 1. Configuration exacte chargée depuis config.lua.
+-- ---------------------------------------------------------------------------
+check(type(Config) == 'table', 'Config chargé depuis config.lua')
+check(type(Config.Presets) == 'table', 'Config.Presets présent')
+local comptePresets = 0
+for _ in pairs(Config.Presets or {}) do comptePresets = comptePresets + 1 end
+check(comptePresets == 4, 'Config.Presets : exactement quatre préréglages')
+for _, nom in ipairs({ 'basse', 'moyenne', 'haute', 'ultra' }) do
+    local preset = Config.Presets[nom]
+    local attendu = PRESETS[nom]
+    local compte = 0
+    if type(preset) == 'table' then
+        for cle in pairs(preset) do compte = compte + 1 end
+    end
+    check(type(preset) == 'table' and compte == 3
+        and preset.width == attendu.width and preset.fps == attendu.fps
+        and preset.quality == attendu.quality,
+        ('Config.Presets.%s exact (3 clés : width, fps, quality)'):format(nom))
+end
+check(Config.DefaultPreset == DEFAUT, 'Config.DefaultPreset = haute')
+check(Config.UploadBps == UPLOAD_BPS, 'Config.UploadBps exact')
+check(Config.ForwardBps == LATENT_OCTETS, 'Config.ForwardBps exact')
+check(Config.MaxFrameChars == MAX_CHARS, 'Config.MaxFrameChars exact')
+check(Config.MaxSeconds == MAX_SECONDS, 'Config.MaxSeconds exact')
+
+-- ---------------------------------------------------------------------------
+-- 2. Enregistrements attendus.
 -- ---------------------------------------------------------------------------
 check(type(commands.screen) == 'function', "RegisterCommand('screen') enregistré")
 check(type(handlers['gf_screen:frame']) == 'function',
@@ -293,7 +385,7 @@ check(type(eventHandlers.playerDropped) == 'function',
 check(#threads >= 1, 'CreateThread de suivi enregistré')
 
 -- ---------------------------------------------------------------------------
--- 2. Refus non-admin : une notification exacte, aucun événement.
+-- 3. Refus non-admin : une notification exacte, aucun événement.
 -- ---------------------------------------------------------------------------
 reinitialiser()
 appeler(6, { '3' })
@@ -303,7 +395,7 @@ check(#notices == 1 and notices[1] ~= nil and notices[1].src == 6
 check(aucunAutreEffet(), 'non-admin : aucun événement, print ni audit')
 
 -- ---------------------------------------------------------------------------
--- 3. Console : un print exact, aucun événement ni notification.
+-- 4. Console : un print exact, aucun événement ni notification.
 -- ---------------------------------------------------------------------------
 reinitialiser()
 appeler(0, { '3' })
@@ -312,7 +404,7 @@ check(#journal == 0 and #notices == 0 and #audits == 0,
     'console : aucun événement, notification ni audit')
 
 -- ---------------------------------------------------------------------------
--- 4. Usage sans vue en cours.
+-- 5. Usage sans vue en cours.
 -- ---------------------------------------------------------------------------
 reinitialiser()
 appeler(1, {})
@@ -320,7 +412,7 @@ check(#notices == 1 and notice(1, USAGE) ~= nil, 'usage sans vue : message exact
 check(aucunAutreEffet(), 'usage sans vue : aucun événement, print ni audit')
 
 -- ---------------------------------------------------------------------------
--- 5. Cible introuvable : l'id demandé apparaît dans le message.
+-- 6. Cible introuvable : l'id demandé apparaît dans le message.
 -- ---------------------------------------------------------------------------
 reinitialiser()
 appeler(1, { '999' })
@@ -329,7 +421,7 @@ check(#notices == 1 and notice(1, 'Joueur 999 introuvable.') ~= nil,
 check(aucunAutreEffet(), 'cible introuvable : aucun événement, print ni audit')
 
 -- ---------------------------------------------------------------------------
--- 6. Refus de regarder son propre écran.
+-- 7. Refus de regarder son propre écran.
 -- ---------------------------------------------------------------------------
 reinitialiser()
 appeler(1, { '1' })
@@ -338,29 +430,41 @@ check(#notices == 1 and notice(1, 'Tu ne peux pas regarder ton propre écran.') 
 check(aucunAutreEffet(), 'soi-même : aucun événement, print ni audit')
 
 -- ---------------------------------------------------------------------------
--- 7. Départ réussi : ordre exact, charges utiles exactes, un seul audit.
+-- 8. Préréglage inconnu : message exact, aucun autre effet.
+-- ---------------------------------------------------------------------------
+reinitialiser()
+appeler(1, { '3', 'turbo' })
+check(#notices == 1 and notice(1, QUALITE_INCONNUE) ~= nil,
+    'préréglage inconnu : message exact')
+check(aucunAutreEffet(), 'préréglage inconnu : aucun événement, print ni audit')
+
+-- ---------------------------------------------------------------------------
+-- 9. Départ réussi : préréglage par défaut, ordre exact, charges utiles exactes.
 -- ---------------------------------------------------------------------------
 reinitialiser()
 appeler(1, { '3' })
 verifierSuite({
     'client captureStart -> 3',
     'client viewStart -> 1',
-    ('notice 1 Écran de %s. Tape screen pour arrêter.'):format(names[3]),
+    ('notice 1 Écran de %s (%s). Tape screen pour arrêter.'):format(names[3], DEFAUT),
     'audit 1 screen 3',
-}, 'départ réussi')
+}, 'départ réussi : préréglage par défaut')
 
 local capture = entry('client', 'gf_screen:captureStart')
 check(capture ~= nil and capture.target == 3
-    and dataExact(capture, 3, { fps = FPS, width = WIDTH, quality = QUALITY }),
-    'départ réussi : captureStart exact vers la cible')
+    and dataExact(capture, 4, {
+        fps = PRESETS[DEFAUT].fps, width = PRESETS[DEFAUT].width,
+        quality = PRESETS[DEFAUT].quality, format = 'webp',
+    }),
+    'départ réussi : captureStart exact (4 clés, format webp) vers la cible')
 local vue = entry('client', 'gf_screen:viewStart')
 check(vue ~= nil and vue.target == 1
-    and dataExact(vue, 2, { target = 3, name = names[3] }),
-    'départ réussi : viewStart exact vers l’admin')
+    and dataExact(vue, 3, { target = 3, name = names[3], preset = DEFAUT }),
+    'départ réussi : viewStart exact (3 clés) vers l’admin')
 check(#audits == 1 and audits[1] ~= nil and audits[1].src == 1
     and audits[1].action == 'screen' and audits[1].cible == 3
-    and audits[1].details == nil,
-    'départ réussi : exactement un LogAction(src, screen, cible, nil)')
+    and audits[1].details == ('qualite=%s'):format(DEFAUT),
+    'départ réussi : un seul LogAction avec details qualite=haute')
 local versCible = #entriesVers('client', nil, 3)
 check(versCible == 1, 'départ réussi : un seul événement vers la cible')
 local cibleNotifiee = false
@@ -370,37 +474,63 @@ end
 check(not cibleNotifiee, 'départ réussi : aucune notification à la cible')
 
 -- ---------------------------------------------------------------------------
--- 8. Cible déjà regardée par un autre admin : refus, vue initiale intacte.
+-- 10. Cible déjà regardée par un autre admin : refus, vue initiale intacte.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-appeler(2, { '3' })
+appeler(2, { '3', 'basse' })
 check(#notices == 1 and notice(2,
         ('%s est déjà regardé par un administrateur.'):format(names[3])) ~= nil,
     'cible déjà regardée : message exact au second admin')
 check(aucunAutreEffet(), 'cible déjà regardée : aucun événement ni audit')
 
 reinitialiser()
-local imageH = PREFIXE .. 'AAAABBBB'
+local imageH = PREFIXE_WEBP .. 'AAAABBBB'
 envoyerImage(3, imageH)
 local transH = entries('latent', 'gf_screen:frame')
 check(#transH == 1 and transH[1] ~= nil and transH[1].target == 1
-    and transH[1].bytes == LATENT_OCTETS and transH[1].data == imageH,
-    'cible déjà regardée : la vue du premier admin reste active')
+    and transH[1].bytes == LATENT_OCTETS
+    and frameDataExact(transH[1], imageH, DEFAUT, nil),
+    'cible déjà regardée : la vue du premier admin reste active avec son preset')
+reinitialiser()
+arret(1, 'cible déjà regardée')
 
 -- ---------------------------------------------------------------------------
--- 9. Même cible : arrêt dans l'ordre, sans audit.
+-- 11. Préréglage inconnu pendant une vue : vue intacte, frame relayée.
 -- ---------------------------------------------------------------------------
+reinitialiser()
+appeler(1, { '3', 'haute' })
+reinitialiser()
+appeler(1, { '3', 'turbo' })
+check(#notices == 1 and notice(1, QUALITE_INCONNUE) ~= nil,
+    'préréglage inconnu pendant une vue : message exact')
+check(aucunAutreEffet(), 'préréglage inconnu pendant une vue : aucun autre effet')
+local imageInconnue = PREFIXE_WEBP .. 'VUEINTACTE'
+envoyerImage(3, imageInconnue)
+local transInconnue = entries('latent', 'gf_screen:frame')
+check(#transInconnue == 1
+    and frameDataExact(transInconnue[1], imageInconnue, 'haute', nil),
+    'préréglage inconnu pendant une vue : la vue et son préréglage restent actifs')
+reinitialiser()
+arret(1, 'préréglage inconnu pendant une vue')
+
+-- ---------------------------------------------------------------------------
+-- 12. Même cible sans préréglage : arrêt dans l'ordre, sans audit.
+-- ---------------------------------------------------------------------------
+reinitialiser()
+appeler(1, { '3', 'haute' })
+check(entry('client', 'gf_screen:captureStart') ~= nil,
+    'même cible sans préréglage : vue active sur 3 avant l’arrêt')
 reinitialiser()
 appeler(1, { '3' })
 verifierSuite({
     'client captureStop -> 3',
     'client viewStop -> 1',
     'notice 1 Écran arrêté.',
-}, 'même cible : arrêt')
-check(#audits == 0, 'même cible : aucun LogAction')
+}, 'même cible sans préréglage : arrêt')
+check(#audits == 0, 'même cible sans préréglage : aucun LogAction')
 check(entry('client', 'gf_screen:captureStart') == nil
     and entry('client', 'gf_screen:viewStart') == nil,
-    'même cible : aucun nouveau départ')
+    'même cible sans préréglage : aucun nouveau départ')
 
 reinitialiser()
 appeler(1, {})
@@ -409,114 +539,350 @@ check(#notices == 1 and notice(1, USAGE) ~= nil,
 check(aucunAutreEffet(), 'arrêt : aucun événement ni audit résiduel')
 
 -- ---------------------------------------------------------------------------
--- 10. Image reçue sans vue en cours : aucun envoi.
+-- 13. Préréglages choisis : charges utiles, notification et audit exacts.
+-- ---------------------------------------------------------------------------
+local function verifierPreset(preset, admin, cible)
+    reinitialiser()
+    appeler(admin, { tostring(cible), preset })
+    local p = PRESETS[preset]
+    local capturePreset = entry('client', 'gf_screen:captureStart')
+    check(capturePreset ~= nil and capturePreset.target == cible
+        and dataExact(capturePreset, 4, {
+            fps = p.fps, width = p.width, quality = p.quality, format = 'webp',
+        }),
+        ('préréglage %s : captureStart exact (4 clés)'):format(preset))
+    local vuePreset = entry('client', 'gf_screen:viewStart')
+    check(vuePreset ~= nil and vuePreset.target == admin
+        and dataExact(vuePreset, 3, {
+            target = cible, name = names[cible], preset = preset,
+        }),
+        ('préréglage %s : viewStart exact (3 clés)'):format(preset))
+    check(notice(admin,
+            ('Écran de %s (%s). Tape screen pour arrêter.'):format(names[cible], preset)) ~= nil,
+        ('préréglage %s : notification exacte avec le préréglage'):format(preset))
+    check(#audits == 1 and audits[1].details == ('qualite=%s'):format(preset),
+        ('préréglage %s : audit avec details'):format(preset))
+    reinitialiser()
+    local imagePreset = PREFIXE_JPEG .. ('PRESET%s'):format(preset)
+    envoyerImage(cible, imagePreset)
+    local transPreset = entries('latent', 'gf_screen:frame')
+    check(#transPreset == 1 and transPreset[1].target == admin
+        and transPreset[1].bytes == LATENT_OCTETS
+        and frameDataExact(transPreset[1], imagePreset, preset, nil),
+        ('préréglage %s : frame relayée avec le bon preset'):format(preset))
+    reinitialiser()
+    arret(admin, ('préréglage %s'):format(preset))
+end
+verifierPreset('basse', 1, 3)
+verifierPreset('moyenne', 2, 4)
+verifierPreset('ultra', 1, 5)
+
+-- ---------------------------------------------------------------------------
+-- 14. Même cible avec préréglage : nouveau captureStart, aucun arrêt,
+--     fenêtre de débit remise à zéro, durée initiale conservée.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-envoyerImage(3, PREFIXE .. 'SANSVIEWER')
+appeler(1, { '3', 'basse' })
+check(entry('client', 'gf_screen:captureStart') ~= nil,
+    'changement de préréglage : vue initiale basse')
+reinitialiser()
+for i = 1, PRESETS.basse.fps + 1 do
+    envoyerImage(3, PREFIXE_JPEG .. ('VIEUX%02d'):format(i))
+end
+check(#entries('latent', 'gf_screen:frame') == PRESETS.basse.fps + 1,
+    'changement de préréglage : quota basse consommé')
+appeler(1, { '3', 'haute' })
+check(#entries('client', 'gf_screen:captureStop') == 0
+    and #entries('client', 'gf_screen:viewStop') == 0
+    and #entries('client', 'gf_screen:viewStart') == 0
+    and #notices == 0 and #audits == 0 and #prints == 0,
+    'changement de préréglage : aucun arrêt, notification ni audit')
+local nouveaux = entries('client', 'gf_screen:captureStart')
+check(#nouveaux == 1 and dataExact(nouveaux[1], 4, {
+        fps = PRESETS.haute.fps, width = PRESETS.haute.width,
+        quality = PRESETS.haute.quality, format = 'webp',
+    }),
+    'changement de préréglage : un seul nouveau captureStart aux valeurs haute')
+for i = 1, PRESETS.haute.fps + 1 do
+    envoyerImage(3, PREFIXE_JPEG .. ('NOUVEAU%02d'):format(i))
+end
+local transChangement = entries('latent', 'gf_screen:frame')
+local totalAttendu = (PRESETS.basse.fps + 1) + (PRESETS.haute.fps + 1)
+check(#transChangement == totalAttendu,
+    ('changement de préréglage : fenêtre remise à zéro (%d images attendues, %d obtenues)')
+        :format(totalAttendu, #transChangement))
+for i = PRESETS.basse.fps + 2, totalAttendu do
+    check(transChangement[i] ~= nil
+        and frameDataExact(transChangement[i],
+            PREFIXE_JPEG .. ('NOUVEAU%02d'):format(i - PRESETS.basse.fps - 1), 'haute', nil),
+        ('changement de préréglage : image %d relayée avec le nouveau preset'):format(i))
+end
+envoyerImage(3, PREFIXE_JPEG .. 'AUDELA')
+check(#entries('latent', 'gf_screen:frame') == totalAttendu,
+    'changement de préréglage : image au-delà du nouveau quota ignorée')
+reinitialiser()
+arret(1, 'changement de préréglage')
+
+reinitialiser()
+appeler(1, { '3', 'basse' })
+local departInitial = now
+reinitialiser()
+now = departInitial + MAX_SECONDS * 1000 - 1000
+appeler(1, { '3', 'moyenne' })
+check(entry('client', 'gf_screen:captureStop') == nil,
+    'durée conservée : pas d’arrêt au changement de préréglage')
+unePasse('durée conservée')
+check(entry('client', 'gf_screen:viewStop') == nil,
+    'durée conservée : aucune expiration avant MaxSeconds depuis le départ')
+now = departInitial + MAX_SECONDS * 1000 + 1
+unePasse('durée conservée : expiration')
+check(entry('client', 'gf_screen:viewStop') ~= nil
+    and notice(1, 'Durée maximale atteinte : écran arrêté.') ~= nil,
+    'durée conservée : expiration après MaxSeconds depuis le départ initial')
+reinitialiser()
+appeler(1, {})
+check(notice(1, USAGE) ~= nil, 'durée conservée : nettoyage complet')
+
+-- ---------------------------------------------------------------------------
+-- 15. Image reçue sans vue en cours : aucun envoi.
+-- ---------------------------------------------------------------------------
+reinitialiser()
+envoyerImage(3, PREFIXE_JPEG .. 'SANSVIEWER', metaValide())
 check(aucunEffet(), 'frame sans viewer : aucun événement, notification ni audit')
 
 -- ---------------------------------------------------------------------------
--- 11. Mauvais préfixe : aucun envoi malgré une vue active.
+-- 16. Formats et charges utiles acceptées / refusées.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-appeler(1, { '4' })
+appeler(1, { '4', 'moyenne' })
 check(entry('client', 'gf_screen:captureStart') ~= nil,
-    'mauvais préfixe : vue démarrée sur la cible 4')
+    'formats : vue démarrée sur la cible 4 en moyenne')
 reinitialiser()
+
+local imageWebp = PREFIXE_WEBP .. 'WEBPACCEPTEE'
+envoyerImage(4, imageWebp)
+local transWebp = entries('latent', 'gf_screen:frame')
+check(#transWebp == 1 and transWebp[1].target == 1
+    and transWebp[1].bytes == LATENT_OCTETS
+    and frameDataExact(transWebp[1], imageWebp, 'moyenne', nil),
+    'image webp : acceptée et relayée')
+
+local imageJpeg = PREFIXE_JPEG .. 'JPEGACCEPTEE'
+envoyerImage(4, imageJpeg)
+local transJpeg = entries('latent', 'gf_screen:frame')
+check(#transJpeg == 2 and frameDataExact(transJpeg[2], imageJpeg, 'moyenne', nil),
+    'image jpeg : acceptée et relayée')
+
+local avantRefus = #entries('latent', 'gf_screen:frame')
 envoyerImage(4, 'data:image/png;base64,AAAA')
-check(aucunEffet(), 'mauvais préfixe : aucun envoi')
-
--- ---------------------------------------------------------------------------
--- 12. Image trop grande : aucun envoi malgré le bon préfixe.
--- ---------------------------------------------------------------------------
-local imageGrande = PREFIXE .. string.rep('A', MAX_CHARS)
-check(#imageGrande > MAX_CHARS, 'image trop grande : charge utile construite au-delà de la limite')
+check(#entries('latent', 'gf_screen:frame') == avantRefus,
+    'autre préfixe : aucun envoi')
+envoyerPayload(4, PREFIXE_JPEG .. 'CHAINESEULE')
+check(#entries('latent', 'gf_screen:frame') == avantRefus,
+    'payload chaîne seule : aucun envoi')
+local imageGrande = PREFIXE_JPEG .. string.rep('A', MAX_CHARS)
+check(#imageGrande > MAX_CHARS,
+    'image trop grande : charge utile construite au-delà de la limite')
 envoyerImage(4, imageGrande)
-check(aucunEffet(), 'image trop grande : aucun envoi')
+check(#entries('latent', 'gf_screen:frame') == avantRefus,
+    'image trop longue : aucun envoi')
+
+-- Les images invalides ne consomment pas de quota : les images valides suivantes
+-- passent encore après les trois refus, puis la suivante est bien bloquée.
+local quota = PRESETS.moyenne.fps + 1
+for i = 3, quota do envoyerImage(4, PREFIXE_JPEG .. ('VALIDE%02d'):format(i)) end
+check(#entries('latent', 'gf_screen:frame') == quota,
+    'images invalides : aucun quota consommé')
+envoyerImage(4, PREFIXE_JPEG .. 'EXCEDENT')
+check(#entries('latent', 'gf_screen:frame') == quota,
+    'images invalides : image suivante ignorée après épuisement du quota')
+reinitialiser()
+arret(1, 'formats et charges utiles')
 
 -- ---------------------------------------------------------------------------
--- 13. Débit : quatre images valides par fenêtre de 1000 ms, puis réinitialisation.
+-- 17. Métadonnées valides : transmises champ par champ avec l'image.
 -- ---------------------------------------------------------------------------
-local imagesM = {}
-for i = 1, 4 do imagesM[i] = PREFIXE .. ('IMG%02d'):format(i) end
-for i = 1, 4 do envoyerImage(4, imagesM[i]) end
-local transM = entries('latent', 'gf_screen:frame')
-check(#transM == 4,
-    ('débit : quatre images transmises dans la fenêtre (obtenu %d)'):format(#transM))
-for i = 1, math.min(#transM, 4) do
-    check(transM[i].target == 1 and transM[i].bytes == LATENT_OCTETS
-        and transM[i].data == imagesM[i],
-        ('débit : image %d exacte vers le seul admin'):format(i))
+reinitialiser()
+appeler(1, { '5', 'haute' })
+reinitialiser()
+local metaComplete = metaValide({
+    hp = 100, armour = 0, weapon = 'WEAPON_SNSPISTOL', clip = 7, ammo = 1234,
+    mode = 'lobby', vehicle = true, speed = 999, w = 4096, h = 1,
+})
+local imageMeta = PREFIXE_WEBP .. 'METACOMPLETE'
+envoyerImage(5, imageMeta, metaComplete)
+local transMeta = entries('latent', 'gf_screen:frame')
+check(#transMeta == 1 and transMeta[1].target == 1
+    and transMeta[1].bytes == LATENT_OCTETS
+    and frameDataExact(transMeta[1], imageMeta, 'haute', metaComplete),
+    'meta valide : dix champs transmis exactement avec l’image')
+check(metaExact(transMeta[1] and transMeta[1].data.meta, metaComplete),
+    'meta valide : comparaison profonde exacte')
+reinitialiser()
+arret(1, 'meta valide')
+
+-- ---------------------------------------------------------------------------
+-- 18. Métadonnées invalides : l'image est relayée, meta absente du data.
+-- ---------------------------------------------------------------------------
+local metaSansHp = metaValide()
+metaSansHp.hp = nil
+local casMetaInvalides = {
+    { 'meta non table', 'pas une table' },
+    { 'clé manquante', metaSansHp },
+    { 'clé en trop', metaValide({ extra = 1 }) },
+    { 'hp hors borne', metaValide({ hp = 101 }) },
+    { 'hp non entier', metaValide({ hp = 50.5 }) },
+    { 'weapon non chaîne', metaValide({ weapon = 42 }) },
+    { 'clip hors borne', metaValide({ clip = 10000 }) },
+    { 'ammo non entier', metaValide({ ammo = 12.5 }) },
+    { 'mode non chaîne', metaValide({ mode = true }) },
+    { 'vehicle non booléen', metaValide({ vehicle = 1 }) },
+    { 'speed hors borne', metaValide({ speed = 1000 }) },
+    { 'w hors borne', metaValide({ w = 4097 }) },
+    { 'h non entier', metaValide({ h = 720.25 }) },
+}
+for _, cas in ipairs(casMetaInvalides) do
+    reinitialiser()
+    appeler(1, { '3', 'basse' })
+    reinitialiser()
+    local imageCas = PREFIXE_JPEG .. 'METAINVALIDE'
+    envoyerImage(3, imageCas, cas[2])
+    local transCas = entries('latent', 'gf_screen:frame')
+    check(#transCas == 1 and transCas[1].bytes == LATENT_OCTETS
+        and transCas[1].target == 1
+        and frameDataExact(transCas[1], imageCas, 'basse', nil),
+        ('meta invalide (%s) : image relayée avec data à deux clés'):format(cas[1]))
+    check(transCas[1] == nil or transCas[1].data.meta == nil,
+        ('meta invalide (%s) : clé meta absente'):format(cas[1]))
+    reinitialiser()
+    arret(1, ('meta invalide (%s)'):format(cas[1]))
 end
-envoyerImage(4, PREFIXE .. 'IMG05')
-check(#entries('latent', 'gf_screen:frame') == 4, 'débit : cinquième image ignorée')
-now = now + 1000
-local image6 = PREFIXE .. 'IMG06'
-envoyerImage(4, image6)
-local trans6 = entries('latent', 'gf_screen:frame')
-check(#trans6 == 5 and trans6[5] ~= nil and trans6[5].target == 1
-    and trans6[5].bytes == LATENT_OCTETS and trans6[5].data == image6,
-    'débit : image acceptée à GetGameTimer() + 1000')
-check(#entries('client', 'gf_screen:frame') == 0,
-    'débit : aucun envoi non latent de frame')
-
-reinitialiser()
-appeler(1, {})
-check(notice(1, 'Écran arrêté.') ~= nil, 'débit : vue arrêtée pour la suite')
 
 -- ---------------------------------------------------------------------------
--- 14. Transmission au seul admin qui regarde.
+-- 19. Troncature des textes libres de la meta.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-appeler(2, { '5' })
+appeler(1, { '3', 'haute' })
+reinitialiser()
+local imageLongue = PREFIXE_JPEG .. 'TRONCATURE'
+envoyerImage(3, imageLongue, metaValide({
+    weapon = string.rep('w', 40), mode = string.rep('m', 20),
+}))
+local transLongue = entries('latent', 'gf_screen:frame')
+check(#transLongue == 1
+    and frameDataExact(transLongue[1], imageLongue, 'haute', metaValide({
+        weapon = string.rep('w', 32), mode = string.rep('m', 16),
+    })),
+    'troncature : weapon à 32 et mode à 16 caractères, meta conservée')
+reinitialiser()
+arret(1, 'troncature')
+
+-- ---------------------------------------------------------------------------
+-- 20. Débit : nombre exact d'images par fenêtre pour chaque préréglage.
+-- ---------------------------------------------------------------------------
+local function verifierDebit(preset, admin, cible)
+    local label = preset
+    reinitialiser()
+    appeler(admin, { tostring(cible), preset })
+    check(entry('client', 'gf_screen:captureStart') ~= nil,
+        ('débit %s : vue démarrée'):format(label))
+    reinitialiser()
+    local limite = PRESETS[preset].fps + 1
+    local images = {}
+    for i = 1, limite do
+        images[i] = PREFIXE_JPEG .. ('%s-%03d'):format(label, i)
+        envoyerImage(cible, images[i])
+    end
+    local trans = entries('latent', 'gf_screen:frame')
+    check(#trans == limite,
+        ('débit %s : %d images transmises dans la fenêtre (obtenu %d)')
+            :format(label, limite, #trans))
+    for i = 1, math.min(#trans, limite) do
+        check(trans[i].target == admin and trans[i].bytes == LATENT_OCTETS
+            and frameDataExact(trans[i], images[i], preset, nil),
+            ('débit %s : image %d exacte vers le seul admin'):format(label, i))
+    end
+    envoyerImage(cible, PREFIXE_JPEG .. label .. '-REFUSEE')
+    check(#entries('latent', 'gf_screen:frame') == limite,
+        ('débit %s : image suivante ignorée'):format(label))
+    now = now + 1000
+    local imagePlus = PREFIXE_JPEG .. label .. '-PLUS'
+    envoyerImage(cible, imagePlus)
+    local transPlus = entries('latent', 'gf_screen:frame')
+    check(#transPlus == limite + 1 and transPlus[limite + 1] ~= nil
+        and frameDataExact(transPlus[limite + 1], imagePlus, preset, nil),
+        ('débit %s : image acceptée à GetGameTimer() + 1000'):format(label))
+    check(#entries('client', 'gf_screen:frame') == 0,
+        ('débit %s : aucun envoi non latent de frame'):format(label))
+    reinitialiser()
+    arret(admin, ('débit %s'):format(label))
+end
+verifierDebit('basse', 1, 3)
+verifierDebit('moyenne', 2, 4)
+verifierDebit('haute', 1, 5)
+verifierDebit('ultra', 2, 3)
+check(PRESETS.ultra.fps + 1 == 16, 'débit ultra : plafond explicite de 16 images/s')
+
+-- ---------------------------------------------------------------------------
+-- 21. Transmission au seul admin qui regarde.
+-- ---------------------------------------------------------------------------
+reinitialiser()
+appeler(2, { '5', 'basse' })
 check(entry('client', 'gf_screen:captureStart') ~= nil,
     'transmission : vue démarrée sur 5 par l’admin 2')
 reinitialiser()
-local imageN = PREFIXE .. 'NSEUL'
-envoyerImage(5, imageN)
+local imageN = PREFIXE_WEBP .. 'NSEUL'
+envoyerImage(5, imageN, metaValide())
 local transN = entries('latent', 'gf_screen:frame')
 check(#transN == 1 and transN[1] ~= nil and transN[1].target == 2
-    and transN[1].bytes == LATENT_OCTETS and transN[1].data == imageN,
+    and transN[1].bytes == LATENT_OCTETS
+    and frameDataExact(transN[1], imageN, 'basse', metaValide()),
     'transmission : image envoyée au seul admin 2')
 check(#entriesVers('latent', 'gf_screen:frame', 1) == 0,
     'transmission : aucun envoi à l’admin 1')
 check(#entriesVers('client', nil, 5) == 0,
     'transmission : aucun événement vers la cible')
 reinitialiser()
-appeler(2, {})
-check(notice(2, 'Écran arrêté.') ~= nil, 'transmission : vue arrêtée pour la suite')
+arret(2, 'transmission')
 
 -- ---------------------------------------------------------------------------
--- 15. Changement de cible : arrêt muet puis nouveau départ.
+-- 22. Changement de cible avec préréglage : arrêt muet puis nouveau départ.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-appeler(1, { '3' })
+appeler(1, { '3', 'basse' })
 check(entry('client', 'gf_screen:captureStart') ~= nil,
-    'changement de cible : vue initiale sur 3')
+    'changement de cible : vue initiale sur 3 en basse')
 reinitialiser()
-appeler(1, { '4' })
+appeler(1, { '4', 'moyenne' })
 verifierSuite({
     'client captureStop -> 3',
     'client viewStop -> 1',
     'client captureStart -> 4',
     'client viewStart -> 1',
-    ('notice 1 Écran de %s. Tape screen pour arrêter.'):format(names[4]),
+    ('notice 1 Écran de %s (%s). Tape screen pour arrêter.'):format(names[4], 'moyenne'),
     'audit 1 screen 4',
-}, 'changement de cible')
+}, 'changement de cible avec préréglage')
 check(notice(1, 'Écran arrêté.') == nil,
     'changement de cible : aucun message intermédiaire')
 check(#notices == 1, 'changement de cible : une seule notification')
-check(#audits == 1 and audits[1].cible == 4,
-    'changement de cible : un seul LogAction, pour la nouvelle cible')
+check(#audits == 1 and audits[1].cible == 4
+    and audits[1].details == 'qualite=moyenne',
+    'changement de cible : un seul LogAction avec qualite=moyenne')
+local captureChangement = entry('client', 'gf_screen:captureStart')
+check(captureChangement ~= nil
+    and dataExact(captureChangement, 4, {
+        fps = PRESETS.moyenne.fps, width = PRESETS.moyenne.width,
+        quality = PRESETS.moyenne.quality, format = 'webp',
+    }),
+    'changement de cible : captureStart aux valeurs du nouveau préréglage')
 reinitialiser()
-appeler(1, {})
-check(notice(1, 'Écran arrêté.') ~= nil, 'changement de cible : vue arrêtée pour la suite')
+arret(1, 'changement de cible avec préréglage')
 
 -- ---------------------------------------------------------------------------
--- 16. Départ de la cible : viewStop, message exact, nettoyage complet.
+-- 23. Départ de la cible : viewStop, message exact, nettoyage complet.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-appeler(1, { '3' })
+appeler(1, { '3', 'haute' })
 check(entry('client', 'gf_screen:captureStart') ~= nil,
     'départ de la cible : vue démarrée sur 3')
 reinitialiser()
@@ -534,10 +900,10 @@ check(#notices == 1 and notice(1, USAGE) ~= nil,
 names[3] = 'CibleTrois'
 
 -- ---------------------------------------------------------------------------
--- 17. Départ de l'admin : captureStop vers la cible, aucun message à l'admin.
+-- 24. Départ de l'admin : captureStop vers la cible, aucun message à l'admin.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-appeler(2, { '4' })
+appeler(2, { '4', 'basse' })
 check(entry('client', 'gf_screen:captureStart') ~= nil,
     'départ de l’admin : vue démarrée sur 4')
 reinitialiser()
@@ -557,10 +923,10 @@ appeler(2, {})
 check(notice(2, USAGE) ~= nil, 'départ de l’admin : nettoyage complet')
 
 -- ---------------------------------------------------------------------------
--- 18. screen sans argument avec une vue en cours : arrêt explicite.
+-- 25. screen sans argument avec une vue en cours : arrêt explicite.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-appeler(1, { '5' })
+appeler(1, { '5', 'moyenne' })
 reinitialiser()
 appeler(1, {})
 verifierSuite({
@@ -571,12 +937,14 @@ verifierSuite({
 check(#audits == 0, 'screen sans argument avec vue : aucun LogAction')
 
 -- ---------------------------------------------------------------------------
--- 19. Durée maximale : une passe de la boucle après MaxSeconds*1000 ms.
+-- 26. Durée maximale : une passe après MaxSeconds*1000 ms depuis le départ.
 -- ---------------------------------------------------------------------------
 reinitialiser()
-appeler(1, { '5' })
+appeler(1, { '5', 'haute' })
 check(entry('client', 'gf_screen:captureStart') ~= nil,
-    'MaxSeconds : vue démarrée sur 5')
+    'MaxSeconds : vue démarrée sur 5 en haute')
+check(notice(1, ('Écran de %s (%s). Tape screen pour arrêter.'):format(names[5], 'haute')) ~= nil,
+    'MaxSeconds : message de départ avec le préréglage')
 reinitialiser()
 now = now + MAX_SECONDS * 1000
 unePasse('MaxSeconds')
@@ -591,19 +959,18 @@ appeler(1, {})
 check(notice(1, USAGE) ~= nil, 'MaxSeconds : nettoyage complet')
 
 -- ---------------------------------------------------------------------------
--- 20. LogAction protégé : une panne d'audit ne casse pas le départ.
+-- 27. LogAction protégé : une panne d'audit ne casse pas le départ.
 -- ---------------------------------------------------------------------------
 reinitialiser()
 logActionErreur = true
-local okAppel, err = pcall(appeler, 1, { '3' })
+local okAppel, err = pcall(appeler, 1, { '3', 'moyenne' })
 check(okAppel, ('LogAction protégé : aucune erreur propagée (%s)'):format(tostring(err)))
 check(entry('client', 'gf_screen:captureStart') ~= nil
     and entry('client', 'gf_screen:viewStart') ~= nil
-    and notice(1, ('Écran de %s. Tape screen pour arrêter.'):format(names[3])) ~= nil,
+    and notice(1, ('Écran de %s (%s). Tape screen pour arrêter.'):format(names[3], 'moyenne')) ~= nil,
     'LogAction protégé : départ effectif malgré la panne d’audit')
 logActionErreur = false
 reinitialiser()
-appeler(1, {})
-check(notice(1, 'Écran arrêté.') ~= nil, 'LogAction protégé : vue arrêtée en fin de test')
+arret(1, 'LogAction protégé')
 
 print(('%d test(s) réussi(s), 0 échec(s)'):format(ok))

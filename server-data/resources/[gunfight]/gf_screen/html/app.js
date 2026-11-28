@@ -21,13 +21,38 @@
     }
   }
 
-  /* --- Visionneuse ------------------------------------------------------ */
+  /* --- Utilitaires ------------------------------------------------------- */
+  var DASH = '\u2014'; /* « — » */
+
+  function isNum(value) {
+    return typeof value === 'number' && isFinite(value);
+  }
+
+  function truncate(text, max) {
+    var s = String(text);
+    return s.length > max ? s.slice(0, max) : s;
+  }
+
+  function numOrDash(value) {
+    return isNum(value) ? String(Math.round(value * 100) / 100) : DASH;
+  }
+
+  /* --- Visionneuse ------------------------------------------------------- */
   var viewer = document.getElementById('viewer');
   var viewerTitle = document.getElementById('viewer-title');
   var viewerImage = document.getElementById('viewer-image');
   var viewerHint = document.getElementById('viewer-hint');
   var viewerFps = document.getElementById('viewer-fps');
-  var frameTimes = [];
+  var info = document.getElementById('viewer-info');
+  var infoStream = document.getElementById('info-stream');
+  var infoPlayer = document.getElementById('info-player');
+
+  var frameTimes = [];      /* horodatages des images reçues (fenêtre glissante 2 s) */
+  var previewTimes = [];    /* horodatages des changements d'image (écart entre images) */
+  var totalBytes = 0;       /* somme des poids estimés en Ko */
+  var totalCount = 0;
+  var startMs = 0;          /* début de la session de visionnage */
+  var streamPreset = '';    /* preset reçu avec viewStart */
   var fpsTimer = null;
 
   function setViewerVisible(visible) {
@@ -36,22 +61,16 @@
     viewer.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
 
-  function resetFps() {
+  function resetStats() {
     frameTimes.length = 0;
+    previewTimes.length = 0;
+    totalBytes = 0;
+    totalCount = 0;
+    startMs = Date.now();
+    streamPreset = '';
     if (viewerFps) viewerFps.textContent = '0 i/s';
-  }
-
-  function refreshFps() {
-    if (!viewerFps) return;
-    var now = Date.now();
-    while (frameTimes.length > 0 && now - frameTimes[0] > 1000) frameTimes.shift();
-    viewerFps.textContent = frameTimes.length + ' i/s';
-  }
-
-  function noteFrame() {
-    if (!viewerFps) return;
-    frameTimes.push(Date.now());
-    refreshFps();
+    if (infoStream) infoStream.textContent = '';
+    if (infoPlayer) infoPlayer.textContent = '';
   }
 
   function stopFpsTimer() {
@@ -63,24 +82,115 @@
 
   function startFpsTimer() {
     stopFpsTimer();
-    fpsTimer = setInterval(refreshFps, 500);
+    fpsTimer = setInterval(refreshStats, 500);
+  }
+
+  function refreshStats() {
+    var now = Date.now();
+    while (frameTimes.length > 0 && now - frameTimes[0] > 2000) frameTimes.shift();
+    while (previewTimes.length > 0 && now - previewTimes[0] > 2000) previewTimes.shift();
+    if (viewerFps) {
+      viewerFps.textContent = (frameTimes.length / 2).toFixed(1) + ' i/s';
+    }
+    if (infoStream) {
+      var fps = frameTimes.length / 2;
+      var seconds = Math.max(0.001, (now - startMs) / 1000);
+      var avgKb = totalCount > 0 ? totalBytes / totalCount : 0;
+      var bitrate = totalBytes / seconds;
+      var gap = DASH;
+      if (previewTimes.length > 1) {
+        var gapSum = 0;
+        for (var i = 1; i < previewTimes.length; i++) gapSum += previewTimes[i] - previewTimes[i - 1];
+        gap = Math.round(gapSum / (previewTimes.length - 1)) + ' ms';
+      }
+      infoStream.textContent =
+        'Flux : ' + fps.toFixed(1) + ' i/s' +
+        ' | ' + streamResolution() +
+        ' | Préréglage : ' + (streamPreset || DASH) +
+        ' | Poids : ' + (totalCount > 0 ? avgKb.toFixed(1) : DASH) + ' Ko' +
+        ' | Débit : ' + bitrate.toFixed(1) + ' Ko/s' +
+        ' | Écart : ' + gap;
+    }
+  }
+
+  var lastMeta = null;
+
+  function streamResolution() {
+    if (lastMeta && isNum(lastMeta.w) && isNum(lastMeta.h)) {
+      return Math.round(lastMeta.w) + ' \u00d7 ' + Math.round(lastMeta.h);
+    }
+    return DASH + ' \u00d7 ' + DASH;
+  }
+
+  function modeLabel(mode) {
+    if (mode === 'attack') return 'Attaque';
+    if (mode === 'redzone') return 'Redzone';
+    if (mode === 'lobby') return 'Lobby';
+    return mode;
+  }
+
+  function renderPlayer(meta) {
+    if (!infoPlayer) return;
+    if (!meta || typeof meta !== 'object') {
+      infoPlayer.textContent = '';
+      return;
+    }
+    var weapon = typeof meta.weapon === 'string' && meta.weapon.length > 0
+      ? truncate(meta.weapon, 32)
+      : 'Mains nues';
+    var ammo = numOrDash(meta.clip) + ' / ' + numOrDash(meta.ammo);
+    var mode = typeof meta.mode === 'string' && meta.mode.length > 0
+      ? truncate(modeLabel(meta.mode), 32)
+      : DASH;
+    var state = meta.vehicle
+      ? 'V\u00e9hicule' + (isNum(meta.speed) ? ' ' + Math.round(meta.speed) + ' km/h' : ' ' + DASH + ' km/h')
+      : '\u00c0 pied';
+
+    infoPlayer.textContent =
+      'Joueur : Vie ' + numOrDash(meta.hp) +
+      ' | Kevlar ' + numOrDash(meta.armour) +
+      ' | Arme ' + weapon + ' (' + ammo + ')' +
+      ' | Mode : ' + mode +
+      ' | ' + state;
   }
 
   function onViewStart(data) {
     if (viewerImage) viewerImage.removeAttribute('src');
-    if (viewerTitle) viewerTitle.textContent = 'ÉCRAN DE ' + data.name;
+    if (viewerTitle) viewerTitle.textContent = 'ÉCRAN DE ' + (typeof data.name === 'string' ? data.name : DASH);
     if (viewerHint) viewerHint.textContent = "screen (F8) ou F10 > Arrêter l'écran";
-    resetFps();
+    resetStats();
+    streamPreset = typeof data.preset === 'string' ? truncate(data.preset, 32) : '';
+    lastMeta = null;
+    if (infoStream) infoStream.textContent = '';
+    if (infoPlayer) infoPlayer.textContent = '';
     setViewerVisible(true);
     startFpsTimer();
+    refreshStats();
   }
 
   function onFrame(data) {
-    if (typeof data.data !== 'string') return;
-    if (data.data.indexOf('data:image/jpeg;base64,') !== 0) return;
+    var image = data.data;
+    if (typeof image !== 'string') return;
+    if (image.indexOf('data:image/webp;base64,') !== 0 &&
+        image.indexOf('data:image/jpeg;base64,') !== 0) return;
     if (!viewerImage) return;
-    viewerImage.src = data.data;
-    noteFrame();
+
+    var now = Date.now();
+    frameTimes.push(now);
+    previewTimes.push(now);
+    var b64length = image.length - image.indexOf(',') - 1;
+    totalBytes += b64length * 3 / 4 / 1024;
+    totalCount++;
+
+    /* Meta strictement courante : une frame sans meta ne conserve rien de la précédente. */
+    lastMeta = (data.meta && typeof data.meta === 'object') ? data.meta : null;
+    if (typeof data.preset === 'string' && data.preset.length > 0) {
+      streamPreset = truncate(data.preset, 32);
+    }
+
+    viewerImage.src = image;
+    renderPlayer(lastMeta);
+    refreshStats();
   }
 
   function onViewStop() {
@@ -89,12 +199,14 @@
     if (viewerTitle) viewerTitle.textContent = '';
     if (viewerHint) viewerHint.textContent = '';
     stopFpsTimer();
-    resetFps();
+    lastMeta = null;
+    resetStats();
   }
 
   /* --- Capture ---------------------------------------------------------- */
   var capture = null; /* { renderer, scene, camera, rt, texture, material, geometry,
-                          canvas, ctx, pixels, width, height, quality, timer, pending } */
+                           canvas, frameCanvas, frameCtx, imageData, pixels,
+                           width, height, quality, format, timer, pending } */
 
   var VERTEX_SHADER = [
     'varying vec2 vUv;',
@@ -135,6 +247,11 @@
         var canvas = c.renderer.domElement;
         if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
       }
+      if (c.frameCanvas) c.frameCanvas.width = c.frameCanvas.height = 1;
+      c.imageData = null;
+      c.pixels = null;
+      c.frameCtx = null;
+      c.frameCanvas = null;
     } catch (e) {
       console.warn('gf_screen: erreur pendant le nettoyage de la capture', e);
     }
@@ -149,8 +266,8 @@
     }
 
     var width = Number(data.width);
-    if (!isFinite(width) || width <= 0) width = 640;
-    width = Math.max(1, Math.round(width));
+    if (!isFinite(width) || width <= 0) width = 1280;
+    width = clamp(Math.round(width), 320, 1920);
     var height = Math.round(width * window.innerHeight / window.innerWidth);
     if (!isFinite(height) || height <= 0) height = 1;
     height = Math.max(1, height);
@@ -160,8 +277,10 @@
     quality = clamp(quality, 0.05, 1);
 
     var fps = Number(data.fps);
-    if (!isFinite(fps) || fps <= 0) fps = 15;
-    fps = clamp(fps, 1, 60);
+    if (!isFinite(fps) || fps <= 0) fps = 8;
+    fps = clamp(Math.round(fps), 1, 30);
+
+    var format = data.format === 'webp' ? 'webp' : 'jpeg';
 
     try {
       var texture = new THREE.CfxTexture();
@@ -199,6 +318,8 @@
       var frameCtx = frameCanvas.getContext('2d');
       if (!frameCtx) throw new Error('contexte 2D indisponible');
 
+      /* Un seul ImageData alloué au démarrage, réutilisé à chaque frame. */
+      var imageData = frameCtx.createImageData(width, height);
       var pixels = new Uint8Array(width * height * 4);
 
       capture = {
@@ -212,10 +333,12 @@
         canvas: canvas,
         frameCanvas: frameCanvas,
         frameCtx: frameCtx,
+        imageData: imageData,
         pixels: pixels,
         width: width,
         height: height,
         quality: quality,
+        format: format,
         timer: null,
         pending: false
       };
@@ -233,14 +356,13 @@
     if (!c || c.pending) return;
 
     c.pending = true;
-    var jpeg = null;
+    var encoded = null;
     try {
       c.renderer.clear();
       c.renderer.render(c.scene, c.camera, c.rt, true);
       c.renderer.readRenderTargetPixels(c.rt, 0, 0, c.width, c.height, c.pixels);
 
-      var imageData = c.frameCtx.createImageData(c.width, c.height);
-      var bytes = imageData.data;
+      var bytes = c.imageData.data;
       var pixels = c.pixels;
       for (var i = 0, j = 0; i < pixels.length; i += 4, j += 4) {
         bytes[j] = pixels[i];
@@ -248,15 +370,28 @@
         bytes[j + 2] = pixels[i + 2];
         bytes[j + 3] = 255;
       }
-      c.frameCtx.putImageData(imageData, 0, 0);
-      jpeg = c.frameCanvas.toDataURL('image/jpeg', c.quality);
+      c.frameCtx.putImageData(c.imageData, 0, 0);
+
+      if (c.format === 'webp') {
+        encoded = c.frameCanvas.toDataURL('image/webp', c.quality);
+        if (encoded.indexOf('data:image/webp;base64,') !== 0) {
+          encoded = c.frameCanvas.toDataURL('image/jpeg', c.quality);
+        }
+      } else {
+        encoded = c.frameCanvas.toDataURL('image/jpeg', c.quality);
+      }
     } catch (e) {
       console.warn('gf_screen: échec de lecture d’une frame', e);
     }
 
-    var next = typeof jpeg === 'string' && jpeg.indexOf('data:image/jpeg;base64,') === 0
-      ? post('frame', { data: jpeg })
-      : Promise.resolve(null);
+    var valid = typeof encoded === 'string' &&
+      (encoded.indexOf('data:image/webp;base64,') === 0 ||
+       encoded.indexOf('data:image/jpeg;base64,') === 0);
+    var next = valid ? post('frame', {
+      data: encoded,
+      w: c.width,
+      h: c.height
+    }) : Promise.resolve(null);
 
     next.then(function () {
       if (capture === c) c.pending = false;

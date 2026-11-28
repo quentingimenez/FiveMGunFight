@@ -25,7 +25,7 @@ local ARGS = {
     kick = -1,
     -- spectate accepte 0 ou 1 argument (id), traité à part.
     spectate = -1,
-    -- screen accepte 0 ou 1 argument (id), traité comme spectate.
+    -- screen accepte 0, 1 ou 2 arguments (id, préréglage), traité à part.
     screen = -1,
     ['goto'] = 1,  -- mot réservé Lua : toujours comme clé de chaîne
     bring = 1,
@@ -36,6 +36,8 @@ local ARGS = {
 
 local MODES = { lobby = true, attack = true, redzone = true }
 local TEAMS = { A = true, B = true }
+-- Préréglages de capture : liste blanche locale, sans dépendance à Config.
+local PRESETS = { basse = true, moyenne = true, haute = true, ultra = true }
 local UI_COMMANDES = { editor = true, maps = true, customveh = true, spectate = true, screen = true }
 
 --- Identifiant joueur : chaîne correspondant à ^[1-9][0-9]*$
@@ -107,17 +109,19 @@ function GFAdminCommands.build(command, args)
         return finir('spectate ' .. args[1])
     end
 
-    -- screen : aucun argument (arrêt) ou exactement un id positionnel [1].
-    -- Même comptage des clés via pairs que spectate (tables trouées incluses).
+    -- screen : 0 argument (arrêt), 1 id, ou id + préréglage. Comptage des clés
+    -- via pairs : tables trouées et clés non positionnelles refusées.
     if command == 'screen' then
         local nb = 0
         for cle in pairs(args) do
             nb = nb + 1
-            if cle ~= 1 then return nil end
+            if cle ~= 1 and cle ~= 2 then return nil end
         end
         if nb == 0 then return finir('screen') end
-        if nb ~= 1 or not idValide(args[1]) then return nil end
-        return finir('screen ' .. args[1])
+        if not idValide(args[1]) then return nil end
+        if nb == 1 then return finir('screen ' .. args[1]) end
+        if nb ~= 2 or type(args[2]) ~= 'string' or not PRESETS[args[2]] then return nil end
+        return finir('screen ' .. args[1] .. ' ' .. args[2])
     end
 
     if #args ~= attendu or args[attendu + 1] ~= nil then return nil end

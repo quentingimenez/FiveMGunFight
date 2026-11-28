@@ -52,7 +52,7 @@ même s'ils sont normalement émis par son script.
 | `gf_menu:quit` | `gf_menu/client.lua` (bouton quitter du menu pause) | `source` serveur, aucun argument, joueur connecté, rate-limit 1000 ms | 1 / 1000 ms | non | Déconnecte le joueur (DropPlayer). |
 | `gf_admin:requestData` | panneau `gf_admin` / son client | `source` serveur, aucun argument, `core:IsAdmin(src)`, joueur connecté, lecture seule | `1 / 500 ms` par joueur | oui | Renvoie `gf_admin:data` avec la liste des joueurs (id, nom, mode, équipe, ping) et le catalogue d'armes, sans identifiant d'identification ; un refus notifie puis émet `gf_admin:denied`. |
 | `gf_admin:spectateEnded` | `gf_admin/client.lua` (arrêt local de la caméra : respawn de l'admin, cible introuvable après 5 s) | `source` joueur ; arguments ignorés ; retire uniquement l'état de son émetteur | 1 / 500 ms par joueur | non | Réconciliation d'un arrêt décidé par le client : restaure le monde d'origine et vide l'état, sans renvoyer `gf_admin:spectateStop` ni message. Sans vue en cours, aucun effet. |
-| `gf_screen:frame` | joueur regardé (client `gf_screen`) | `source` présent dans `Viewer`, image chaîne `data:image/jpeg;base64,`, longueur ≤ `Config.MaxFrameChars` | `Config.Fps` + 1 par seconde et par joueur (les images au-delà sont ignorées) | non | Transmet uniquement à l'admin qui regarde, en événement latent (600000 octets). Aucune notification à la cible, aucun stockage : l'émetteur est un joueur, pas un admin. |
+| `gf_screen:frame` | joueur regardé (client `gf_screen`) | table `{ image, meta }` : `source` présent dans `Viewer`, image WebP (`data:image/webp;base64,`) ou JPEG (`data:image/jpeg;base64,`) de longueur ≤ `Config.MaxFrameChars`, `meta` validée champ par champ (types et bornes, chaînes tronquées ; méta invalide → `nil`) | débit `Config.Presets[preset].fps` + 1 par seconde et par joueur, fenêtre fixe de 1000 ms (les images invalides ne consomment pas) | non | Relais latent à 1500000 octets (`Config.ForwardBps`), transmis uniquement à l'admin qui regarde. Aucune notification, aucun stockage ; émetteur = joueur regardé. |
 | `baseevents:onPlayerKilled` | `[cfx-default] baseevents/deathevents.lua` (client) | killerId client ignoré ; tueur dérivé de `lastDamager` (< `Config.KillCreditWindow` = 10 s, même mode), victime réellement morte si `Config.ValidateDeathHealth`, anti-doublon 1,5 s, distance max `Config.MaxKillDistance` | aucun dédié ; anti-doublon 1,5 s et refus journalisé au plus 1/min/joueur | non | Le tueur vient exclusivement de `weaponDamageEvent` côté serveur ; l'arme du client ne sert que si le serveur n'en a pas enregistré. Sans dégât serveur récent, aucun kill n'est crédité. |
 | `baseevents:onPlayerDied` | `[cfx-default] baseevents/deathevents.lua` (client) | mêmes règles que `onPlayerKilled`, sans arme fournie | aucun dédié ; anti-doublon 1,5 s | non | Mort sans tueur identifié : `killer = nil`, sauf dégât serveur récent. |
 | `baseevents:onPlayerWasted` | `[cfx-default] baseevents/deathevents.lua` (client) | aucune (événement cfx-default, non traité par gf_core) | aucun | non | Enregistré par `baseevents/server.lua` ; aucun handler gf_core ne l'écoute. Tout client peut l'émettre, sans effet sur le jeu. |
@@ -60,6 +60,48 @@ même s'ils sont normalement émis par son script.
 | `baseevents:enteringAborted` | `[cfx-default] baseevents/vehiclechecker.lua` (client) | aucune (événement cfx-default, non traité par gf_core) | aucun | non | Enregistré par `baseevents/server.lua`. |
 | `baseevents:enteredVehicle` | `[cfx-default] baseevents/vehiclechecker.lua` (client) | aucune (événement cfx-default, non traité par gf_core) | aucun | non | Enregistré par `baseevents/server.lua`. |
 | `baseevents:leftVehicle` | `[cfx-default] baseevents/vehiclechecker.lua` (client) | aucune (événement cfx-default, non traité par gf_core) | aucun | non | Enregistré par `baseevents/server.lua`. |
+
+## Détail : payload de `gf_screen:frame`
+
+Le joueur regardé envoie l'image et ses données d'état au serveur avec
+`TriggerLatentServerEvent('gf_screen:frame', Config.UploadBps, { image = image, meta = meta })`
+: l'envoi latent utilise `Config.UploadBps`, soit 1000000 octets par seconde.
+
+L'image est une chaîne qui commence par `data:image/webp;base64,` ou par
+`data:image/jpeg;base64,`. Sa longueur, préfixe compris, ne dépasse pas
+`Config.MaxFrameChars` (600000 caractères). Tout autre préfixe ou toute image
+plus longue est écartée avant tout relais.
+
+La table `meta` contient dix champs, validés un par un :
+
+- `hp` : entier entre 0 et 100 ;
+- `armour` : entier entre 0 et 100 ;
+- `weapon` : chaîne de 32 caractères au plus, vide si le joueur a les mains
+  nues ;
+- `clip` : entier entre 0 et 9999 ;
+- `ammo` : entier entre 0 et 9999 ;
+- `mode` : chaîne de 16 caractères au plus ;
+- `vehicle` : booléen ;
+- `speed` : nombre entre 0 et 999, en km/h ;
+- `w` : entier entre 1 et 4096 ;
+- `h` : entier entre 1 et 4096.
+
+Les chaînes `weapon` et `mode` sont tronquées respectivement à 32 et 16
+caractères. Si la méta est invalide, l'image est tout de même relayée avec
+`meta = nil` : la visionneuse affiche alors l'image sans barre d'informations.
+
+Le débit est limité à `Config.Presets[preset].fps` + 1 images par seconde et par
+joueur, dans une fenêtre fixe de 1000 ms. Les images invalides sont rejetées
+avant le comptage et ne consomment aucun quota. En `ultra`, le plafond est ainsi
+de 16 images par seconde (15 i/s de capture + 1).
+
+Le serveur relaie alors l'image à l'administrateur qui regarde avec
+`TriggerLatentClientEvent('gf_screen:frame', admin, Config.ForwardBps, { image, meta, preset })`,
+où `Config.ForwardBps` vaut 1500000 octets par seconde. La page NUI reçoit
+ensuite `SendNUIMessage` avec `{ type = 'viewStart', name, preset }` au début de
+la vue, puis `{ type = 'frame', data = image, meta = meta, preset = preset }`
+pour chaque image. L'émetteur de l'événement serveur est le joueur regardé :
+aucune notification n'est envoyée et aucune image n'est stockée.
 
 ## Détail : validation du véhicule de mode
 
